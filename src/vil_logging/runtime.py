@@ -889,6 +889,7 @@ class Runtime:
                             self._event("OBSERVATION_LOSS", level="WARNING", target=role.label, counters=inspection)
                 actual_paths.append(str(actual_path))
             self._repo.update_session(plan.session_id, phase, demo=False, inspections=inspections,
+                                      inspection=inspections.get(Role.ETHERNET.value),
                                       stop_results={role.value: {"success": result.success, "state": result.state,
                                                                 "evidence": result.evidence, "details": result.details}
                                                     for role, result in results.items()})

@@ -1,5 +1,6 @@
 """Fault injection for production state/file policy; opens no NIC or external tool."""
 
+import json
 import struct
 
 import pytest
@@ -75,6 +76,11 @@ def test_real_start_reserves_once_and_normal_stop_verifies_then_publishes(real):
     assert not file.temp_path.parent.exists()
     assert not file.temp_path.parent.parent.exists()
     assert runtime._settings.next_index == 2
+    details = runtime._submit(lambda: runtime._repo._connection.execute(
+        "SELECT details FROM sessions WHERE session_id=?", (runtime._plan.session_id,)
+    ).fetchone()[0]).result(timeout=5)
+    document = json.loads(details)
+    assert document["inspection"] == document["inspections"]["ethernet"]
 
 
 def test_prepare_failure_never_reserves_or_starts(real):
