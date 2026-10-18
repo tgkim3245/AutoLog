@@ -27,4 +27,12 @@
 - 설정·블록 드롭다운·독립 연결 설정 창을 한국어로 렌더링해 배치를 확인했다.
 - **남은 실제 기록 시험:** View Only를 해제할 CANoe/VN 라이선스·장비 준비 후 CAN 단독 3회, Diag 단독 3회, CAN+Diag 및 Zipy 조합에서 출력 옵션의 측정 중 적용·복구, BLF 완결·기대 채널·측정 유지·CAPL 공존을 확인한다. 연결과 모의 검사만으로 실제 취득 성공/고부하 무손실을 보증하지 않는다.
 
-근거는 설치된 Vector can.ini의 SingleCOMClient 설명, CANoe.tlb와 실제 두 구성의 COM 관찰이다. 처음의 Configuration E_FAIL은 라이선스 오류로 단정하지 않고 미구성 객체와 구분해 재검증했다. 배포본 검증은 빌드 후 별도 기록한다.
+근거는 설치된 Vector can.ini의 SingleCOMClient 설명, CANoe.tlb와 실제 두 구성의 COM 관찰이다. 처음의 Configuration E_FAIL은 라이선스 오류로 단정하지 않고 미구성 객체와 구분해 재검증했다.
+
+## 배포본 검증
+
+- 소스 커밋 `4f3bcaf`, 미커밋 변경 없이 `build.cmd --no-pause`로 빌드했다. 빌드명은 `AutoLog-0.5.1_20261018_155441`이며 이 PC의 `Downloads/AutoLog_Builds/` 아래에 EXE 폴더·ZIP·SHA-256·build_info.json·build.log가 있다.
+- ZIP CRC·ZIP/EXE SHA-256과 제품명 AutoLog·버전 0.5.1을 확인했다. COM 어댑터/worker, BLF 검사, 새 독립 연결 설정 모듈이 EXE에 포함되어 있다.
+- ZIP을 별도로 풀고 개발용 Python 환경변수·경로를 제외해 모의 기록·정지·종료를 확인했다. 종료 코드 0, 개발자로그 55건, 필수 완료 이벤트, 기록 실패/큐 넘침 0을 확인했다. 로그는 추출 EXE의 developer_logs 안에 생성됐다.
+- 같은 추출 EXE에서 실제 localhost 캡처 6개 세션(pcap/pcapng 각각 빈 기록·5패킷·재시작)과 비IP 파일 해석을 통과했다. 물리 NIC나 CANoe 측정은 이 배포본 검사에서 열지 않았다.
+- 근거는 빌드 폴더의 `verification/result.json`, `verification/ethernet/result.json`에 있다. 별도의 실제 두 구성 연결 검증과 합쳐도 측정 중 BLF 취득·대용량·차량 네트워크 성능 검증을 대신하지 않는다.
