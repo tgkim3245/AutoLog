@@ -13,6 +13,7 @@ from vil_logging.adapters.tshark import FIELDS, parse_summary
 from vil_logging.contracts.models import Role, SessionPhase
 from vil_logging.diagnostics.connections import _find_tshark
 from vil_logging.diagnostics.debug_log import DebugLogService
+from vil_logging.monitors.rules import EthernetRule, encode_rules
 from vil_logging.runtime import Runtime
 from vil_logging.storage.blf import FILE_HEADER
 from vil_logging.storage.file_access import observe
@@ -153,6 +154,103 @@ def verify_recovery(data_dir: Path) -> dict:
     finally:
         if repository:
             repository.close()
+        debug.close()
+        (root / "result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return report
+
+
+def verify_monitoring(data_dir: Path) -> dict:
+    root = Path(data_dir)
+    if root.exists():
+        raise ValueError("Verification requires a new folder; existing profiles are preserved")
+    root.mkdir(parents=True)
+    configure_worker_environment()
+    debug = DebugLogService(root)
+    debug.enable()
+    runtime = None
+    report = {"passed": False, "app_data": str(root), "physical_nic_opened": False,
+              "scope": "Generated localhost packets; synthetic test criteria only", "cases": []}
+    try:
+        tool = _find_tshark("")
+        if tool["status"] != "ready":
+            raise RuntimeError(tool["message_en"])
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+            receiver.bind(("127.0.0.1", 0))
+            port = receiver.getsockname()[1]
+            runtime = Runtime(root, _verification_filter=f"udp dst port {port}")
+            runtime.initialize().result(10)
+            runtime.save_preferences({"tshark_path": tool["path"], "nic_id": r"\Device\NPF_Loopback"}).result(10)
+
+            def wait_status(status, timeout=6, min_packets=0):
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    runtime._submit(runtime._query).result(5)
+                    snapshot = runtime._snapshots[Role.ETHERNET]
+                    if runtime.phase != SessionPhase.RECORDING:
+                        raise AssertionError("Monitor warning interrupted capture: " + str(runtime.phase))
+                    count = sum(row.get("matched_packets", 0) for row in snapshot.observation_details.get("rules", []))
+                    if snapshot.observation.value == status and count >= min_packets:
+                        return snapshot.observation_details
+                    time.sleep(.1)
+                raise AssertionError(f"Expected {status}, got {snapshot.observation_details}")
+
+            def send(count, delay):
+                for number in range(count):
+                    sender.sendto(f"AutoLog-monitor-fixture-{number}".encode(), ("127.0.0.1", port))
+                    time.sleep(delay)
+
+            configured = EthernetRule("generated", "Localhost generated traffic", 1500, 2500, 750, 2,
+                                      protocol="UDP", destination_ip="127.0.0.1", expected_ip="127.0.0.1")
+            runtime.save_preferences({"monitor_rules_json": encode_rules([configured])}).result(10)
+            runtime.toggle((Role.ETHERNET,)).result(30)
+            wait_status("warning")
+            report["cases"].append({"case": "initial_missing_without_stopping_capture", "passed": True})
+            # Deliberately leave the UI queue undrained; the monitor consumes before it.
+            send(1200, .001)
+            observed = wait_status("normal", min_packets=1200)
+            if observed["display_drops"] <= 0 or observed["rules"][0]["matched_packets"] < 1200:
+                raise AssertionError("Display overflow was not isolated from complete monitor input")
+            report["cases"].append({"case": "receive_recovery_and_display_overflow_isolation", "passed": True,
+                                    "monitor_packets": observed["rules"][0]["matched_packets"],
+                                    "display_drops": observed["display_drops"]})
+            wait_status("warning")
+            send(10, .02)
+            wait_status("normal", min_packets=1210)
+            report["cases"].append({"case": "second_missing_and_recovery", "passed": True})
+            runtime.toggle((Role.ETHERNET,)).result(100)
+            if runtime.phase != SessionPhase.COMPLETED:
+                raise AssertionError("Monitored capture did not finish normally")
+            unexpected = EthernetRule("generated", "Deliberately different expected source", 1500, 2500, 750, 2,
+                                      protocol="UDP", destination_ip="127.0.0.1", expected_ip="192.0.2.99")
+            runtime.save_preferences({"monitor_rules_json": encode_rules([unexpected])}).result(10)
+            runtime.toggle((Role.ETHERNET,)).result(30)
+            send(10, .02)
+            observed = wait_status("warning", min_packets=10)
+            if "unexpected_source" not in observed["rules"][0]["reasons"]:
+                raise AssertionError("Different source was conflated with missing traffic")
+            report["cases"].append({"case": "wrong_source_inside_selected_flow", "passed": True})
+            runtime.toggle((Role.ETHERNET,)).result(100)
+            stored = runtime._submit(runtime._repo.captures).result(10)
+            if len(stored) != 2 or any(item["phase"] != "completed" for item in stored):
+                raise AssertionError("Monitor warnings changed capture results")
+            if sum(item["details"]["inspection"]["packet_count"] for item in stored) != 1220:
+                raise AssertionError("Generated packet count differs from fully read capture files")
+            saved_events = runtime._submit(runtime._repo.recent_events).result(10)
+            codes = [event.code for event in saved_events]
+            if not {"MONITOR_MISSING", "MONITOR_SOURCE", "MONITOR_RECOVERED", "DISPLAY_SUMMARY_LOSS"} <= set(codes):
+                raise AssertionError("Monitor events were not persisted")
+            report["cases"].append({"case": "archive_and_persistent_monitor_evidence", "passed": True,
+                                    "packets": 1220, "missing_events": codes.count("MONITOR_MISSING"),
+                                    "source_events": codes.count("MONITOR_SOURCE")})
+        if not runtime.request_exit().result(10):
+            raise AssertionError("Orderly exit failed")
+        report["passed"] = True
+    except Exception as error:
+        debug.exception("verification.monitor_failed", error)
+        report["error"] = str(error)
+    finally:
+        if runtime:
+            runtime.close_for_test()
         debug.close()
         (root / "result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report

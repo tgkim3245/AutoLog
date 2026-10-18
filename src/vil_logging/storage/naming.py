@@ -112,6 +112,8 @@ def validate_settings(
     at least one target. A successful probe cannot guarantee future disk writes.
     """
     validate_prefix(settings.prefix)
+    from vil_logging.monitors.rules import parse_rules
+    parse_rules(settings.monitor_rules_json)
     if type(settings.next_index) is not int or settings.next_index < 0:
         raise NamingError("Next index must be a nonnegative integer")
     if settings.next_index.bit_length() > 850:

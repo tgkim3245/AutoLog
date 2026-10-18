@@ -7,6 +7,7 @@ requests and consume bounded notifications; they never wait for tool operations.
 import logging
 import queue
 import threading
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
@@ -23,7 +24,9 @@ from vil_logging.contracts.models import (
     Role,
     SessionPhase,
     TargetSnapshot,
+    utc_now,
 )
+from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
 from vil_logging.storage.file_service import FileResultStorageError, FileService
 from vil_logging.storage.naming import build_plan, find_collisions, validate_settings
@@ -56,6 +59,9 @@ class Runtime:
         self._pool = FakeWorkerPool(behaviors) if demo else CaptureWorkerPool()
         self._verification_filter = _verification_filter
         self._observation_loss_reported = False
+        self._monitor_reports = {}
+        self._monitor_counts = {}
+        self._monitor_last_persist = 0
         self._plan: CapturePlan | None = None
         self._issued_roles: tuple[Role, ...] = ()
         self._snapshots = {role: TargetSnapshot(role) for role in Role}
@@ -638,6 +644,11 @@ class Runtime:
         self._issued_roles = ()
         self._failure_latched = False
         self._target_failures = {}
+        self._monitor_reports = {}
+        self._monitor_counts = {}
+        self._monitor_last_persist = 0
+        for role in Role:
+            self._target(role, observation=ObservationState.NOT_MONITORED, observation_details={})
         try:
             if not roles:
                 self._event("NO_TARGETS", level="WARNING")
@@ -777,18 +788,17 @@ class Runtime:
                 any_recording = True
                 if not self.demo:
                     details = result.details
-                    lost = details.get("summary_drops", 0) or details.get("parse_errors", 0) or details.get("reader_errors")
-                    if lost:
-                        self._target(role, observation=ObservationState.UNKNOWN, evidence=result.evidence)
-                        if not self._observation_loss_reported:
-                            self._observation_loss_reported = True
-                            self._event("OBSERVATION_LOSS", level="WARNING", target=role.label,
-                                        counters=details)
+                    self._accept_monitor(role, details)
+                    if details.get("summary_drops", 0) and not self._observation_loss_reported:
+                        self._observation_loss_reported = True
+                        self._event("DISPLAY_SUMMARY_LOSS", level="WARNING", target=role.label,
+                                    count=details["summary_drops"])
                 continue
             previous = self._snapshots[role].recording
             state = RecordingState.ERROR if result.state in {"error", "stopped"} else RecordingState.UNKNOWN
             self._target(role, recording=state, observation=ObservationState.UNKNOWN,
-                         evidence=result.evidence)
+                         evidence=result.evidence, observation_details={"status": "unknown", "reasons": ["recorder_unavailable"]})
+            self._monitor_reports[role.value] = {"status": "unknown", "rules": [], "reasons": ["recorder_unavailable"]}
             if previous != state:
                 self._failure_latched = True
                 self._target_failures[role] = result.evidence
@@ -800,6 +810,55 @@ class Runtime:
                 self._repo.update_session(self._plan.session_id, SessionPhase.PARTIAL)
             if not any_recording and all(result.state in {"error", "stopped"} for result in results.values()):
                 self._stop()
+        self._persist_monitors()
+
+    def _accept_monitor(self, role, details, *, stopped=False):
+        if role != Role.ETHERNET:
+            report = {"status": "unsupported", "rules": [], "reasons": ["canoe_receive_events_unavailable"]}
+        else:
+            report = details.get("monitor")
+            if (not isinstance(report, dict) or report.get("session_id") != self._plan.session_id
+                    or report.get("status") not in ({"not_monitored"} if stopped else set()) |
+                    {"not_configured", "unknown", "normal", "warning"}):
+                report = {"status": "unknown", "rules": [], "reasons": ["observation_unavailable"]}
+            else:
+                report = fresh_report(dict(report)) if not stopped else dict(report)
+            report["parsed_packets"] = details.get("parsed_packets", 0)
+            report["display_drops"] = details.get("summary_drops", 0)
+            report["parse_errors"] = details.get("parse_errors", 0)
+            report["reader_errors"] = details.get("reader_errors", [])
+            report["last_packet_utc"] = details.get("last_packet_utc")
+        previous = self._monitor_reports.get(role.value, {})
+        for row in report.get("rules", []):
+            for key, event in (("missing", "MONITOR_MISSING"), ("source", "MONITOR_SOURCE"),
+                               ("recovered", "MONITOR_RECOVERED")):
+                counter_key = (role.value, row["id"], key)
+                count = row["counters"].get(key, 0)
+                delta = count - self._monitor_counts.get(counter_key, 0)
+                if delta > 0:
+                    self._event(event, level="INFO" if key == "recovered" else "WARNING", target=role.label,
+                                rule=row["name"], episodes=delta, total_episodes=count, evidence=row)
+                self._monitor_counts[counter_key] = count
+        def issues(value):
+            return sorted(set(value.get("reasons", [])) | {reason for row in value.get("rules", [])
+                          for reason in row["reasons"] if reason not in {"waiting_samples", "missing_flow", "unexpected_source"}})
+        current_issues, previous_issues = issues(report), issues(previous)
+        if report["status"] == "unknown" and current_issues and current_issues != previous_issues:
+            self._event("MONITOR_UNCONFIRMED", level="WARNING", target=role.label, reasons=current_issues)
+        elif previous.get("status") == "unknown" and previous_issues and report["status"] in {"normal", "warning"}:
+            self._event("MONITOR_OBSERVATION_RESTORED", target=role.label)
+        elif report["status"] in {"unsupported", "not_configured"} and previous.get("status") != report["status"]:
+            self._event("MONITOR_" + report["status"].upper(), target=role.label)
+        if stopped:
+            report["status"] = "not_monitored"
+        report["updated_utc"] = utc_now()
+        self._monitor_reports[role.value] = report
+        self._target(role, observation=ObservationState(report["status"]), observation_details=report)
+
+    def _persist_monitors(self):
+        if self._plan and self._monitor_reports and time.monotonic() - self._monitor_last_persist >= 5:
+            self._repo.update_session(self._plan.session_id, self.phase, monitoring=dict(self._monitor_reports))
+            self._monitor_last_persist = time.monotonic()
 
     def drain_packets(self):
         packets = self._pool.drain_packets() if self._pool is not None else []
@@ -906,6 +965,8 @@ class Runtime:
             for role in group:
                 self._target(role, recording=RecordingState.STARTING)
             parameters = {file.role: {"temp_path": str(file.temp_path)} for file in plan.files}
+            if Role.ETHERNET in group:
+                parameters[Role.ETHERNET]["monitor_rules_json"] = self._settings.monitor_rules_json
             if self._verification_filter and Role.ETHERNET in group:
                 parameters[Role.ETHERNET]["verification_filter"] = self._verification_filter
             results = self._request_real(group, "start", plan.session_id, timeout=18, cancel=self._cancel,
@@ -916,6 +977,7 @@ class Runtime:
                 if not result.success:
                     self._target_failures[role] = result.evidence
                 else:
+                    self._accept_monitor(role, result.details)
                     file = next(file for file in plan.files if file.role == role)
                     self._repo.update_capture_file(plan.session_id, role, "writing",
                                                    actual_path=str(file.temp_path), start_evidence=result.details)
@@ -963,6 +1025,12 @@ class Runtime:
                              observation=ObservationState.NOT_MONITORED if stopped else ObservationState.UNKNOWN,
                              evidence=self._target_failures.get(role, "Normal stop confirmed") if stopped else
                                       results[role].evidence)
+                if role in results and stopped:
+                    self._accept_monitor(role, results[role].details, stopped=stopped)
+                elif not stopped:
+                    report = {"status": "unknown", "reasons": ["recorder_unavailable"], "rules": []}
+                    self._monitor_reports[role.value] = report
+                    self._target(role, observation=ObservationState.UNKNOWN, observation_details=report)
                 if not stopped:
                     self._repo.update_capture_file(plan.session_id, role, "unknown", actual_path=str(actual_path))
                 elif not file.temp_path.exists():
@@ -1002,10 +1070,15 @@ class Runtime:
                                         target=role.label, path=str(actual_path), bytes=inspection["bytes"],
                                         packets=inspection.get("packet_count", 0),
                                         objects=inspection.get("object_count", 0))
-                        if inspection.get("summary_drops") or inspection.get("parse_errors") or inspection.get("reader_errors"):
+                        if inspection.get("parse_errors") or inspection.get("reader_errors"):
                             self._event("OBSERVATION_LOSS", level="WARNING", target=role.label, counters=inspection)
+                        if inspection.get("summary_drops") and not self._observation_loss_reported:
+                            self._observation_loss_reported = True
+                            self._event("DISPLAY_SUMMARY_LOSS", level="WARNING", target=role.label,
+                                        count=inspection["summary_drops"])
                 actual_paths.append(str(actual_path))
             self._repo.update_session(plan.session_id, phase, demo=False, inspections=inspections,
+                                      monitoring=dict(self._monitor_reports),
                                       inspection=inspections.get(Role.ETHERNET.value),
                                       stop_results={role.value: {"success": result.success, "state": result.state,
                                                                 "evidence": result.evidence, "details": result.details}

@@ -20,6 +20,8 @@ from vil_logging.diagnostics.connections import (
     _run_query,
 )
 from vil_logging.diagnostics.environment import _version_response
+from vil_logging.monitors.engine import MonitorEngine
+from vil_logging.monitors.rules import address, parse_rules
 
 FIELDS = ("frame.time_epoch", "eth.src", "eth.dst", "ip.src", "ipv6.src", "ip.dst", "ipv6.dst",
           "_ws.col.Protocol", "frame.len")
@@ -59,9 +61,10 @@ def parse_summary(line: str, session_id: str) -> PacketSummary:
     if count < 0 or count > 2**31 - 1:
         raise ValueError("Invalid captured frame length")
     timestamp = datetime.fromtimestamp(float(epoch), UTC).isoformat(timespec="milliseconds")
-    return PacketSummary(timestamp, ipv4_src or ipv6_src or source_mac,
-                         ipv4_dst or ipv6_dst or destination_mac, protocol, count,
-                         source_mac, destination_mac, session_id)
+    source_ip, destination_ip = address(ipv4_src or ipv6_src), address(ipv4_dst or ipv6_dst)
+    return PacketSummary(timestamp, source_ip or source_mac,
+                         destination_ip or destination_mac, protocol, count,
+                         source_mac, destination_mac, session_id, source_ip, destination_ip, float(epoch))
 
 
 class TSharkCapture:
@@ -80,6 +83,9 @@ class TSharkCapture:
         self._stop_requested = False
         self._started = False
         self._last_packet = None
+        self._monitor = MonitorEngine()
+        self._monitor_error = ""
+        self._stdout_eof = False
 
     def prepare(self, params: dict) -> dict:
         if self.process and self.process.poll() is None:
@@ -125,6 +131,13 @@ class TSharkCapture:
         self._parsed = self._dropped = self._parse_errors = 0
         self._read_errors = []
         self._last_packet = None
+        self._stdout_eof = False
+        self._monitor_error = ""
+        try:
+            self._monitor = MonitorEngine(parse_rules(params.get("monitor_rules_json", "")), session_id)
+        except Exception as error:
+            self._monitor = MonitorEngine(session_id=session_id)
+            self._monitor_error = str(error)
         self._stop_requested = self._started = False
         arguments = [self.binding["tshark_path"], "-n", "-l", "-P", "-i", self.binding["nic_id"],
                      "-w", str(path), "-F", self.binding["file_format"], "-T", "fields",
@@ -150,7 +163,9 @@ class TSharkCapture:
             ready = self._notice.is_set() and capture_header_ready(path, self.binding["file_format"])
             header_since = (header_since or time.monotonic()) if ready else None
             if header_since and time.monotonic() - header_since >= .15:
-                self._started = True
+                with self._stats_lock:
+                    self._started = True
+                    self._monitor_call("activate")
                 return self.stats()
             time.sleep(.02)
         raise TimeoutError("TShark capture readiness was not confirmed: " + self.evidence())
@@ -164,6 +179,7 @@ class TSharkCapture:
                     if not discard:
                         with self._stats_lock:
                             self._parse_errors += 1
+                            self._monitor_call("invalidate", "parse_error")
                     discard = not complete
                     continue
                 try:
@@ -171,10 +187,12 @@ class TSharkCapture:
                 except (ValueError, OverflowError, OSError, UnicodeError):
                     with self._stats_lock:
                         self._parse_errors += 1
+                        self._monitor_call("invalidate", "parse_error")
                     continue
                 with self._stats_lock:
                     self._parsed += 1
                     self._last_packet = packet.timestamp
+                    self._monitor_call("feed", packet)
                 try:
                     self.packets.put_nowait(packet)
                 except queue.Full:
@@ -183,6 +201,9 @@ class TSharkCapture:
         except (OSError, ValueError) as error:
             with self._stats_lock:
                 self._read_errors.append(str(error))
+        finally:
+            with self._stats_lock:
+                self._stdout_eof = True
 
     def _consume_stderr(self):
         try:
@@ -200,11 +221,22 @@ class TSharkCapture:
         with self._stats_lock:
             return "\n".join(self._stderr)[-8192:]
 
+    def _monitor_call(self, method, *args, **kwargs):
+        if not self._monitor_error:
+            try:
+                return getattr(self._monitor, method)(*args, **kwargs)
+            except Exception as error:
+                import traceback
+                self._monitor_error = traceback.format_exc()[-8192:] or str(error)
+        return {"session_id": self.session_id, "status": "unknown", "rules": [],
+                "reasons": ["monitor_internal_error"], "error": self._monitor_error}
+
     def stats(self) -> dict:
         with self._stats_lock:
             stats = {"parsed_packets": self._parsed, "summary_drops": self._dropped,
                      "parse_errors": self._parse_errors, "reader_errors": list(self._read_errors),
-                     "last_packet_utc": self._last_packet, "started": self._started}
+                     "last_packet_utc": self._last_packet, "started": self._started,
+                     "monitor": self._monitor_call("snapshot", reader_ok=not self._stdout_eof and not self._read_errors)}
         stats.update(capture_pid=self.process.pid if self.process else None,
                      exit_code=self.process.poll() if self.process else None,
                      temp_path=str(self.path) if self.path else "", session_id=self.session_id,
@@ -233,6 +265,8 @@ class TSharkCapture:
                 raise TimeoutError("Capture output pipes did not reach EOF")
             self.process.stdout.close()
             self.process.stderr.close()
+        with self._stats_lock:
+            self._monitor_call("stop")
         return self.stats()
 
     def inspect_file(self, session_id: str, timeout: float = 60) -> dict:

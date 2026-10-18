@@ -2,6 +2,7 @@
 
 import logging
 from collections import deque
+from dataclasses import replace
 from math import cos, pi, sin
 from pathlib import Path
 
@@ -30,15 +31,18 @@ from vil_logging import __version__
 from vil_logging.contracts.models import (
     AppEvent,
     AppSettings,
+    ObservationState,
     PacketSummary,
     Role,
     SessionPhase,
     TargetSnapshot,
 )
+from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.naming import capture_prefix
 
 from .file_manager_dialog import FileManagerDialog, confirm_delete
 from .i18n import render_event, tr
+from .monitor_dialog import MonitorDialog, monitor_description
 from .packet_window import PacketWindow
 from .recovery_dialog import RecoveryDialog
 from .settings_dialog import SettingsDialog
@@ -197,6 +201,11 @@ class MainWindow(QMainWindow):
         self.target_heading = _label(variant="section")
         self.selection_count = _label(variant="helper")
         target_heading.addWidget(self.target_heading, 1)
+        self.monitor_button = QPushButton()
+        self.monitor_button.setObjectName("openMonitorButton")
+        self.monitor_button.setProperty("compact", True)
+        self.monitor_button.clicked.connect(self._show_monitor)
+        target_heading.addWidget(self.monitor_button)
         target_heading.addWidget(self.selection_count)
         outer.addLayout(target_heading)
         cards = QHBoxLayout()
@@ -349,6 +358,8 @@ class MainWindow(QMainWindow):
         self.settings_dialog.environment_requested.connect(self.environment_requested)
         self.settings_dialog.exit_requested.connect(self.exit_requested)
         self.packet_window = PacketWindow(self)
+        self.monitor_dialog = MonitorDialog(self)
+        self.monitor_dialog.preferences_changed.connect(self.preferences_changed)
         self.file_manager = FileManagerDialog(self)
         self.file_manager.delete_requested.connect(self.delete_files_requested)
         self.file_manager.refresh_requested.connect(self.files_refresh_requested)
@@ -433,6 +444,8 @@ class MainWindow(QMainWindow):
                             tr("ethernet_stage", language) + "\n" + tr("real", language))
         self.settings_dialog.set_language(language)
         self.packet_window.set_language(language)
+        self.monitor_dialog.set_language(language)
+        self.monitor_button.setText(tr("monitor_title", language))
         self.file_manager.set_language(language)
         self.recovery_dialog.set_language(language)
         self.set_recovery(self._recovery_report)
@@ -449,6 +462,7 @@ class MainWindow(QMainWindow):
 
     def set_settings(self, settings: AppSettings):
         self._settings = settings
+        self.monitor_dialog.set_settings(settings)
         self.settings_dialog.set_settings(settings)
         self.set_language(settings.language)
 
@@ -543,6 +557,7 @@ class MainWindow(QMainWindow):
         self._render_readiness()
         self._render_file_controls()
         self.recovery_dialog.set_locked(self._file_busy or phase in BUSY_PHASES)
+        self.monitor_dialog.set_locked(busy)
 
     def set_target(self, target: TargetSnapshot):
         if self._targets.get(target.role) != target:
@@ -564,11 +579,24 @@ class MainWindow(QMainWindow):
         state.setProperty("tone", tone)
         refresh_style(state)
         self.observation_labels[target.role].setText(tr(target.observation.value, self._language))
-        self.observation_labels[target.role].setToolTip(target.evidence)
+        self.observation_labels[target.role].setToolTip(monitor_description(target.observation_details, self._language))
+        self.observation_labels[target.role].setProperty("tone", "attention" if target.observation in {
+            ObservationState.WARNING, ObservationState.UNKNOWN} else "neutral")
+        refresh_style(self.observation_labels[target.role])
+        self.monitor_dialog.set_target(target)
         self.target_formats[target.role].setText(
             "." + self._settings.ethernet_format if target.role == Role.ETHERNET else ".blf"
         )
         self._render_readiness()
+
+    def check_monitor_freshness(self):
+        if self._phase not in {SessionPhase.RECORDING, SessionPhase.PARTIAL}:
+            return
+        for target in list(self._targets.values()):
+            if target.observation_details:
+                report = fresh_report(target.observation_details)
+                if report != target.observation_details:
+                    self.set_target(replace(target, observation=ObservationState(report["status"]), observation_details=report))
 
     def _render_files(self):
         if self._files:
@@ -646,6 +674,11 @@ class MainWindow(QMainWindow):
         self.file_manager.show()
         self.file_manager.raise_()
 
+    def _show_monitor(self):
+        self.monitor_dialog.show()
+        self.monitor_dialog.raise_()
+        self.monitor_dialog.activateWindow()
+
     def _show_recovery(self):
         self.files_refresh_requested.emit()
         self.recovery_dialog.show()
@@ -676,6 +709,7 @@ class MainWindow(QMainWindow):
         self.event_empty.setVisible(not self._events)
         if event.code == "SETTINGS_ERROR":
             self.settings_dialog.set_error(render_event(event, self._language))
+            self.monitor_dialog.set_error(render_event(event, self._language, include_details=False))
         elif event.code == "SETTINGS_SAVED":
             self.settings_dialog.set_error("")
 

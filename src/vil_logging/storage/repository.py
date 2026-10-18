@@ -212,7 +212,7 @@ class Repository:
         Capture preparation still performs full filesystem/tool validation.
         """
         allowed = {"can_cfg", "diag_cfg", "tshark_path", "output_dir", "nic_id",
-                   "language", "ethernet_format", "can_logging_block", "diag_logging_block"}
+                   "language", "ethernet_format", "can_logging_block", "diag_logging_block", "monitor_rules_json"}
         if not isinstance(patch, dict) or set(patch) - allowed:
             raise RepositoryError("Unsupported connection preference fields")
         if any(not isinstance(value, str) or any(ord(char) < 32 for char in value)
@@ -222,6 +222,9 @@ class Repository:
             raise RepositoryError("Unsupported display language")
         if "ethernet_format" in patch and patch["ethernet_format"] not in {"pcap", "pcapng"}:
             raise RepositoryError("Unsupported Ethernet file format")
+        if "monitor_rules_json" in patch:
+            from vil_logging.monitors.rules import parse_rules
+            parse_rules(patch["monitor_rules_json"])
         for key in ("can_logging_block", "diag_logging_block"):
             if key in patch and patch[key] and (not patch[key].isdecimal() or not 1 <= int(patch[key]) <= 128):
                 raise RepositoryError("Logging Block must be a listed 1-based index")

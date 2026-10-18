@@ -19,6 +19,7 @@
     │  │  ├─ ui/                      PySide6 화면·번역
     │  │  ├─ adapters/                외부 도구 연결
     │  │  ├─ workers/                 별도 작업 프로세스
+    │  │  ├─ monitors/                명시적 감시 규칙·수신 근거·유효시간
     │  │  ├─ storage/                 설정·번호·캡처 파일
     │  │  └─ diagnostics/             환경 진단·순환 로그
     ├─ tests/unit/                    장비 없는 단위 검사

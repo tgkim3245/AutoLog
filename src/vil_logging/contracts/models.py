@@ -42,6 +42,7 @@ class RecordingState(StrEnum):
 class ObservationState(StrEnum):
     NOT_MONITORED = "not_monitored"
     NOT_CONFIGURED = "not_configured"
+    UNSUPPORTED = "unsupported"
     UNKNOWN = "unknown"
     NORMAL = "normal"
     WARNING = "warning"
@@ -72,6 +73,7 @@ class AppSettings:
     nic_id: str = ""
     tshark_path: str = ""
     language: str = "ko"
+    monitor_rules_json: str = ""
     version: int = 1
 
 
@@ -103,6 +105,7 @@ class TargetSnapshot:
     observation: ObservationState = ObservationState.NOT_MONITORED
     generation: int = 0
     evidence: str = ""
+    observation_details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -126,3 +129,6 @@ class PacketSummary:
     source_mac: str = ""
     destination_mac: str = ""
     session_id: str = ""
+    source_ip: str = ""
+    destination_ip: str = ""
+    captured_epoch: float | None = None

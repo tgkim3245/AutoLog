@@ -54,8 +54,18 @@ def main(argv: list[str] | None = None) -> int:
                         help="Verify native file management using only generated capture fixtures")
     parser.add_argument("--verify-recovery", action="store_true",
                         help="Verify recovery using generated offline BLF/PCAP/PCAPNG files only")
+    parser.add_argument("--verify-monitoring", action="store_true",
+                        help="Verify monitoring with generated localhost packets only")
     parser.add_argument("--version", action="version", version=__version__)
     args = parser.parse_args(argv)
+    if args.verify_monitoring:
+        if args.demo or args.smoke_test or args.verify_ethernet or args.verify_file_management or args.verify_recovery:
+            parser.error("--verify-monitoring requires a separate verification run")
+        from vil_logging.verification import verify_monitoring
+        folder = args.data_dir or default_data_dir() / "development" / "monitor-verification" / uuid4().hex
+        report = verify_monitoring(folder)
+        print(json.dumps(report, ensure_ascii=False))
+        return 0 if report["passed"] else 2
     if args.verify_recovery:
         if args.demo or args.smoke_test or args.verify_ethernet or args.verify_file_management:
             parser.error("--verify-recovery requires a separate verification run")
@@ -356,6 +366,7 @@ def main(argv: list[str] | None = None) -> int:
                     window.set_phase(runtime.phase)
         for packet in runtime.drain_packets():
             window.add_packet(packet)
+        window.check_monitor_freshness()
         if debug.enabled:
             try:
                 debug.check_health()
