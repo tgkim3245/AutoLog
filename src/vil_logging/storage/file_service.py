@@ -104,6 +104,8 @@ class FileService:
             return "pending"
         if statuses <= {"renamed", "deleted", "unchanged", "recovered_rename"}:
             return "completed" if "recovered_rename" not in statuses else "recovered"
+        if "acknowledged_unconfirmed" in statuses:
+            return "acknowledged"
         return "partial" if statuses & {"renamed", "deleted", "recovered_rename"} else "blocked"
 
     @staticmethod
@@ -189,12 +191,9 @@ class FileService:
         """Observe only. Never repeat a rename/deletion or promote a capture."""
         recovered = []
         for operation in self.repo.file_operations(unresolved=True):
-            if operation["status"] == "review":
-                recovered.append(operation)
-                continue
             document, updates = operation["document"], []
             for item in document["items"]:
-                if item["status"] != "pending":
+                if item["status"] not in {"pending", "review"}:
                     continue
                 evidence = {}
                 for name in ("source", "destination"):
@@ -211,13 +210,14 @@ class FileService:
                 destination = evidence.get("destination", {})
                 same_source = matches(source.get("identity", {}), item["identity"])
                 same_destination = matches(destination.get("identity", {}), item["identity"])
-                if operation["kind"] == "rename" and same_destination and source.get("present") is False:
+                if operation["kind"] in {"rename", "recover_publish"} and same_destination and source.get("present") is False:
                     item.update(status="recovered_rename", actual_path=item["destination"])
                     updates.append(self._update(item, item["destination"]))
                 elif same_source and (operation["kind"] == "delete" or destination.get("present") is False
                                       or item["source"] == item.get("destination")):
                     item.update(status="not_applied", actual_path=item["source"])
-                    updates.append(self._update(item, item["source"]))
+                    if operation["kind"] != "recover_publish" or item["source"] == item.get("destination"):
+                        updates.append(self._update(item, item["source"]))
                 else:
                     # Absence cannot prove our delete was the cause. Keep both candidates.
                     item.update(status="review", error="파일 작업 결과 확인 불가 / File operation result unconfirmed")

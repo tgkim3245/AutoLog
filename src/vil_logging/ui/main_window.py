@@ -40,6 +40,7 @@ from vil_logging.storage.naming import capture_prefix
 from .file_manager_dialog import FileManagerDialog, confirm_delete
 from .i18n import render_event, tr
 from .packet_window import PacketWindow
+from .recovery_dialog import RecoveryDialog
 from .settings_dialog import SettingsDialog
 from .theme import COLOR, STYLE, ThemedCheckBox, apply_theme, refresh_style
 
@@ -115,6 +116,7 @@ class MainWindow(QMainWindow):
     rename_requested = Signal(str, str)
     delete_files_requested = Signal(object)
     files_refresh_requested = Signal()
+    recovery_requested = Signal(object)
 
     def __init__(self, demo: bool = False):
         super().__init__()
@@ -131,6 +133,7 @@ class MainWindow(QMainWindow):
         self._capture_history = []
         self._file_busy = False
         self._last_file_result = None
+        self._recovery_report = {}
         self._preparation_report: dict = {}
         self._discovery_report: dict = {}
         self.setObjectName("mainWindow")
@@ -244,6 +247,12 @@ class MainWindow(QMainWindow):
         self.phase_label.setWordWrap(True)
         self.phase_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(self.phase_label)
+        self.recovery_button = QPushButton()
+        self.recovery_button.setObjectName("openRecoveryButton")
+        self.recovery_button.setProperty("compact", True)
+        self.recovery_button.clicked.connect(self._show_recovery)
+        self.recovery_button.hide()
+        outer.addWidget(self.recovery_button)
         file_frame = QFrame()
         file_frame.setObjectName("filePanel")
         file_frame.setProperty("panel", True)
@@ -343,6 +352,9 @@ class MainWindow(QMainWindow):
         self.file_manager = FileManagerDialog(self)
         self.file_manager.delete_requested.connect(self.delete_files_requested)
         self.file_manager.refresh_requested.connect(self.files_refresh_requested)
+        self.file_manager.recovery_requested.connect(self._show_recovery)
+        self.recovery_dialog = RecoveryDialog(self)
+        self.recovery_dialog.requested.connect(self.recovery_requested)
         self.tray: QSystemTrayIcon | None = None
         if QSystemTrayIcon.isSystemTrayAvailable():
             self.tray = QSystemTrayIcon(self.windowIcon(), self)
@@ -422,6 +434,8 @@ class MainWindow(QMainWindow):
         self.settings_dialog.set_language(language)
         self.packet_window.set_language(language)
         self.file_manager.set_language(language)
+        self.recovery_dialog.set_language(language)
+        self.set_recovery(self._recovery_report)
         if self.tray:
             self.show_action.setText(tr("show", language))
             self.exit_action.setText(tr("exit", language))
@@ -528,6 +542,7 @@ class MainWindow(QMainWindow):
         self.logging_button.setToolTip(tr(phase_key, self._language))
         self._render_readiness()
         self._render_file_controls()
+        self.recovery_dialog.set_locked(self._file_busy or phase in BUSY_PHASES)
 
     def set_target(self, target: TargetSnapshot):
         if self._targets.get(target.role) != target:
@@ -630,6 +645,19 @@ class MainWindow(QMainWindow):
         self.files_refresh_requested.emit()
         self.file_manager.show()
         self.file_manager.raise_()
+
+    def _show_recovery(self):
+        self.files_refresh_requested.emit()
+        self.recovery_dialog.show()
+        self.recovery_dialog.raise_()
+        self.recovery_dialog.activateWindow()
+
+    def set_recovery(self, report):
+        self._recovery_report = report
+        count = len(report.get("sessions", [])) + len(report.get("operations", []))
+        self.recovery_button.setText(tr("recovery_count", self._language).format(count=count))
+        self.recovery_button.setVisible(bool(count) or bool(report.get("live_session_id")))
+        self.recovery_dialog.set_report(report)
 
     def set_file_result(self, result: dict):
         self._last_file_result = result

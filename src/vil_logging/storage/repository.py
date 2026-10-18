@@ -326,10 +326,13 @@ class Repository:
         logger.info("storage.capture_file_updated", extra={"session_id": session_id, "role": role.value,
                                                           "state": state, "details": details})
 
-    def captures(self, limit: int = 100) -> list[dict]:
+    def captures(self, limit: int | None = 100, *, include_demo: bool = False) -> list[dict]:
         self._check_owner()
+        condition = "" if include_demo else " WHERE demo=0"
+        suffix = " ORDER BY rowid DESC" + (" LIMIT ?" if limit is not None else "")
         rows = self._connection.execute(
-            "SELECT * FROM sessions WHERE demo=0 ORDER BY rowid DESC LIMIT ?", (limit,)).fetchall()
+            "SELECT * FROM sessions" + condition + suffix,
+            (limit,) if limit is not None else ()).fetchall()
         result = []
         for row in rows:
             session = dict(row)
@@ -343,6 +346,28 @@ class Repository:
                 session["files"].append(file)
             result.append(session)
         return result
+
+    def finish_manual_review(self, session_id: str, evidence: dict) -> None:
+        """Keep files and consumed index; never certify an interrupted capture as success."""
+        with self._transaction("finish_manual_review") as connection:
+            row = connection.execute("SELECT phase,details FROM sessions WHERE session_id=?",
+                                     (session_id,)).fetchone()
+            if row is None or row["phase"] not in {"incomplete", "failed"}:
+                raise RepositoryError("Session is not awaiting recovery")
+            details = json.loads(row["details"])
+            for file in connection.execute("SELECT role,state,temp_path FROM capture_files WHERE session_id=?",
+                                           (session_id,)).fetchall():
+                if file["state"] not in {"published", "deleted", "not_created", "unconfirmed"}:
+                    connection.execute("UPDATE capture_files SET state='retained' WHERE session_id=? AND role=?",
+                                       (session_id, file["role"]))
+                    metadata = details.setdefault("files", {}).setdefault(file["role"], {})
+                    metadata["state"] = "retained"
+                    metadata.setdefault("actual_path", file["temp_path"])
+            details["manual_review"] = {"timestamp": utc_now(), "recorders_stopped_by_user": True,
+                                        "result": "failed_files_preserved", "evidence": evidence}
+            connection.execute("UPDATE sessions SET phase='failed',details=?,updated_utc=? WHERE session_id=?",
+                               (_json(details), utc_now(), session_id))
+        logger.warning("storage.manual_review_finished", extra={"session_id": session_id})
 
     def file_operations(self, *, unresolved=False, limit=200) -> list[dict]:
         self._check_owner()
@@ -383,10 +408,14 @@ class Repository:
                 metadata = details.setdefault("files", {}).setdefault(item["role"], {})
                 metadata.update(actual_path=item["actual_path"], state=item["state"],
                                 file_identity=item["identity"], last_file_operation=operation_id)
-                connection.execute("UPDATE capture_files SET final_path=?,filename=?,state=? "
-                                   "WHERE session_id=? AND role=?",
-                                   (item["actual_path"], Path(item["actual_path"]).name, item["state"],
-                                    item["session_id"], item["role"]))
+                if item["state"] == "unconfirmed":
+                    connection.execute("UPDATE capture_files SET state=? WHERE session_id=? AND role=?",
+                                       (item["state"], item["session_id"], item["role"]))
+                else:
+                    connection.execute("UPDATE capture_files SET final_path=?,filename=?,state=? "
+                                       "WHERE session_id=? AND role=?",
+                                       (item["actual_path"], Path(item["actual_path"]).name, item["state"],
+                                        item["session_id"], item["role"]))
                 connection.execute("UPDATE sessions SET details=?,updated_utc=? WHERE session_id=?",
                                    (_json(details), utc_now(), item["session_id"]))
             connection.execute("UPDATE file_operations SET status=?,document=?,updated_utc=? "

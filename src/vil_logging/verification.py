@@ -14,9 +14,11 @@ from vil_logging.contracts.models import Role, SessionPhase
 from vil_logging.diagnostics.connections import _find_tshark
 from vil_logging.diagnostics.debug_log import DebugLogService
 from vil_logging.runtime import Runtime
+from vil_logging.storage.blf import FILE_HEADER
 from vil_logging.storage.file_access import observe
 from vil_logging.storage.file_service import FileService
 from vil_logging.storage.naming import build_plan
+from vil_logging.storage.recovery import RecoveryService
 from vil_logging.storage.repository import Repository
 
 
@@ -77,6 +79,76 @@ def verify_file_management(data_dir: Path) -> dict:
         report.update(passed=True, next_index=2, file_operations=len(repository.file_operations()))
     except Exception as error:
         debug.exception("verification.files_failed", error)
+        report["error"] = str(error)
+    finally:
+        if repository:
+            repository.close()
+        debug.close()
+        (root / "result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return report
+
+
+def verify_recovery(data_dir: Path) -> dict:
+    """Exercise the packaged recovery path without opening a CANoe window or NIC."""
+    root = Path(data_dir)
+    if root.exists():
+        raise ValueError("Verification requires a new folder; existing profiles are preserved")
+    root.mkdir(parents=True)
+    output = root / "captures"
+    output.mkdir()
+    debug = DebugLogService(root)
+    debug.enable()
+    repository = None
+    report = {"passed": False, "app_data": str(root), "physical_nic_opened": False,
+              "canoe_opened": False, "scope": "Generated offline capture recovery only", "cases": []}
+    try:
+        tool = _find_tshark("")
+        if tool["status"] != "ready":
+            raise RuntimeError(tool["message_en"])
+        fixtures = {
+            "blf": FILE_HEADER.pack(b"LOGG", 144, *([0] * 8), 144, 144, 0, 0, *([0] * 16)).ljust(144, b"\0"),
+            "pcap": struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1),
+            "pcapng": (struct.pack("<IIIHHqI", 0x0A0D0D0A, 28, 0x1A2B3C4D, 1, 0, -1, 28) +
+                       struct.pack("<IIHHII", 1, 20, 1, 0, 65535, 20)),
+        }
+        repository = Repository(root / "state.sqlite3")
+        repository.load_settings(str(output))
+        for extension, content in fixtures.items():
+            repository.save_preferences({"ethernet_format": extension if extension != "blf" else "pcap"})
+            settings = repository.load_settings()
+            role = Role.CAN if extension == "blf" else Role.ETHERNET
+            plan = build_plan(settings, (role,))
+            repository.reserve(plan)
+            file = plan.files[0]
+            file.temp_path.parent.mkdir(parents=True)
+            file.temp_path.write_bytes(content)
+            repository.close()
+            repository = Repository(root / "state.sqlite3")
+            repository.recover_incomplete()
+            service = RecoveryService(repository)
+            row = service.report()["sessions"][0]
+            with file.temp_path.open("rb"):
+                try:
+                    service.publish(plan.session_id, role.value, row["token"], True, tool["path"])
+                except OSError:
+                    pass
+                else:
+                    raise AssertionError("An externally open capture was accepted")
+            result = service.publish(plan.session_id, role.value, row["token"], True, tool["path"])
+            if file.final_path.read_bytes() != content or file.temp_path.exists():
+                raise AssertionError("Recovery changed the captured content or left its source behind")
+            if result["inspection"].get("packet_count", result["inspection"].get("object_count")) != 0:
+                raise AssertionError("Zero-packet recovery was not reported accurately")
+            service.finish_session(plan.session_id, service.report()["sessions"][0]["token"], True)
+            if repository.captures()[0]["phase"] != "failed" or repository.load_settings().next_index != plan.index + 1:
+                raise AssertionError("Recovery certified acquisition success or changed the reserved index")
+            report["cases"].append({"case": extension + "_restart_recovery", "passed": True,
+                                    "inspection": result["inspection"], "path": str(file.final_path)})
+        if service.report()["sessions"] or (output / ".vil_work").exists():
+            raise AssertionError("Finished recovery left an incomplete session or empty working folder")
+        report.update(passed=True, next_index=repository.load_settings().next_index)
+    except Exception as error:
+        debug.exception("verification.recovery_failed", error)
         report["error"] = str(error)
     finally:
         if repository:

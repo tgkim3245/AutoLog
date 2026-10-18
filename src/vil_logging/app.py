@@ -52,8 +52,18 @@ def main(argv: list[str] | None = None) -> int:
                         help="Explicit real capture verification using only generated localhost packets")
     parser.add_argument("--verify-file-management", action="store_true",
                         help="Verify native file management using only generated capture fixtures")
+    parser.add_argument("--verify-recovery", action="store_true",
+                        help="Verify recovery using generated offline BLF/PCAP/PCAPNG files only")
     parser.add_argument("--version", action="version", version=__version__)
     args = parser.parse_args(argv)
+    if args.verify_recovery:
+        if args.demo or args.smoke_test or args.verify_ethernet or args.verify_file_management:
+            parser.error("--verify-recovery requires a separate verification run")
+        from vil_logging.verification import verify_recovery
+        folder = args.data_dir or default_data_dir() / "development" / "recovery-verification" / uuid4().hex
+        report = verify_recovery(folder)
+        print(json.dumps(report, ensure_ascii=False))
+        return 0 if report["passed"] else 2
     if args.verify_file_management:
         if args.demo or args.smoke_test or args.verify_ethernet:
             parser.error("--verify-file-management requires a separate verification run")
@@ -215,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     window.rename_requested.connect(runtime.rename_previous)
     window.delete_files_requested.connect(runtime.delete_files)
     window.files_refresh_requested.connect(runtime.refresh_file_history)
+    window.recovery_requested.connect(runtime.recover)
     environment_dialog = EnvironmentDialog(window)
     environment_state = {"environment": {}, "connections": {}, "pending": False, "discovering": False,
                          "error": "", "startup_checked": args.demo}
@@ -305,6 +316,10 @@ def main(argv: list[str] | None = None) -> int:
                 window.set_file_busy(value)
             elif kind == "file_result":
                 window.set_file_result(value)
+            elif kind == "recovery":
+                window.set_recovery(value)
+            elif kind == "recovery_result":
+                window.recovery_dialog.set_result(value)
             elif kind == "packets_clear":
                 window.packet_window.clear_session()
             elif kind == "connections":

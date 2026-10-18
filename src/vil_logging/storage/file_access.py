@@ -96,6 +96,11 @@ class ExclusiveFile:
         destination = plain_path(destination)
         if destination.parent != self.path.parent:
             raise ValueError("A prefix change must keep the same directory")
+        self.move(destination)
+
+    def move(self, destination: Path):
+        """Move this exact open file without replacement (same volume only)."""
+        destination = plain_path(destination)
 
         class RenameInfo(ctypes.Structure):
             _fields_ = [("Flags", wintypes.DWORD), ("RootDirectory", wintypes.HANDLE),

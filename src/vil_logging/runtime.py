@@ -27,6 +27,7 @@ from vil_logging.contracts.models import (
 from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
 from vil_logging.storage.file_service import FileResultStorageError, FileService
 from vil_logging.storage.naming import build_plan, find_collisions, validate_settings
+from vil_logging.storage.recovery import RecoveryService
 from vil_logging.storage.repository import Repository
 from vil_logging.workers.ethernet_pool import CaptureWorkerPool
 from vil_logging.workers.pool import FakeWorkerPool
@@ -68,6 +69,7 @@ class Runtime:
         self._exit_pending = False
         self._file_busy = False
         self._file_service: FileService | None = None
+        self._recovery: RecoveryService | None = None
         self._discovery_generation = 0
         self._connections: dict | None = None
         self._preparation_generations = {role: 0 for role in Role}
@@ -158,6 +160,7 @@ class Runtime:
         self._repo = Repository(self.data_dir / "state.sqlite3")
         self._settings = self._repo.load_settings(str(default_output))
         self._file_service = FileService(self._repo)
+        self._recovery = RecoveryService(self._repo)
         file_recovery = self._file_service.recover()
         recovered = self._repo.recover_incomplete()
         self._publish("settings", self._settings)
@@ -198,11 +201,78 @@ class Runtime:
         history = self._file_service.history() if self._file_service and not self.demo else []
         self._publish("capture_history", history)
         self._publish("file_operations", self._repo.file_operations() if self._repo and not self.demo else [])
+        self._refresh_recovery()
         if history and self.phase not in ACTIVE | {SessionPhase.INCOMPLETE}:
             latest = history[0]
             paths = [file["path"] for file in latest["files"] if file["status"] != "deleted"]
             self._publish("files", (paths, "completed" if latest["phase"] == "completed" else "failed"))
         return history
+
+    def _refresh_recovery(self):
+        if not self._recovery:
+            return
+        report = self._recovery.report()
+        report["live_session_id"] = (self._plan.session_id if self._plan and
+                                     self.phase == SessionPhase.INCOMPLETE else "")
+        self._publish("recovery", report)
+        return report
+
+    def recover(self, request: dict) -> Future | None:
+        with self._lock:
+            if (not self._ready or self._file_busy or self._exit_pending or self._storage_failed
+                    or self.phase in ACTIVE):
+                self._publish("recovery_result", {"success": False, "error":
+                    "기록 또는 다른 파일 처리가 끝난 뒤 다시 시도하세요. / Finish recording and file operations first."})
+                return None
+            self._file_busy = True
+            self._publish("file_busy", True)
+        return self._submit(self._recover, dict(request))
+
+    def _recover(self, request):
+        try:
+            action = request.get("action")
+            live = self._plan and self.phase == SessionPhase.INCOMPLETE
+            if live:
+                if action != "retry_stop":
+                    raise ValueError("현재 기록의 정지를 먼저 다시 확인하세요. / Retry stop for the current capture first.")
+                success = self._stop()
+                result = {"success": success, "action": action}
+            else:
+                self._event("RECOVERY_STARTED", request=request)
+                if action == "recheck":
+                    self._file_service.recover()
+                elif action == "publish":
+                    self._recovery.publish(request["session_id"], request["role"], request["token"],
+                                           request.get("stopped"), self._settings.tshark_path)
+                elif action == "finish":
+                    self._recovery.finish_session(request["session_id"], request["token"], request.get("stopped"))
+                elif action == "acknowledge":
+                    self._recovery.acknowledge_operation(request["operation_id"], request["token"], request.get("stopped"))
+                else:
+                    raise ValueError("Unknown recovery action")
+                report = self._recovery.report()
+                if self.phase == SessionPhase.INCOMPLETE and not any(
+                        row["phase"] == "incomplete" for row in report["sessions"]):
+                    self._set_phase(SessionPhase.IDLE)
+                result = {"success": True, "action": action}
+                self._event("RECOVERY_COMPLETED", action=action)
+            self._publish("recovery_result", result)
+            return result
+        except Exception as error:
+            if isinstance(error, FileResultStorageError):
+                self._storage_failed = True
+            log.exception("recovery.failed", extra={"request": request})
+            self._event("RECOVERY_ERROR", level="ERROR", original=str(error), request=request)
+            result = {"success": False, "error": str(error)}
+            self._publish("recovery_result", result)
+            return result
+        finally:
+            try:
+                self._refresh_file_history()
+            finally:
+                with self._lock:
+                    self._file_busy = False
+                    self._publish("file_busy", False)
 
     def rename_previous(self, session_id: str, name: str) -> Future | None:
         return self._manage_files("rename", session_id, name)

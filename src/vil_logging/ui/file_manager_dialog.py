@@ -52,6 +52,7 @@ def confirm_delete(files: list[dict], language: str, parent) -> bool:
 class FileManagerDialog(QDialog):
     delete_requested = Signal(object)
     refresh_requested = Signal()
+    recovery_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -99,6 +100,9 @@ class FileManagerDialog(QDialog):
         self.history_button = QPushButton()
         self.history_button.clicked.connect(self._show_operations)
         controls.addWidget(self.history_button)
+        self.recovery_button = QPushButton()
+        self.recovery_button.clicked.connect(self.recovery_requested)
+        controls.addWidget(self.recovery_button)
         controls.addStretch()
         self.delete_button = QPushButton()
         self.delete_button.setObjectName("deleteSelectedFilesButton")
@@ -117,6 +121,7 @@ class FileManagerDialog(QDialog):
         self.refresh_button.setText(tr("refresh", language))
         self.folder_button.setText(tr("open_folder", language))
         self.history_button.setText(tr("file_operations", language))
+        self.recovery_button.setText(tr("recovery", language))
         self.delete_button.setText(tr("delete_selected", language))
         self.close_button.setText(tr("close", language))
         self.table.setHorizontalHeaderLabels([tr(key, language) for key in ("capture_number", "filename", "file_state", "full_path")])
