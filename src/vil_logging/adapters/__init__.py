@@ -1,0 +1,1 @@
+"""Owned external capture adapters."""

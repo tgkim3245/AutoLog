@@ -1,0 +1,41 @@
+# Local environments and generated files
+.venv/
+venv/
+.tox/
+.nox/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+*.egg-info/
+.coverage
+coverage.xml
+htmlcov/
+node_modules/
+build/
+dist/
+site/
+
+# Machine-specific settings and secrets
+.env
+.env.*
+!.env.example
+config/local/
+
+# Local recordings and generated artifacts
+data/raw/
+*.blf
+*.pcap
+*.pcapng
+outputs/*
+!outputs/README.md
+developer_logs/
+.vil_work/
+
+# Editor and OS temporary files
+.idea/
+~$*
+Thumbs.db
+.DS_Store

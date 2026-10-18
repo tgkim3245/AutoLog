@@ -1,0 +1,126 @@
+"""Application states are independent of external tool implementation details."""
+
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from enum import StrEnum
+from pathlib import Path
+from typing import Any
+
+
+def utc_now() -> str:
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
+
+
+class Role(StrEnum):
+    CAN = "can"
+    DIAG = "diag"
+    ETHERNET = "ethernet"
+
+    @property
+    def label(self) -> str:
+        return {self.CAN: "CAN", self.DIAG: "Diag", self.ETHERNET: "Zipy"}[self]
+
+
+class ConnectionState(StrEnum):
+    DISCONNECTED = "disconnected"
+    CONNECTING = "connecting"
+    READY = "ready"
+    ERROR = "error"
+    UNKNOWN = "unknown"
+
+
+class RecordingState(StrEnum):
+    IDLE = "idle"
+    STARTING = "starting"
+    RECORDING = "recording"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
+    ERROR = "error"
+    UNKNOWN = "unknown"
+
+
+class ObservationState(StrEnum):
+    NOT_MONITORED = "not_monitored"
+    NOT_CONFIGURED = "not_configured"
+    UNKNOWN = "unknown"
+    NORMAL = "normal"
+    WARNING = "warning"
+
+
+class SessionPhase(StrEnum):
+    IDLE = "idle"
+    PREPARING = "preparing"
+    STARTING = "starting"
+    RECORDING = "recording"
+    PARTIAL = "partial"
+    STOPPING = "stopping"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    INCOMPLETE = "incomplete"
+
+
+@dataclass(frozen=True)
+class AppSettings:
+    prefix: str = "AutoLog"
+    next_index: int = 1
+    output_dir: str = ""
+    ethernet_format: str = "pcap"
+    can_cfg: str = ""
+    diag_cfg: str = ""
+    nic_id: str = ""
+    tshark_path: str = ""
+    language: str = "ko"
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class CaptureFilePlan:
+    role: Role
+    filename: str
+    temp_path: Path
+    final_path: Path
+
+
+@dataclass(frozen=True)
+class CapturePlan:
+    session_id: str
+    index: int
+    prefix: str
+    roles: tuple[Role, ...]
+    files: tuple[CaptureFilePlan, ...]
+    settings_version: int
+    demo: bool = False
+    created_utc: str = field(default_factory=utc_now)
+
+
+@dataclass(frozen=True)
+class TargetSnapshot:
+    role: Role
+    connection: ConnectionState = ConnectionState.DISCONNECTED
+    recording: RecordingState = RecordingState.IDLE
+    observation: ObservationState = ObservationState.NOT_MONITORED
+    generation: int = 0
+    evidence: str = ""
+
+
+@dataclass(frozen=True)
+class AppEvent:
+    code: str
+    level: str = "INFO"
+    target: str = "app"
+    params: dict[str, Any] = field(default_factory=dict)
+    original: str = ""
+    timestamp: str = field(default_factory=utc_now)
+    session_id: str | None = None
+
+
+@dataclass(frozen=True)
+class PacketSummary:
+    timestamp: str
+    source: str
+    destination: str
+    protocol: str
+    length: int
+    source_mac: str = ""
+    destination_mac: str = ""
+    session_id: str = ""
