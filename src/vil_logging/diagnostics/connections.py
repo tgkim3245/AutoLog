@@ -19,7 +19,6 @@ from uuid import UUID
 from vil_logging.diagnostics.environment import (
     _discover_npcap,
     _text,
-    _tool_candidates,
     _version_response,
 )
 
@@ -157,12 +156,7 @@ def _windows_interfaces() -> tuple[list[dict[str, Any]], str]:
 
 def _find_tshark(tshark_path: str) -> dict[str, Any]:
     specified = tshark_path.strip()
-    candidates = _tool_candidates("tshark", specified=specified)
-    if not specified and (local_app_data := os.environ.get("LOCALAPPDATA")):
-        for app_name in ("AutoLog", "Auto_Log", "VILLogging"):
-            tool_root = Path(local_app_data) / app_name / "tools"
-            candidates.extend((tool_root / "Wireshark" / "tshark.exe",
-                               tool_root / "WiresharkPortable" / "App" / "Wireshark" / "tshark.exe"))
+    candidates = [Path(specified)] if specified else []
     attempted = []
     for candidate in dict.fromkeys(candidates):
         try:
@@ -181,7 +175,7 @@ def _find_tshark(tshark_path: str) -> dict[str, Any]:
                 "message_ko": "TShark를 찾았습니다. 아래에서 사용할 연결을 선택하세요.",
                 "message_en": "TShark was found. Select the connection below.",
                 "detail": "Version command succeeded; live capture has not been tested.",
-                "automatic": not bool(specified),
+                "automatic": False,
             }
         attempted.append(f"{candidate}: " + (
             version.get("original") or version.get("reason") or output or "TShark version was not confirmed"
@@ -189,17 +183,17 @@ def _find_tshark(tshark_path: str) -> dict[str, Any]:
     invalid = bool(specified or attempted)
     return {
         "status": "invalid" if invalid else "missing", "path": specified, "version": "",
-        "message_ko": ("저장된 TShark 경로를 사용할 수 없습니다. 다시 찾거나 프로그램을 선택하세요."
+        "message_ko": ("선택한 TShark 경로를 사용할 수 없습니다. tshark.exe를 직접 선택하세요."
                        if specified else ("찾은 TShark를 실행할 수 없습니다. 경로와 설치 상태를 확인하세요."
-                                          if invalid else "TShark를 찾지 못했습니다. Wireshark 설치 후 다시 찾기를 누르세요.")),
-        "message_en": ("The saved TShark path is unavailable. Find it again or select the program."
+                                          if invalid else "사용할 tshark.exe를 직접 선택하세요.")),
+        "message_en": ("The selected TShark path is unavailable. Choose tshark.exe."
                        if specified else ("The discovered TShark could not be verified. Check its installation."
-                                          if invalid else "TShark was not found. Install Wireshark, then find it again.")),
+                                          if invalid else "Choose the tshark.exe to use.")),
         "detail": "\n".join(attempted)[:8192] if attempted else (
             f"Executable not found: {specified}" if specified else
-            "Checked PATH and known Wireshark installation folders."
+            "No TShark path selected; automatic executable search is disabled."
         ),
-        "automatic": not bool(specified),
+        "automatic": False,
     }
 
 

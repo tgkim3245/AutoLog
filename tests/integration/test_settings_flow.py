@@ -48,7 +48,7 @@ def test_choices_and_prepare_feedback_survive_real_app_restart(tmp_path):
                     if mode == "edit" and self.step == 0:
                         self.step = 1
                         dialog.show()
-                        for key, value in (("can_cfg", cfg), ("diag_cfg", cfg), ("output_dir", output)):
+                        for key, value in (("can_cfg", cfg), ("diag_cfg", cfg), ("output_dir", output), ("tshark_path", tool)):
                             dialog.fields[key].setText(value)
                             dialog.fields[key].editingFinished.emit()
                         dialog.nic_input.setCurrentIndex(dialog.nic_input.findData("test-nic"))

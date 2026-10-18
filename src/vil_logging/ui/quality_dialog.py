@@ -5,6 +5,7 @@ import time
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QDialog, QFormLayout, QLabel, QPushButton, QVBoxLayout
 
+from .i18n import localized
 from .theme import apply_theme, refresh_style
 
 
@@ -69,11 +70,13 @@ class QualityDialog(QDialog):
         self.render()
 
     def render(self):
-        ko = self.language != "en"
-        title = "Ethernet 기록 품질" if ko else "Ethernet capture quality"
+        ko = self.language == "ko"
+        def t(ko_text, en_text):
+            return localized(ko_text, en_text, self.language)
+        title = t("Ethernet 기록 품질", "Ethernet capture quality")
         self.setWindowTitle(title)
         self.heading.setText(title)
-        self.close_button.setText("닫기" if ko else "Close")
+        self.close_button.setText(t("닫기", "Close"))
         names = {
             "elapsed": ("기록 시간", "Recording duration"), "size": ("파일 크기", "File size"),
             "growth": ("파일 증가 속도", "File growth"), "parsed": ("요약 해석 속도", "Summary decoding"),
@@ -84,29 +87,31 @@ class QualityDialog(QDialog):
             "loss": ("드라이버 / OS 누락", "Driver / OS drops"),
         }
         for key, texts in names.items():
-            self.labels[key].setText(texts[0 if ko else 1])
+            self.labels[key].setText(t(*texts))
             self.values[key].setText("—")
         report, metrics = self.report, self.report.get("metrics", {})
         state = report.get("state")
         stale = state == "recording" and time.time() - (report.get("sampled_epoch") or 0) > 6
         tone = "neutral"
-        text = "아직 Ethernet 기록이 없습니다." if ko else "No Ethernet capture yet."
+        text = t("아직 Ethernet 기록이 없습니다.", "No Ethernet capture yet.")
         if state:
             text = ({"recording": "기록 중 · 최근 관측값", "archived": "보관 완료 · 종료 시 관측값",
                      "historical": "이전 실행의 종료 기록", "unknown": "기록 상태 확인 필요 · 마지막 관측값"}
                     if ko else {"recording": "Recording · latest sample", "archived": "Archived · final sample",
                                 "historical": "Previous run · final sample", "unknown": "State unknown · last sample"}).get(state, state)
             tone = "ready" if state in {"recording", "archived"} else "neutral"
+            if self.language == "zh":
+                text = t("", text)
         if stale:
-            text, tone = ("갱신 지연 · 마지막 관측값" if ko else "Updates delayed · last sample"), "attention"
+            text, tone = t("갱신 지연 · 마지막 관측값", "Updates delayed · last sample"), "attention"
         loss = report.get("capture_loss", {})
         mismatch = report.get("summary_consistency") and not report["summary_consistency"].get("same_count")
         if metrics.get("low_space") or loss.get("status") == "loss_reported" or metrics.get("error") or state == "unknown":
             tone = "attention"
         if loss.get("status") == "loss_reported":
-            text += " · 원본 누락 보고됨" if ko else " · packet drops reported"
+            text += t(" · 원본 누락 보고됨", " · packet drops reported")
         if mismatch:
-            text += " · 패킷 수 차이" if ko else " · packet counts differ"
+            text += t(" · 패킷 수 차이", " · packet counts differ")
             tone = "attention"
         self.status.setText(text)
         self.status.setProperty("tone", tone)
@@ -128,7 +133,7 @@ class QualityDialog(QDialog):
             self.values["buffer"].setText(f"{buffer} MiB" if buffer is not None else "—")
             count = report.get("packet_count")
             self.values["counts"].setText((f"{count:,}" if count is not None else "—") + f" / {report.get('parsed_packets', 0):,}")
-            unknown = "확인 불가" if ko else "Unknown"
+            unknown = t("확인 불가", "Unknown")
             self.values["loss"].setText(" / ".join(f"{loss[key]:,}" if loss.get(key) is not None else unknown
                                                        for key in ("driver_dropped", "os_dropped")))
         notes = [
@@ -138,10 +143,10 @@ class QualityDialog(QDialog):
             "Size and rates are sampled. Decode rate is not wire rate; delay includes clock error. Display drops affect summaries. "
             "Original drops use optional counters from the closed file; unknown does not mean zero. Equal counts or successful archival do not prove lossless capture.",
         ]
-        text = notes[0 if ko else 1]
+        text = t(*notes)
         if report.get("error") or metrics.get("error"):
             text += "\n" + str(report.get("error") or metrics["error"])
         if metrics.get("low_space"):
-            text += "\n" + ("저장 공간이 부족합니다. 저장 위치를 확인하세요." if ko else "Low disk space. Check the output location.")
+            text += "\n" + t("저장 공간이 부족합니다. 저장 위치를 확인하세요.", "Low disk space. Check the output location.")
         self.note.setText(text)
         self.path.setText(report.get("path", ""))

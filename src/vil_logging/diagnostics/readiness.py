@@ -2,12 +2,6 @@
 
 from vil_logging.contracts.models import Role
 
-INSTALL_URLS = {
-    "wireshark": "https://www.wireshark.org/download.html",
-    "npcap": "https://npcap.com/#download",
-    "canoe": "https://www.vector.com/en/product/canoe/",
-}
-
 
 def missing_dependencies(environment: dict, connections: dict, roles: tuple[Role, ...]) -> set[str]:
     missing = set()

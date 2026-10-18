@@ -41,6 +41,8 @@ def _tool_candidates(name: str, *, specified: str = "", sibling_dir: Path | None
     if specified:
         # Explicit settings never silently switch to a different installation.
         return [Path(specified).expanduser()]
+    if name == "tshark":
+        return []  # Capture executable is always chosen explicitly by the user.
     candidates = []
     if sibling_dir is not None:
         candidates.append(sibling_dir / f"{name}.exe")
@@ -97,7 +99,8 @@ def _discover_tool(name: str, *, specified: str = "", sibling_dir: Path | None =
         "checked_paths": [str(candidate) for candidate in candidates],
         "discovery_errors": errors,
         "explicit_path": bool(specified),
-        "scope": "PATH, known Wireshark folders, and supplied path; no live capture",
+        "scope": "User-selected executable; no live capture" if name == "tshark" else
+                 "Sibling tools, PATH and known Wireshark folders; no live capture",
         "capture_check": "not_performed",
     }
     if selected is not None:

@@ -230,7 +230,7 @@ def test_naming_apply_merges_with_latest_saved_paths(runtime_factory):
     assert runtime._settings.prefix == "new_"
 
 
-def test_find_again_can_replace_missing_saved_tool_and_persist_it(runtime_factory, monkeypatch):
+def test_inventory_refresh_never_replaces_the_user_selected_tool(runtime_factory, monkeypatch):
     from vil_logging.diagnostics import connections
     runtime = runtime_factory(demo=False)
     calls = []
@@ -243,10 +243,10 @@ def test_find_again_can_replace_missing_saved_tool_and_persist_it(runtime_factor
     runtime.save_preferences({"tshark_path": "C:/missing.exe"}).result(timeout=3)
     wait_for_message(runtime, "connections")
     assert runtime._settings.tshark_path == "C:/missing.exe"
-    runtime.discover(reset_tool=True).result(timeout=3)
+    runtime.discover().result(timeout=3)
     wait_for_message(runtime, "connections")
-    assert calls == ["C:/missing.exe", ""]
-    assert runtime._settings.tshark_path == "C:/found/tshark.exe"
+    assert calls == ["C:/missing.exe", "C:/missing.exe"]
+    assert runtime._settings.tshark_path == "C:/missing.exe"
     assert runtime._submit(runtime._repo.load_settings).result(timeout=3) == runtime._settings
 
 
@@ -262,7 +262,7 @@ def test_missing_npcap_is_reported_before_asking_for_a_network(runtime_factory, 
     assert result["status"] == "attention"
     assert "TShark는 정상" in result["message_ko"]
     assert "Npcap" in result["message_ko"]
-    assert "다시 찾기" in result["next_action_ko"]
+    assert "설정창을 다시 열고" in result["next_action_ko"]
     assert "wpcap.dll" in result["detail"]
     event = wait_for_message(runtime, "event", lambda value: value.code == "TARGET_ATTENTION")
     assert event.level == "INFO"

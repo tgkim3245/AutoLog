@@ -154,11 +154,13 @@ class Repository:
         if row is None:
             return None
         document = json.loads(row["document"])
+        document["ethernet_buffer_mib"] = "64"  # Fixed application buffer; ignore legacy UI tuning.
         document.update(next_index=int(row["next_index"]), version=row["version"])
         return AppSettings(**document)
 
     @staticmethod
     def _write_settings(connection: sqlite3.Connection, settings: AppSettings) -> None:
+        settings = replace(settings, ethernet_buffer_mib="64")
         connection.execute(
             "INSERT INTO settings(id,next_index,version,document) VALUES(1,?,?,?) "
             "ON CONFLICT(id) DO UPDATE SET next_index=excluded.next_index, "
@@ -181,6 +183,7 @@ class Repository:
 
     def save_settings(self, settings: AppSettings, roles: tuple[Role, ...]) -> AppSettings:
         self._check_owner()
+        settings = replace(settings, ethernet_buffer_mib="64")
         validate_settings(settings, roles)
         preview = build_plan(settings, roles) if roles else None
         with self._transaction("save_settings") as connection:
@@ -218,7 +221,7 @@ class Repository:
         if any(not isinstance(value, str) or any(ord(char) < 32 for char in value)
                for value in patch.values()):
             raise RepositoryError("Connection preferences must be plain text")
-        if "language" in patch and patch["language"] not in {"ko", "en"}:
+        if "language" in patch and patch["language"] not in {"ko", "en", "zh"}:
             raise RepositoryError("Unsupported display language")
         if "ethernet_format" in patch and patch["ethernet_format"] not in {"pcap", "pcapng"}:
             raise RepositoryError("Unsupported Ethernet file format")
@@ -236,6 +239,8 @@ class Repository:
             if current is None:
                 raise RepositoryError("Load settings before saving preferences")
             patch = dict(patch)
+            if "ethernet_buffer_mib" in patch:
+                patch["ethernet_buffer_mib"] = "64"
             for prefix in ("can", "diag"):
                 cfg_key, block_key = prefix + "_cfg", prefix + "_logging_block"
                 if cfg_key in patch and patch[cfg_key] != getattr(current, cfg_key) and block_key not in patch:

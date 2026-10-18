@@ -9,9 +9,12 @@ def test_bug_report_button_exports_logs_and_shows_email_instructions(tmp_path):
     script = textwrap.dedent(r'''
         import sys
         import zipfile
+        import json
+        import hashlib
         from pathlib import Path
         from PySide6.QtCore import QStandardPaths, QTimer
         from PySide6.QtWidgets import QApplication, QMessageBox
+        from PySide6.QtGui import QDesktopServices
         from vil_logging import ui
         from vil_logging.app import main
 
@@ -19,6 +22,8 @@ def test_bug_report_button_exports_logs_and_shows_email_instructions(tmp_path):
         desktop = root / "Desktop"
         QStandardPaths.writableLocation = staticmethod(lambda _location: str(desktop))
         dialogs = []
+        opened_folders = []
+        QDesktopServices.openUrl = staticmethod(lambda url: opened_folders.append(url.toLocalFile()) or True)
         QMessageBox.information = staticmethod(lambda _parent, title, message:
                                                dialogs.append((title, message)))
         QMessageBox.warning = staticmethod(lambda _parent, title, message:
@@ -32,9 +37,14 @@ def test_bug_report_button_exports_logs_and_shows_email_instructions(tmp_path):
                 self.exercise.start(30)
 
             def export_and_exit(self):
-                if not self.bug_report_button.isEnabled():
+                if not self.bug_report_button.isEnabled() or not self._settings.output_dir:
                     return
                 self.exercise.stop()
+                assert self.debug_folder_button.isEnabled()
+                expected_output = Path(self._settings.output_dir).resolve()
+                self.debug_folder_button.click()
+                assert Path(opened_folders[0]).resolve() == expected_output
+                assert "developer_logs" not in opened_folders[0]
                 self.bug_report_button.click()
                 QTimer.singleShot(0, self.exit_requested.emit)
 
@@ -54,6 +64,12 @@ def test_bug_report_button_exports_logs_and_shows_email_instructions(tmp_path):
             assert "AutoLog_developer.jsonl" in archive.namelist()
             content = archive.read("AutoLog_developer.jsonl").decode("utf-8")
             assert "bug_report.export_requested" in content
+            manifest = json.loads(archive.read("manifest.json"))
+            assert manifest["send_to"] == "Taegon.Kim"
+            for item in manifest["files"]:
+                data = archive.read(item["name"])
+                assert hashlib.sha256(data).hexdigest() == item["sha256"]
+                assert len(data) == item["bytes"]
         print("BUG_REPORT_BUTTON_PASSED", reports[0].name)
     ''')
     environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "PYTHONDONTWRITEBYTECODE": "1",

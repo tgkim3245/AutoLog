@@ -18,7 +18,6 @@ from vil_logging.app import main
 from vil_logging.runtime import Runtime
 from vil_logging.diagnostics import connections
 from vil_logging.ui.environment_dialog import EnvironmentDialog
-from vil_logging.ui.installation_dialog import InstallationDialog
 from vil_logging.ui.main_window import MainWindow
 
 missing = sys.argv[2] == "True"
@@ -27,7 +26,7 @@ checks = 0
 
 def environment(self, show=True):
     status = "unavailable" if missing else "present"
-    return {"canoe": {}, "dumpcap": {"version_check": {"status": status}},
+    return {"canoe": {"executables": [{"path": "CANoe.exe"}]}, "dumpcap": {"version_check": {"status": status}},
             "capinfos": {"version_check": {"status": status}}}
 
 def discover(*args):
@@ -58,16 +57,15 @@ def verify():
         main_window.logging_requested.emit()
         assert main_window._phase.value == "idle", "missing tools must not start a session"
         view.cards["tshark"][3].click()
-        installer = next(w for w in QApplication.topLevelWidgets() if isinstance(w, InstallationDialog))
-        assert installer.isVisible()
-        missing = False  # Simulate installation completing while AutoLog remains open.
-        installer.refresh_button.click()
+        assert main_window.settings_dialog.isVisible()
+        assert main_window.settings_dialog.tabs.currentIndex() == 2
+        assert view.cards["npcap"][3].isHidden()
+        missing = False  # Dependencies installed externally; recheck without an in-app installer.
+        view.refresh_button.click()
         stage = 1
     elif stage == 1 and view._connections["tshark"]["status"] == "ready" and view._environment[
             "capinfos"]["version_check"]["status"] == "present":
-        assert "tshark" not in view._install_actions
-        assert "npcap" not in view._install_actions
-        assert view.cards["canoe"][1].text() == "선택 대상 아님"
+        assert view.cards["canoe"][1].text() == "확인됨"
         main_window.exit_requested.emit()
         stage = 3
 

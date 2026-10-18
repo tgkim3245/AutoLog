@@ -26,11 +26,13 @@ from vil_logging import __version__
 from vil_logging.contracts.models import AppSettings, Role, TargetSnapshot
 from vil_logging.storage.naming import NamingError, parse_index
 
-from .i18n import tr
+from . import zh_cn
+from .i18n import localized, report_text, tr
+from .network_combo import NetworkComboBox
 from .theme import ThemedComboBox, apply_theme, refresh_style
 
 logger = logging.getLogger(__name__)
-PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format", "ethernet_buffer_mib",
+PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format",
                "can_logging_block", "diag_logging_block")
 TEXT = {
     "intro": ("파일과 네트워크 선택은 자동으로 기억합니다.", "File and network choices are saved automatically."),
@@ -43,17 +45,16 @@ TEXT = {
     "unknown": ("상태 미확인", "Status unknown"),
     "capture_attention": ("캡처 확인 필요", "Capture access needs checking"),
     "tool": ("Wireshark 캡처 도구", "Wireshark capture tool"),
-    "tool_help": ("TShark는 Wireshark에 포함된 캡처 도구입니다. 설치 위치를 자동으로 찾습니다.",
-                  "TShark is the capture tool included with Wireshark. Its location is detected automatically."),
-    "find": ("다시 찾기", "Find again"), "select": ("직접 선택", "Choose file"),
+    "tool_help": ("직접 선택으로 설치된 tshark.exe를 지정하세요. 선택한 경로를 기억합니다.",
+                  "Choose your installed tshark.exe. The selected path is remembered."),
+    "select": ("직접 선택", "Choose file"),
     "finding": ("캡처 도구와 네트워크를 찾고 있습니다…", "Finding the capture tool and networks…"),
-    "tool_pending": ("설정창을 열면 설치된 캡처 도구를 찾습니다.", "The capture tool is detected when you open settings."),
+    "tool_pending": ("tshark.exe를 직접 선택한 뒤 네트워크를 선택하세요.", "Choose tshark.exe, then select a network."),
     "tool_found": ("캡처 도구를 찾았습니다", "Capture tool found"),
     "tool_missing": ("Wireshark 캡처 도구를 찾지 못했습니다.", "Wireshark capture tool was not found."),
-    "tool_next": ("Wireshark를 설치한 뒤 다시 찾거나 tshark.exe를 직접 선택하세요.",
-                  "Install Wireshark and find again, or choose tshark.exe."),
-    "network_help": ("장비가 연결된 네트워크 이름을 선택하세요. 선택한 장치는 다음 실행에도 기억합니다.",
-                     "Choose the network connected to your device. Your choice is remembered for the next launch."),
+    "tool_next": ("직접 선택으로 사용할 tshark.exe를 지정하세요.", "Choose the tshark.exe to use."),
+    "network_help": ("목록 오른쪽 그래프는 네트워크 전체 수신량(pps)입니다. 장비가 연결된 네트워크를 선택하세요. 선택은 기억합니다.",
+                     "Graphs show total received packets per second (pps). Choose the network connected to your device. Your choice is remembered."),
     "can_help": ("각 .cfg를 별도 CANoe 창으로 열어 독립적으로 연결합니다. 해당 카드에서 그 구성의 BLF 기록 블록 하나를 지정하세요.",
                  "Each .cfg opens in its own CANoe instance. Choose one BLF logging block from that configuration in its card."),
     "canoe_set_title": ("CANoe 구성별 연결", "Separate CANoe connections"),
@@ -87,25 +88,21 @@ TEXT = {
                    "Select the target on the main screen, then start logging."),
     "scope": ("환경·연결 확인은 실제 캡처 성공을 의미하지 않습니다.",
               "Environment and connection checks do not establish successful capture."),
-    "timeout": ("검색 응답이 지연되고 있습니다. 다시 찾기를 눌러 재시도하세요.",
-                "Discovery is taking too long. Choose Find again to retry."),
-    "npcap": ("Npcap 설치 페이지", "Npcap installation page"),
+    "timeout": ("네트워크 확인이 지연되고 있습니다. 설정창을 다시 열어 확인하세요.",
+                "Network discovery is taking too long. Reopen settings to retry."),
     "format_help": ("기본 저장 형식은 pcap입니다. 다른 형식을 선택하면 다음 실행에도 기억합니다.",
                     "The default is pcap. A different choice is remembered for the next launch."),
-    "npcap_help": ("실제 캡처에 필요한 Npcap이 없습니다. 설치 후 다시 찾기를 누르세요.",
-                   "Npcap is required for live capture. Install it, then choose Find again."),
+    "npcap_help": ("실제 캡처에 필요한 Npcap이 없습니다. 별도 설치 안내를 확인하세요.",
+                   "Npcap is required for live capture. Refer to your installation guide."),
 }
 
 
 class SettingsDialog(QDialog):
-    installation_requested = Signal(str)
     settings_applied = Signal(object)
     preferences_changed = Signal(object)
     prepare_requested = Signal(object)
     environment_requested = Signal()
-    discovery_requested = Signal(bool)
-    npcap_requested = Signal()
-    exit_requested = Signal()
+    discovery_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -207,20 +204,15 @@ class SettingsDialog(QDialog):
         self.tool_status = self._helper()
         self.tool_status.setObjectName("captureToolStatus")
         layout.addWidget(self.tool_status)
-        self.find_button = QPushButton()
-        self.find_button.setObjectName("discoverConnectionsButton")
-        self.find_button.clicked.connect(lambda: self._request_discovery(reset_tool=True))
-        layout.addWidget(self.find_button, 0, Qt.AlignmentFlag.AlignLeft)
-        self.install_button = QPushButton()
-        self.install_button.clicked.connect(lambda: self.installation_requested.emit("wireshark"))
-        layout.addWidget(self.install_button, 0, Qt.AlignmentFlag.AlignLeft)
         form = QFormLayout()
         self.network_label = QLabel()
-        self.nic_input = ThemedComboBox()
+        self.nic_input = NetworkComboBox()
         self.nic_input.setObjectName("nicAdapterComboBox")
         self.nic_input.setMinimumContentsLength(28)
         self.nic_input.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.nic_input.currentIndexChanged.connect(self._nic_changed)
+        self.nic_input.popup_opened.connect(self._request_discovery)
+        self.nic_input.popup_closed.connect(lambda: self._render_networks(self._current("nic_id")))
         form.addRow(self.network_label, self.nic_input)
         self.format_label = QLabel()
         self.format_input = ThemedComboBox()
@@ -228,25 +220,11 @@ class SettingsDialog(QDialog):
         self.format_input.addItems(["pcap", "pcapng"])
         self.format_input.currentTextChanged.connect(self._format_changed)
         form.addRow(self.format_label, self.format_input)
-        self.buffer_label = QLabel()
-        self.buffer_input = ThemedComboBox()
-        self.buffer_input.setObjectName("ethernetBufferComboBox")
-        for value in (16, 32, 64, 128, 256):
-            self.buffer_input.addItem(f"{value} MiB", str(value))
-        self.buffer_input.currentIndexChanged.connect(self._buffer_changed)
-        form.addRow(self.buffer_label, self.buffer_input)
         layout.addLayout(form)
-        self.buffer_hint = self._helper()
-        layout.addWidget(self.buffer_hint)
         self.network_hint = self._helper()
         layout.addWidget(self.network_hint)
         self.driver_status = self._helper()
         layout.addWidget(self.driver_status)
-        self.npcap_button = QPushButton()
-        self.npcap_button.setProperty("variant", "secondary")
-        self.npcap_button.clicked.connect(self.npcap_requested)
-        self.npcap_button.hide()
-        layout.addWidget(self.npcap_button, 0, Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self._preparation_box(Role.ETHERNET))
         layout.addStretch()
         self.tabs.addTab(ethernet, "")
@@ -258,20 +236,22 @@ class SettingsDialog(QDialog):
         actions = QHBoxLayout()
         self.environment_button = QPushButton()
         self.environment_button.clicked.connect(self.environment_requested)
-        self.exit_button = QPushButton()
-        self.exit_button.setProperty("variant", "ghost")
-        self.exit_button.clicked.connect(self.exit_requested)
         self.close_button = QPushButton()
         self.close_button.clicked.connect(self.hide)
         actions.addWidget(self.environment_button)
         actions.addStretch()
-        actions.addWidget(self.exit_button)
         actions.addWidget(self.close_button)
         outer.addLayout(actions)
+        self.tabs.currentChanged.connect(self._sync_network_sampling)
         self.set_settings(self._settings)
 
     def _t(self, key: str) -> str:
+        if self._language == "zh":
+            return zh_cn.SETTINGS.get(key, TEXT[key][1])
         return TEXT[key][self._language == "en"]
+
+    def _phrase(self, ko, en):
+        return localized(ko, en, self._language)
 
     @staticmethod
     def _helper() -> QLabel:
@@ -422,8 +402,15 @@ class SettingsDialog(QDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
-        if not self._discovery_started:
-            self._request_discovery()
+        self._request_discovery()
+        self._sync_network_sampling()
+
+    def hideEvent(self, event):
+        self.nic_input.set_sampling(False)
+        super().hideEvent(event)
+
+    def _sync_network_sampling(self, *_args):
+        self.nic_input.set_sampling(self.isVisible() and self.tabs.currentIndex() == 2)
 
     def _mark_dirty(self, key):
         if not self._updating:
@@ -438,8 +425,6 @@ class SettingsDialog(QDialog):
             return self.nic_input.currentData() or ""
         if key == "ethernet_format":
             return self.format_input.currentText()
-        if key == "ethernet_buffer_mib":
-            return self.buffer_input.currentData()
         return self.fields[key].text().strip()
 
     def _block_changed(self, key):
@@ -451,7 +436,7 @@ class SettingsDialog(QDialog):
             return
         with QSignalBlocker(self.block_inputs[key]):
             self.block_inputs[key].clear()
-            self.block_inputs[key].addItem("연결 후 블록 선택" if self._language == "ko" else "Choose block after connection", "")
+            self.block_inputs[key].addItem(self._phrase("연결 후 블록 선택", "Choose block after connection"), "")
         self._mark_dirty(key)
 
     def _save_preferences(self, keys, *, force=False, skip_pending=False):
@@ -492,10 +477,6 @@ class SettingsDialog(QDialog):
         self._mark_dirty("ethernet_format")
         self._save_preferences(("ethernet_format",))
 
-    def _buffer_changed(self, _index):
-        self._mark_dirty("ethernet_buffer_mib")
-        self._save_preferences(("ethernet_buffer_mib",))
-
     def _nic_changed(self, _index):
         self._mark_dirty("nic_id")
         self._save_preferences(("nic_id",))
@@ -511,8 +492,7 @@ class SettingsDialog(QDialog):
             return
         values = {key: self._current(key) for key in self.fields}
         values.update(next_index=next_index, nic_id=self._current("nic_id"),
-                      ethernet_format=self.format_input.currentText(),
-                      ethernet_buffer_mib=self._current("ethernet_buffer_mib"))
+                      ethernet_format=self.format_input.currentText(), ethernet_buffer_mib="64")
         self._save_preferences(PREFERENCES)
         self.feedback.clear()
         self.settings_applied.emit(replace(self._settings, **values))
@@ -566,15 +546,6 @@ class SettingsDialog(QDialog):
                 with QSignalBlocker(self.format_input):
                     self.format_input.setCurrentText(settings.ethernet_format)
             selected = self._current("nic_id") if "nic_id" in self._dirty else settings.nic_id
-            key = "ethernet_buffer_mib"
-            if key not in self._dirty or (self._current(key) == settings.ethernet_buffer_mib and key not in pending):
-                self._dirty.discard(key)
-                with QSignalBlocker(self.buffer_input):
-                    index = self.buffer_input.findData(settings.ethernet_buffer_mib)
-                    if index < 0:
-                        self.buffer_input.addItem(f"{settings.ethernet_buffer_mib} MiB", settings.ethernet_buffer_mib)
-                        index = self.buffer_input.count() - 1
-                    self.buffer_input.setCurrentIndex(index)
             if selected == settings.nic_id and "nic_id" not in pending:
                 self._dirty.discard("nic_id")
             self._render_networks(selected)
@@ -586,13 +557,13 @@ class SettingsDialog(QDialog):
             self.feedback.setProperty("tone", "ready")
             refresh_style(self.feedback)
 
-    def _request_discovery(self, *, reset_tool=False):
+    def _request_discovery(self):
         if self._discovering:
             return
         self._discovery_started = self._discovering = True
         self._discovery_revision = self._revision
         self.set_discovery_busy(True)
-        self.discovery_requested.emit(reset_tool)
+        self.discovery_requested.emit()
 
     def set_discovery_busy(self, busy: bool):
         self._discovering = busy
@@ -601,7 +572,6 @@ class SettingsDialog(QDialog):
             self._discovery_timer.start()
         else:
             self._discovery_timer.stop()
-        self.find_button.setEnabled(not self._busy and not busy)
         self._render_discovery()
 
     def _discovery_timed_out(self):
@@ -623,16 +593,12 @@ class SettingsDialog(QDialog):
         self._discovery_started = True
         self._discovery_error = ""
         self.set_discovery_busy(False)
-        tool = report.get("tshark", {})
-        if not self._busy and tool.get("path") and tool.get("status") == "ready" and not self._current("tshark_path") and (
-            self._field_revision.get("tshark_path", 0) <= self._discovery_revision
-        ):
-            self.fields["tshark_path"].setText(tool["path"])
-            self._save_preferences(("tshark_path",), force=True)
         self._render_networks(self._current("nic_id") if "nic_id" in self._dirty else self._settings.nic_id)
         self._render_discovery()
 
     def _render_networks(self, selected):
+        if self.nic_input.popup_open:
+            return  # Do not move rows under the cursor while receiving inventory updates.
         with QSignalBlocker(self.nic_input):
             self.nic_input.clear()
             self.nic_input.addItem(self._t("choose_network"), "")
@@ -657,10 +623,11 @@ class SettingsDialog(QDialog):
                 index = self.nic_input.count() - 1
                 self.nic_input.setItemData(index, selected, Qt.ItemDataRole.ToolTipRole)
             self.nic_input.setCurrentIndex(max(index, 0))
+        self.nic_input.refresh_activity()
 
     def _render_discovery(self):
         tool = self._discovery.get("tshark", {})
-        message = tool.get("message_" + self._language) or self._t(
+        message = report_text(tool, "message", self._language) or self._t(
             "tool_found" if tool.get("status") == "ready" else "tool_missing" if tool else "tool_pending")
         if tool.get("version"):
             message += "\n" + str(tool["version"]).splitlines()[0]
@@ -673,10 +640,9 @@ class SettingsDialog(QDialog):
         refresh_style(self.tool_status)
         driver = self._discovery.get("npcap", {})
         missing = driver.get("status") == "missing"
-        self.driver_status.setText(self._t("npcap_help") if missing else driver.get("message_" + self._language, ""))
+        self.driver_status.setText(self._t("npcap_help") if missing else report_text(driver, "message", self._language))
         self.driver_status.setProperty("tone", "attention" if missing else "neutral")
         refresh_style(self.driver_status)
-        self.npcap_button.setVisible(missing)
 
     def set_preparation_report(self, report):
         try:
@@ -691,13 +657,13 @@ class SettingsDialog(QDialog):
             selected = self._current(key) if key in self._dirty else report.get("selected_block", "")
             with QSignalBlocker(combo):
                 combo.clear()
-                combo.addItem("기록 블록 선택" if self._language == "ko" else "Choose logging block", "")
+                combo.addItem(self._phrase("기록 블록 선택", "Choose logging block"), "")
                 for item in report["blocks"]:
                     label = f"{item['id']} · {item['name']}"
                     if item.get("format"):
                         label += f" · .{item['format']}"
                     if item.get("compatible") is False:
-                        label += " · 선택 불가" if self._language == "ko" else " · unavailable"
+                        label += self._phrase(" · 선택 불가", " · unavailable")
                     combo.addItem(label, item["id"])
                     index = combo.count() - 1
                     combo.setItemData(index, item.get("path", ""), Qt.ItemDataRole.ToolTipRole)
@@ -723,7 +689,7 @@ class SettingsDialog(QDialog):
         report = self._reports.get(role, {})
         status = report.get("status", "neutral")
         title = self._t(status) if status in {"checking", "ready", "attention", "error"} else self._t("unprepared")
-        message = report.get("message_" + self._language, "")
+        message = report_text(report, "message", self._language)
         if role in self.preparation_headings:
             heading_key = "can_connection" if role == Role.CAN else "diag_connection" if role == Role.DIAG else "ethernet_connection"
             self.preparation_headings[role].setText(self._t(heading_key))
@@ -731,12 +697,12 @@ class SettingsDialog(QDialog):
         label.setText(title + (" · " + message if message else ""))
         label.setProperty("tone", status)
         refresh_style(label)
-        detail = str(report.get("detail_" + self._language, report.get("detail", "")))
+        detail = str(report_text(report, "detail", self._language, report.get("detail", "")))
         visible_detail = detail[:500] if status in {"attention", "error"} else ""
         self.result_details[role].setText(visible_detail)
         self.result_details[role].setVisible(bool(visible_detail))
         self.result_details[role].setToolTip(report.get("diagnostic_detail", detail))
-        action = report.get("next_action_" + self._language, "")
+        action = report_text(report, "next_action", self._language)
         if report and not action:
             action = self._t("wait" if status == "checking" else "ready_next" if status == "ready" else
                              "network_next" if role == Role.ETHERNET else "cfg_next")
@@ -754,7 +720,7 @@ class SettingsDialog(QDialog):
             summary = self.connection_summaries[role]
             cfg = str(report.get("connected_cfg", ""))
             pid = report.get("canoe_pid", 0)
-            caption = "연결된 구성" if self._language == "ko" else "Connected configuration"
+            caption = self._phrase("연결된 구성", "Connected configuration")
             summary.setText(f"{caption} · {Path(cfg).name}" + (f" · CANoe PID {pid}" if pid else ""))
             summary.setToolTip(cfg)
             summary.setVisible(bool(cfg))
@@ -773,7 +739,7 @@ class SettingsDialog(QDialog):
         self._render_preparation(target.role)
 
     def set_language(self, language):
-        self._language = "en" if language == "en" else "ko"
+        self._language = language if language in {"ko", "en", "zh"} else "ko"
         self.setWindowTitle(f"{tr('settings', self._language)} · AutoLog {__version__}")
         self.heading.setText(tr("settings", self._language))
         self.hint.setText(tr("locked", self._language) if self._busy else self._t("intro"))
@@ -796,19 +762,11 @@ class SettingsDialog(QDialog):
                            (self.scope_hint, "scope")):
             label.setText(self._t(key))
         self.format_label.setText(tr("format", self._language))
-        self.buffer_label.setText("캡처 버퍼" if self._language == "ko" else "Capture buffer")
-        self.buffer_hint.setText(
-            "기본 64 MiB · 드라이버에 요청하는 버퍼입니다. 실제 적용량과 무손실 캡처를 보장하지 않습니다."
-            if self._language == "ko" else
-            "Default 64 MiB · Requested driver buffer; actual allocation and lossless capture are not guaranteed.")
         self.format_input.setToolTip(self._t("format_help"))
-        self.find_button.setText(self._t("find"))
         for key, label in self.block_labels.items():
             label.setText(self._t("can_block_label" if key.startswith("can_") else "diag_block_label"))
-            self.block_inputs[key].setItemText(0, "연결 후 블록 선택" if self._language == "ko" else "Choose block after connection")
-        self.install_button.setText("Wireshark " + ("설치·복구" if self._language == "ko" else "install / repair"))
-        self.npcap_button.setText(self._t("npcap"))
-        for button, key in ((self.environment_button, "environment"), (self.exit_button, "exit"),
+            self.block_inputs[key].setItemText(0, self._phrase("연결 후 블록 선택", "Choose block after connection"))
+        for button, key in ((self.environment_button, "environment"),
                             (self.apply_button, "apply"), (self.close_button, "close")):
             button.setText(tr(key, self._language))
         self._render_networks(self._current("nic_id") if "nic_id" in self._dirty else self._settings.nic_id)
@@ -820,9 +778,8 @@ class SettingsDialog(QDialog):
         self._busy = busy
         for widget in [*self.fields.values(), *self.browse_buttons, self.nic_input,
                        *self.block_inputs.values(), self.format_input,
-                       self.buffer_input, self.apply_button]:
+                       self.apply_button]:
             widget.setEnabled(not busy)
-        self.find_button.setEnabled(not busy and not self._discovering)
         self.set_language(self._language)
 
     def set_error(self, message):

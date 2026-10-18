@@ -540,8 +540,8 @@ class Runtime:
             result = report("attention", "TShark는 정상입니다. 실제 캡처에 필요한 Npcap 드라이버가 없습니다.",
                             "TShark works. The Npcap driver needed for live capture is missing.",
                             connections.get("interface_query_error", ""))
-            result.update(next_action_ko="Npcap 설치 페이지에서 설치한 뒤 다시 찾기를 누르고 장비의 네트워크를 선택하세요.",
-                          next_action_en="Install Npcap using the link above, choose Find again, then select your device network.")
+            result.update(next_action_ko="별도 설치 안내에 따라 Npcap을 준비한 뒤 설정창을 다시 열고 장비의 네트워크를 선택하세요.",
+                          next_action_en="Follow your separate guide to install Npcap, then reopen Settings and select the device network.")
             return result, connections
         if not settings.nic_id:
             return report("attention", "차량에 연결된 네트워크를 위 목록에서 선택하세요.",
@@ -561,6 +561,7 @@ class Runtime:
         result = report("ready", f"{selected['name']} 캡처 준비를 확인했습니다. 패킷 기록은 시작하지 않았습니다.",
                       f"{selected['name']} is available for capture. Recording has not started.", tool["path"]), connections
         result[0].update(next_action_ko="메인에서 Zipy를 선택하고 logging을 누르면 선택한 네트워크 기록을 시작합니다.",
+                         message_zh=f"{selected['name']} 已准备好采集，尚未开始记录。",
                          next_action_en="Select Zipy on the main screen and press logging to capture the selected network.")
         return result
 
@@ -602,41 +603,34 @@ class Runtime:
                     level="ERROR" if report["status"] == "error" else "INFO", target=role.label,
                     original=report["message_ko"], detail=report["detail"], readiness_only=True)
 
-    def discover(self, reset_tool: bool = False) -> Future:
-        return self._submit(self._begin_discovery, reset_tool)
+    def discover(self) -> Future:
+        return self._submit(self._begin_discovery)
 
-    def _begin_discovery(self, reset_tool: bool = False) -> None:
+    def _begin_discovery(self) -> None:
         if self._closed or not self._ready:
             return
         from vil_logging.diagnostics.connections import discover_connections
         self._discovery_generation += 1
         generation, settings = self._discovery_generation, self._settings
         self._publish("discovery_busy", True)
-        self._background(lambda: discover_connections("" if reset_tool else settings.tshark_path, settings.nic_id),
-                         lambda future: self._finish_discovery(generation, settings, future, reset_tool))
+        self._background(lambda: discover_connections(settings.tshark_path, settings.nic_id),
+                         lambda future: self._finish_discovery(generation, settings, future))
 
-    def _finish_discovery(self, generation: int, captured: AppSettings, future: Future,
-                          reset_tool: bool = False) -> None:
+    def _finish_discovery(self, generation: int, captured: AppSettings, future: Future) -> None:
         if self._closed or generation != self._discovery_generation:
             return
         self._publish("discovery_busy", False)
         if (captured.tshark_path, captured.nic_id) != (self._settings.tshark_path, self._settings.nic_id):
             return
         try:
-            self._accept_discovery(future.result(), replace_tool=reset_tool)
+            self._accept_discovery(future.result())
         except Exception as error:
             log.exception("connections.discovery_failed")
             self._publish("discovery_error", "캡처 도구와 네트워크를 찾는 중 오류가 발생했습니다. " + str(error))
             self._event("OPERATION_ERROR", level="ERROR", original=str(error))
 
-    def _accept_discovery(self, report: dict, *, replace_tool: bool = False) -> None:
+    def _accept_discovery(self, report: dict) -> None:
         self._connections = report
-        detected = report["tshark"]
-        if (not self._settings.tshark_path or replace_tool) and detected["status"] == "ready" and (
-            self.phase not in ACTIVE and self.phase != SessionPhase.INCOMPLETE
-        ):
-            self._settings = self._repo.save_preferences({"tshark_path": detected["path"]})
-            self._publish("settings", self._settings)
         self._publish("connections", report)
 
     def toggle(self, roles: tuple[Role, ...]) -> Future | None:
@@ -933,7 +927,7 @@ class Runtime:
     def _real_params(self, role: Role) -> dict:
         if role == Role.ETHERNET:
             return {"tshark_path": self._settings.tshark_path, "nic_id": self._settings.nic_id,
-                    "file_format": self._settings.ethernet_format, "buffer_mib": self._settings.ethernet_buffer_mib}
+                    "file_format": self._settings.ethernet_format, "buffer_mib": "64"}
         key = "can" if role == Role.CAN else "diag"
         return {"cfg_path": getattr(self._settings, key + "_cfg"),
                 "logging_block": getattr(self._settings, key + "_logging_block")}

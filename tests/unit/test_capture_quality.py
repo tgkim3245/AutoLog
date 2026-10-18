@@ -2,7 +2,6 @@ import io
 import queue
 import struct
 import time
-from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -102,7 +101,7 @@ def test_capture_buffer_rejects_invalid_values(value):
         validate_buffer(value)
 
 
-def test_buffer_settings_persist_and_old_defaults_are_64(tmp_path):
+def test_legacy_buffer_settings_are_normalized_to_fixed_64(tmp_path):
     repo = Repository(tmp_path / "state.sqlite3")
     assert repo.load_settings().ethernet_buffer_mib == "64"
     saved = repo.save_preferences({"ethernet_buffer_mib": "128"})
@@ -112,7 +111,7 @@ def test_buffer_settings_persist_and_old_defaults_are_64(tmp_path):
     repo.close()
     repo = Repository(tmp_path / "state.sqlite3")
     try:
-        assert repo.load_settings().ethernet_buffer_mib == "128"
+        assert repo.load_settings().ethernet_buffer_mib == "64"
     finally:
         repo.close()
 
@@ -200,19 +199,11 @@ def test_quality_ui_unknown_stale_and_final_samples_are_distinct(qtbot):
     assert "Unknown" in dialog.values["loss"].text() and "lossless" in dialog.note.text()
 
 
-def test_buffer_combo_saves_and_stale_ack_cannot_overwrite_new_choice(qtbot):
+def test_buffer_is_fixed_and_legacy_ui_choice_is_not_exposed(qtbot):
     dialog = SettingsDialog()
     qtbot.addWidget(dialog)
-    original = AppSettings(version=4)
-    dialog.set_settings(original)
-    assert dialog.buffer_input.currentData() == "64"
-    spy = QSignalSpy(dialog.preferences_changed)
-    dialog.buffer_input.setCurrentIndex(dialog.buffer_input.findData("128"))
-    assert spy.at(0)[0] == {"ethernet_buffer_mib": "128"}
-    dialog.buffer_input.setCurrentIndex(dialog.buffer_input.findData("256"))
-    dialog.set_settings(replace(original, ethernet_buffer_mib="128", version=5))
-    assert dialog.buffer_input.currentData() == "256"
-    dialog.set_settings(replace(original, ethernet_buffer_mib="256", version=6))
-    assert not dialog._pending_patches
-    dialog.set_busy(True)
-    assert not dialog.buffer_input.isEnabled()
+    dialog.set_settings(AppSettings(output_dir="C:/captures", ethernet_buffer_mib="256", version=4))
+    assert not hasattr(dialog, "buffer_input")
+    spy = QSignalSpy(dialog.settings_applied)
+    dialog._apply()
+    assert spy.at(0)[0].ethernet_buffer_mib == "64"

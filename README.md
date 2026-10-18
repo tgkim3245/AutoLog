@@ -2,9 +2,11 @@
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 공통 logging 버튼으로 기록을 제어합니다.
 
-현재 소스 버전은 **0.8.4**입니다. CAN과 Diag의 **연결 확인**을 누르면 각 .cfg가 별도 CANoe 창에 연결됩니다. 연결 방식 선택창은 없으며 각 카드에 연결된 .cfg와 CANoe PID를 표시합니다. [자동 독립 연결 수정](docs/canoe_independent_connection.md), [기록 품질·캡처 버퍼·부하 검사](docs/development_stage_8.md), [Ethernet 통신 감시](docs/development_stage_7.md), [미완료 기록 복구](docs/development_stage_6.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
+현재 소스 버전은 **0.8.5**입니다. [화면 간소화·네트워크 그래프·중국어·버그리포트 검증](docs/ui_update_0_8_5.md)을 반영했습니다. CAN과 Diag의 **연결 확인**을 누르면 각 .cfg가 별도 CANoe 창에 연결됩니다. 연결 방식 선택창은 없으며 각 카드에 연결된 .cfg와 CANoe PID를 표시합니다. [자동 독립 연결 수정](docs/canoe_independent_connection.md), [기록 품질·부하 검사](docs/development_stage_8.md), [Ethernet 통신 감시](docs/development_stage_7.md), [미완료 기록 복구](docs/development_stage_6.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
-**기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. **설정 → Ethernet 연결**의 캡처 버퍼는 기본 64 MiB이고 선택값을 기억합니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
+**기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
+
+기본 선택은 **CAN·Zipy**입니다. `한 | EN | 中` 버튼은 클릭할 때마다 표시 언어를 바꾸고 기억합니다. Ethernet 설정에서 `tshark.exe`를 직접 지정하며, 네트워크 목록 오른쪽 그래프는 해당 어댑터 전체의 초당 수신 패킷 수입니다. **로그 폴더**는 사용자가 지정한 캡처 저장 폴더를 엽니다.
 
 **통신 감시 → 감시 기준**에서 Zipy의 목적지·프로토콜·기대 출처와 시간/복귀 기준을 직접 저장하면 다음 기록부터 감시합니다. 기준값은 기본으로 비어 있으며, 미수신·다른 출처·복귀·관측 지연을 구분합니다. 패킷 표시 필터·일시 정지·화면 큐 누락과 감시는 독립적이며, 경고로 기록을 자동 정지하지 않습니다. CAN·Diag의 실제 수신 감시는 현재 미지원입니다.
 
@@ -55,11 +57,11 @@ SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉
 
 개발자로그는 항상 기록하며, 소스 실행 시 저장소 루트의 `developer_logs/`, 배포 실행 시 EXE 옆 `developer_logs/`에 저장합니다. 기본 파일명은 `AutoLog_developer.jsonl`이며 5MB 파일 하나와 최대 4개 순환 백업으로 크기를 제한합니다.
 
-**버그리포트** 버튼은 최근 로그와 백업을 ZIP으로 묶어 바탕화면에 저장하고 `Taegon.Kim`에게 해당 파일을 이메일로 보내 달라고 안내합니다. 앱이 이메일을 직접 보내지는 않습니다. 최근 활동 화면은 최대 500개를 표시합니다.
+**버그리포트** 버튼은 최근 로그와 백업을 ZIP으로 묶어 바탕화면에 저장하고 `Taegon.Kim`에게 해당 파일을 이메일로 보내 달라고 안내합니다. ZIP의 `manifest.json`에 원본별 크기와 SHA256을 넣고 저장 전에 검증합니다. 압축 크기와 원본 크기는 다르며 내보낸 뒤에도 원본 로그는 계속 증가합니다. 앱이 이메일을 직접 보내지는 않습니다. 최근 활동 화면은 최대 500개를 표시합니다.
 
 ## 기존 사용자 데이터
 
-이전 `%LOCALAPPDATA%\Auto_Log` 또는 `%LOCALAPPDATA%\VILLogging`의 SQLite 설정과 번호 이력은 새 프로필이 없을 때 `%LOCALAPPDATA%\AutoLog`로 복사합니다. 이전 기본 prefix는 `AutoLog`로 바꾸고 사용자 지정 prefix, 저장 경로, 장치 선택과 다음 번호는 유지합니다. 기존 캡처 파일은 이동하거나 이름을 바꾸지 않습니다. TShark 검색은 이전 도구 폴더도 지원합니다.
+이전 `%LOCALAPPDATA%\Auto_Log` 또는 `%LOCALAPPDATA%\VILLogging`의 SQLite 설정과 번호 이력은 새 프로필이 없을 때 `%LOCALAPPDATA%\AutoLog`로 복사합니다. 이전 기본 prefix는 `AutoLog`로 바꾸고 사용자 지정 prefix, 저장 경로, 장치 선택과 다음 번호는 유지합니다. 기존 캡처 파일은 이동하거나 이름을 바꾸지 않습니다. 이전에 선택한 TShark 경로도 유지하며 자동으로 다른 설치본으로 바꾸지 않습니다.
 
 ## 구현 및 검증 범위
 

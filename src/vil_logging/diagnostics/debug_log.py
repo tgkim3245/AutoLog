@@ -9,6 +9,7 @@ anonymizer.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import math
@@ -346,9 +347,7 @@ class DebugLogService:
             listener.flush_pending()
 
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report = destination_dir / f"AutoLog_BugReport_{stamp}.zip"
-            if report.exists():
-                report = destination_dir / f"AutoLog_BugReport_{stamp}_{uuid4().hex[:6]}.zip"
+            report = destination_dir / f"AutoLog_BugReport_To_Taegon.Kim_{stamp}_{uuid4().hex[:8]}.zip"
             temporary = report.with_name(f".{report.name}.{uuid4().hex[:8]}.tmp")
             # The listener has drained all records up to the barrier. Holding the
             # rotating handler lock keeps filenames stable while the archive is
@@ -360,9 +359,29 @@ class DebugLogService:
                 log_files = [item for item in log_files if item.is_file()]
                 if not log_files:
                     raise FileNotFoundError("No developer log files are available to export")
+                manifest = {"created_utc": datetime.now(timezone.utc).isoformat(), "send_to": "Taegon.Kim",
+                            "snapshot": "Developer logs at export time; source logs continue growing.", "files": []}
                 with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                     for log_file in log_files:
-                        archive.write(log_file, arcname=log_file.name)
+                        digest, size = hashlib.sha256(), 0
+                        with log_file.open("rb") as source, archive.open(log_file.name, "w") as destination:
+                            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                                destination.write(chunk)
+                                digest.update(chunk)
+                                size += len(chunk)
+                        manifest["files"].append({"name": log_file.name, "bytes": size, "sha256": digest.hexdigest()})
+                    archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+                with zipfile.ZipFile(temporary) as archive:
+                    if archive.testzip() is not None:
+                        raise DebugLogError("Bug report ZIP integrity check failed")
+                    for item in manifest["files"]:
+                        digest, size = hashlib.sha256(), 0
+                        with archive.open(item["name"]) as source:
+                            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                                digest.update(chunk)
+                                size += len(chunk)
+                        if (size, digest.hexdigest()) != (item["bytes"], item["sha256"]):
+                            raise DebugLogError("Bug report snapshot content verification failed")
                 temporary.replace(report)
             finally:
                 output.release()

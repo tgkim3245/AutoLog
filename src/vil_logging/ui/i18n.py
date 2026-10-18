@@ -4,7 +4,24 @@ from datetime import datetime
 
 from vil_logging.contracts.models import AppEvent
 
+from . import zh_cn
+
+
+def localized(ko: str, en: str, language: str) -> str:
+    if language == "zh":
+        return zh_cn.PHRASES.get(en, en)
+    return en if language == "en" else ko
+
+
+def report_text(report: dict, key: str, language: str, default="") -> str:
+    """Keep diagnostic originals when no translation exists, rather than hide them."""
+    if language == "zh":
+        return report.get(key + "_zh") or zh_cn.PHRASES.get(
+            report.get(key + "_en", ""), report.get(key + "_en", default))
+    return report.get(key + "_" + language, default)
+
 TEXT = {
+    "quality": ("기록 품질", "Quality"),
     "title": ("로그 캡처", "Log capture"),
     "subtitle": ("CAN · Diag · Zipy 통합 제어", "CAN · Diag · Zipy controls"),
     "settings": ("설정", "Settings"),
@@ -104,9 +121,9 @@ TEXT = {
     "bug_report": ("버그리포트", "Bug report"),
     "bug_report_title": ("버그리포트", "Bug report"),
     "bug_report_saved": (
-        "바탕화면에 개발자 로그를 저장했습니다.\n파일명: {filename}\n"
+        "최근 개발자 로그를 ZIP으로 압축해 바탕화면에 저장했습니다.\n파일명: {filename}\n"
         "이 파일을 Taegon.Kim에게 이메일로 보내 주세요.",
-        "The developer log was saved to your Desktop.\nFilename: {filename}\n"
+        "Recent developer logs were compressed into a ZIP on your Desktop.\nFilename: {filename}\n"
         "Please email this file to Taegon.Kim.",
     ),
     "bug_report_failed": (
@@ -315,6 +332,8 @@ DEMO_EVENTS = {
 
 def tr(key: str, language: str = "ko") -> str:
     pair = TEXT.get(key)
+    if language == "zh":
+        return zh_cn.TEXT.get(key, pair[1] if pair else key)
     return pair[language == "en"] if pair else key
 
 
@@ -323,12 +342,15 @@ def render_event(event: AppEvent, language: str, *, include_details: bool = True
     pair = DEMO_EVENTS.get(event.code) if event.params.get("demo") is True else None
     pair = pair or EVENTS.get(event.code)
     description = pair[language == "en"] if pair else (event.original or event.code)
+    if language == "zh" and pair:
+        description = (zh_cn.DEMO_EVENTS if event.params.get("demo") is True and event.code in DEMO_EVENTS
+                       else zh_cn.EVENTS).get(event.code, pair[1])
     if event.code == "FILE_PUBLISHED" and "packets" in event.params:
         count = event.params["packets"]
-        description += f" · {count} packets" if language == "en" else f" · {count}패킷"
+        description += {"ko": f" · {count}패킷", "zh": f" · {count} 个数据包"}.get(language, f" · {count} packets")
     if event.code == "BLF_PUBLISHED" and "objects" in event.params:
         count = event.params["objects"]
-        description += f" · {count} objects" if language == "en" else f" · {count}객체"
+        description += {"ko": f" · {count}객체", "zh": f" · {count} 个对象"}.get(language, f" · {count} objects")
     if event.code.startswith("FILE_OPERATION_") and "kind" in event.params:
         description = tr("file_kind_" + event.params["kind"], language) + " · " + description
     details = " · ".join(f"{key}={value}" for key, value in event.params.items())
@@ -346,5 +368,6 @@ def render_event(event: AppEvent, language: str, *, include_details: bool = True
         display_time = datetime.fromisoformat(event.timestamp).astimezone().strftime("%H:%M:%S")
     except ValueError:
         display_time = event.timestamp[11:23] or event.timestamp
-    target = {"app": "프로그램" if language == "ko" else "App", "can": "CAN", "diag": "Diag", "ethernet": "Zipy"}.get(event.target, event.target)
+    target = {"app": {"ko": "프로그램", "zh": "程序"}.get(language, "App"),
+              "can": "CAN", "diag": "Diag", "ethernet": "Zipy"}.get(event.target, event.target)
     return f"{display_time}  {event.level}  {target} · {description}"

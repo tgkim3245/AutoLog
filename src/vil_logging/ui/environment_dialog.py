@@ -24,7 +24,6 @@ from .theme import apply_theme, refresh_style
 class EnvironmentDialog(QDialog):
     refresh_requested = Signal()
     settings_requested = Signal(str)
-    installation_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -126,7 +125,8 @@ class EnvironmentDialog(QDialog):
         self.set_language("ko")
 
     def _t(self, ko: str, en: str) -> str:
-        return en if self._language == "en" else ko
+        from .i18n import localized
+        return localized(ko, en, self._language)
 
     def set_roles(self, roles):
         self._roles = tuple(roles)
@@ -138,10 +138,7 @@ class EnvironmentDialog(QDialog):
         self._render()
 
     def _act(self, key, section):
-        if key in self._install_actions:
-            self.installation_requested.emit(self._install_actions[key])
-        else:
-            self.settings_requested.emit(section)
+        self.settings_requested.emit(section)
 
     def _toggle_details(self, checked: bool):
         self.details.setVisible(checked)
@@ -170,7 +167,7 @@ class EnvironmentDialog(QDialog):
         self._render()
 
     def set_language(self, language: str):
-        self._language = "en" if language == "en" else "ko"
+        self._language = language if language in {"ko", "en", "zh"} else "ko"
         self.setWindowTitle(self._t("환경 확인", "Readiness check"))
         self.title.setText(self.windowTitle())
         self.intro.setText(self._t("설치된 도구와 네트워크를 확인하고, 필요한 설정을 안내합니다.",
@@ -191,8 +188,8 @@ class EnvironmentDialog(QDialog):
                                 "CANoe was not found. Check its installation on the test PC.")
         if canoe_ok:
             version = installations[0].get("version_check", {}).get("file_version", "")
-            canoe_message = self._t(f"CANoe {version} 설치를 찾았습니다. 사용할 .cfg 파일을 선택하세요.",
-                                    f"CANoe {version} was found. Choose the configuration to use.")
+            canoe_message = self._t("CANoe {version} 설치를 찾았습니다. 사용할 .cfg 파일을 선택하세요.",
+                                    "CANoe {version} was found. Choose the configuration to use.").format(version=version)
         tool = connections.get("tshark", {})
         if not tool and data.get("tshark", {}).get("path"):
             observed = data["tshark"]
@@ -200,8 +197,8 @@ class EnvironmentDialog(QDialog):
                     "path": observed["path"]}
         tool_ok = tool.get("status") == "ready"
         tool_message = tool.get("message_" + self._language) or self._t(
-            "Wireshark의 TShark가 필요합니다. 설치 후 자동으로 찾거나 파일을 직접 선택하세요.",
-            "TShark, included with Wireshark, is needed. Install it or select its executable.")
+            "Wireshark의 TShark가 필요합니다. 설정에서 실행 파일을 직접 선택하세요.",
+            "TShark, included with Wireshark, is needed. Select its executable in Settings.")
         if tool_ok:
             tool_message = (tool.get("version") or self._t("캡처 도구를 찾았습니다.", "Capture tool found."))
             tool_message += "\n" + tool.get("path", "")
@@ -220,16 +217,13 @@ class EnvironmentDialog(QDialog):
         driver = connections.get("npcap") or data.get("npcap", {})
         driver_ok = driver.get("status") == "present"
         driver_message = driver.get("message_" + self._language) or self._t(
-            "실시간 Ethernet 취득에는 Npcap 드라이버가 필요합니다. Wireshark 설치 항목에서 확인하세요.",
-            "Live Ethernet capture needs Npcap. Check this component in the Wireshark installer.")
+            "실시간 Ethernet 취득에는 Npcap이 필요합니다. 별도 설치 안내를 확인하세요.",
+            "Live Ethernet capture needs Npcap. Refer to your installation guide.")
         helpers_ok = all(data.get(name, {}).get("version_check", {}).get("status") == "present"
                          for name in ("dumpcap", "capinfos"))
         helpers_message = self._t("dumpcap·capinfos를 확인했습니다.", "dumpcap and capinfos were found.") if helpers_ok else self._t(
-            "캡처·완료 파일 검사에 dumpcap과 capinfos가 필요합니다. Wireshark를 설치하거나 복구하세요.",
-            "Capture and file inspection require dumpcap and capinfos. Install or repair Wireshark.")
-        self._install_actions = {key: tool for key, tool, ready in (
-            ("canoe", "canoe", canoe_ok), ("tshark", "wireshark", tool_ok),
-            ("helpers", "wireshark", helpers_ok), ("npcap", "npcap", driver_ok)) if not ready}
+            "캡처·파일 검사에 dumpcap과 capinfos가 필요합니다. 별도 설치 안내를 확인하세요.",
+            "Capture and file inspection require dumpcap and capinfos. Refer to your installation guide.")
         rows = {
             "canoe": ("CANoe", canoe_ok, canoe_message, self._t("구성 파일 설정", "Choose configuration")),
             "tshark": (self._t("캡처 도구", "Capture tool"), tool_ok, tool_message,
@@ -251,12 +245,13 @@ class EnvironmentDialog(QDialog):
             status_label.setProperty("tone", "neutral" if not applicable else "ready" if ready else "attention")
             refresh_style(status_label)
             message_label.setText(message)
-            action_button.setText(self._t("설치·복구 안내", "Install / repair") if key in self._install_actions else action)
+            action_button.setText(action)
+            action_button.setVisible(key != "npcap")
         attention = sum(not row[1] for key, row in rows.items() if
                         ((Role.CAN in self._roles or Role.DIAG in self._roles) if key == "canoe"
                          else Role.ETHERNET in self._roles))
         self.summary.setText(self._t("확인 중…", "Checking…") if self._busy else
-                             self._t(f"{attention}곳 확인 필요", f"{attention} need attention") if attention else
+                             self._t("{count}곳 확인 필요", "{count} need attention").format(count=attention) if attention else
                              self._t("설정 확인 완료", "Checks complete"))
         self.summary.setProperty("tone", "checking" if self._busy else "attention" if attention else "ready")
         if self._error:

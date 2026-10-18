@@ -15,7 +15,6 @@ NIC_B = "\\Device\\NPF_{" + GUID_B + "}"
 
 def empty_discovery(monkeypatch, tmp_path):
     monkeypatch.setattr(connections, "_windows_interfaces", lambda: ([], ""))
-    monkeypatch.setattr(connections, "_tool_candidates", lambda *args, **kwargs: [])
     monkeypatch.setattr(connections, "_discover_npcap", lambda: {"status": "unavailable", "files": []})
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
@@ -24,7 +23,6 @@ def mock_tool(monkeypatch, tmp_path):
     executable = tmp_path / "Wireshark" / "tshark.exe"
     executable.parent.mkdir()
     executable.write_bytes(b"test fixture; never execute")
-    monkeypatch.setattr(connections, "_tool_candidates", lambda *args, **kwargs: [executable])
     monkeypatch.setattr(connections, "_version_response", lambda _: {
         "status": "present", "stdout": "TShark (Wireshark) 4.6.0\nBuilt for tests", "stderr": "",
     })
@@ -55,7 +53,7 @@ def test_friendly_os_name_and_guid_match_capture_and_remembered_nic(monkeypatch,
     }], ""))
     run = Mock(return_value={"success": True, "stdout": f"1. {NIC_A} (장치 설명)\n"})
     monkeypatch.setattr(connections, "_run_query", run)
-    report = connections.discover_connections(nic_id=remembered)
+    report = connections.discover_connections(str(executable), nic_id=remembered)
     interface = report["interfaces"][0]
     assert interface["name"] == "이더넷"
     assert interface["description"] == "Intel(R) Ethernet Controller"
@@ -65,7 +63,7 @@ def test_friendly_os_name_and_guid_match_capture_and_remembered_nic(monkeypatch,
     assert interface["capture_available"] is True
     assert report["selected_nic_id"] == NIC_A
     assert report["remembered_nic_missing"] is False
-    assert report["tshark"]["automatic"] is True
+    assert report["tshark"]["automatic"] is False
     assert report["tshark"]["status"] == "ready"
     assert report["tshark"]["path"] == str(executable.resolve())
     assert "\n" not in report["tshark"]["version"]
@@ -74,15 +72,15 @@ def test_friendly_os_name_and_guid_match_capture_and_remembered_nic(monkeypatch,
 
 def test_missing_remembered_nic_never_uses_first_interface(monkeypatch, tmp_path):
     empty_discovery(monkeypatch, tmp_path)
-    mock_tool(monkeypatch, tmp_path)
+    executable = mock_tool(monkeypatch, tmp_path)
     monkeypatch.setattr(connections, "_run_query", lambda *args, **kwargs: {
         "success": True, "stdout": f"1. {NIC_A} (이더넷)\n2. {NIC_B} (Wi-Fi)\n",
     })
-    report = connections.discover_connections(nic_id=GUID_C)
+    report = connections.discover_connections(str(executable), nic_id=GUID_C)
     assert len(report["interfaces"]) == 2
     assert report["selected_nic_id"] == ""
     assert report["remembered_nic_missing"] is True
-    first_launch = connections.discover_connections()
+    first_launch = connections.discover_connections(str(executable))
     assert first_launch["selected_nic_id"] == ""
     assert first_launch["remembered_nic_missing"] is False
 
@@ -103,16 +101,13 @@ def test_without_tshark_os_nics_remain_visible_and_not_capture_ready(monkeypatch
 def test_explicit_missing_path_is_invalid_and_not_silently_replaced(monkeypatch, tmp_path):
     empty_discovery(monkeypatch, tmp_path)
     missing = tmp_path / "remembered_missing.exe"
-    candidates = Mock(return_value=[missing])
-    monkeypatch.setattr(connections, "_tool_candidates", candidates)
     version = Mock(side_effect=AssertionError("Missing executable must not be launched"))
     monkeypatch.setattr(connections, "_version_response", version)
     report = connections.discover_connections(str(missing))
     assert report["tshark"]["status"] == "invalid"
     assert report["tshark"]["path"] == str(missing)
     assert report["tshark"]["automatic"] is False
-    assert "다시" in report["tshark"]["message_ko"]
-    candidates.assert_called_once_with("tshark", specified=str(missing))
+    assert "직접 선택" in report["tshark"]["message_ko"]
     version.assert_not_called()
 
 
@@ -127,24 +122,25 @@ def test_wrong_program_version_is_invalid(monkeypatch, tmp_path):
     assert report["interfaces"] == []
 
 
-def test_auto_discovery_can_skip_broken_candidate(monkeypatch, tmp_path):
+def test_blank_or_broken_path_never_falls_back_to_another_installed_tool(monkeypatch, tmp_path):
     empty_discovery(monkeypatch, tmp_path)
     executable = mock_tool(monkeypatch, tmp_path)
     broken = tmp_path / "broken.exe"
     broken.write_bytes(b"test fixture")
-    monkeypatch.setattr(connections, "_tool_candidates", lambda *args, **kwargs: [broken, executable])
     monkeypatch.setattr(connections, "_version_response", lambda path: {
         "status": "unavailable", "original": "DLL missing",
     } if path == broken else {"status": "present", "stdout": "TShark 4.6.0"})
     monkeypatch.setattr(connections, "_run_query", lambda *args, **kwargs: {"success": True, "stdout": ""})
     report = connections.discover_connections()
-    assert report["tshark"]["status"] == "ready"
-    assert report["tshark"]["path"] == str(executable.resolve())
+    assert report["tshark"]["status"] == "missing"
+    report = connections.discover_connections(str(broken))
+    assert report["tshark"]["status"] == "invalid"
+    assert report["tshark"]["path"] != str(executable.resolve())
 
 
 def test_interface_list_failure_keeps_os_list_and_original_error(monkeypatch, tmp_path):
     empty_discovery(monkeypatch, tmp_path)
-    mock_tool(monkeypatch, tmp_path)
+    executable = mock_tool(monkeypatch, tmp_path)
     monkeypatch.setattr(connections, "_windows_interfaces", lambda: ([{
         "id": NIC_A, "name": "차량용 이더넷", "description": "USB adapter", "status": "up",
         "mac": "", "source": "windows", "capture_available": False,
@@ -152,7 +148,7 @@ def test_interface_list_failure_keeps_os_list_and_original_error(monkeypatch, tm
     monkeypatch.setattr(connections, "_run_query", lambda *args, **kwargs: {
         "success": False, "detail": "Npcap service could not be loaded",
     })
-    report = connections.discover_connections()
+    report = connections.discover_connections(str(executable))
     assert report["interfaces"][0]["name"] == "차량용 이더넷"
     assert report["interfaces"][0]["capture_available"] is False
     assert "Npcap service" in report["interface_query_error"]

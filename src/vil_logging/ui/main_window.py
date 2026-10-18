@@ -9,7 +9,6 @@ from pathlib import Path
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (
-    QButtonGroup,
     QCheckBox,
     QFrame,
     QHBoxLayout,
@@ -41,7 +40,8 @@ from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.naming import capture_prefix
 
 from .file_manager_dialog import FileManagerDialog, confirm_delete
-from .i18n import render_event, tr
+from .i18n import render_event, report_text, tr
+from .language_button import LanguageButton
 from .monitor_dialog import MonitorDialog, monitor_description
 from .packet_window import PacketWindow
 from .quality_dialog import QualityDialog
@@ -113,8 +113,7 @@ class MainWindow(QMainWindow):
     settings_applied = Signal(object)
     preferences_changed = Signal(object)
     prepare_requested = Signal(object)
-    discovery_requested = Signal(bool)
-    npcap_requested = Signal()
+    discovery_requested = Signal()
     exit_requested = Signal()
     environment_requested = Signal()
     open_debug_folder_requested = Signal()
@@ -160,19 +159,9 @@ class MainWindow(QMainWindow):
         self.bug_report_button.setProperty("compact", True)
         self.bug_report_button.clicked.connect(self.bug_report_requested)
         header.addWidget(self.bug_report_button)
-        self.language_group = QButtonGroup(self)
-        self.language_group.setExclusive(True)
-        self.language_buttons: dict[str, QToolButton] = {}
-        for language, text in (("ko", "한국어"), ("en", "EN")):
-            button = QToolButton()
-            button.setText(text)
-            button.setCheckable(True)
-            button.setObjectName(f"language{language.upper()}Button")
-            button.setProperty("compact", True)
-            button.clicked.connect(lambda _checked=False, lang=language: self._change_language(lang))
-            self.language_group.addButton(button)
-            self.language_buttons[language] = button
-            header.addWidget(button)
+        self.language_button = LanguageButton()
+        self.language_button.language_requested.connect(self._change_language)
+        header.addWidget(self.language_button)
         self.settings_button = QToolButton()
         self.settings_button.setIcon(settings_icon())
         self.settings_button.setIconSize(QSize(20, 20))
@@ -181,13 +170,6 @@ class MainWindow(QMainWindow):
         self.settings_button.clicked.connect(self._show_settings)
         header.addWidget(self.settings_button)
         outer.addLayout(header)
-        title_row = QHBoxLayout()
-        self.title_label = _label(variant="title")
-        title_row.addWidget(self.title_label, 1)
-        self.status_pill = _label(variant="status")
-        self.status_pill.setProperty("tone", "neutral")
-        title_row.addWidget(self.status_pill)
-        outer.addLayout(title_row)
         self.subtitle = _label(variant="muted")
         self.subtitle.setObjectName("readinessSubtitle")
         self.subtitle.setWordWrap(True)
@@ -225,7 +207,7 @@ class MainWindow(QMainWindow):
             card = QFrame()
             card.setObjectName("targetCard")
             card.setProperty("role", "card")
-            card.setProperty("selected", role == Role.ETHERNET)
+            card.setProperty("selected", role in {Role.CAN, Role.ETHERNET})
             self._role_cards[role] = card
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(10, 11, 8, 10)
@@ -234,7 +216,7 @@ class MainWindow(QMainWindow):
             card_top.setSpacing(3)
             check = ThemedCheckBox(role.label)
             check.setObjectName(f"select{role.label}CheckBox")
-            check.setChecked(role == Role.ETHERNET)
+            check.setChecked(role in {Role.CAN, Role.ETHERNET})
             check.toggled.connect(self._selection_changed)
             self.role_checks[role] = check
             card_top.addWidget(check, 1)
@@ -336,7 +318,7 @@ class MainWindow(QMainWindow):
         self.packet_button.setObjectName("openPacketsButton")
         self.packet_button.clicked.connect(self._show_packets)
         self.debug_folder_button = QPushButton()
-        self.debug_folder_button.setObjectName("openDebugFolderButton")
+        self.debug_folder_button.setObjectName("openLogFolderButton")
         self.debug_folder_button.clicked.connect(self.open_debug_folder_requested)
         self.debug_folder_button.setEnabled(False)
         self.environment_button = QPushButton()
@@ -360,9 +342,7 @@ class MainWindow(QMainWindow):
         if hasattr(self.settings_dialog, "discovery_requested"):
             self.settings_dialog.discovery_requested.connect(self.discovery_requested)
         self.settings_dialog.prepare_requested.connect(self.prepare_requested)
-        self.settings_dialog.npcap_requested.connect(self.npcap_requested)
         self.settings_dialog.environment_requested.connect(self.environment_requested)
-        self.settings_dialog.exit_requested.connect(self.exit_requested)
         self.packet_window = PacketWindow(self)
         self.quality_dialog = QualityDialog(self)
         self.monitor_dialog = MonitorDialog(self)
@@ -421,12 +401,11 @@ class MainWindow(QMainWindow):
         self.preferences_changed.emit({"language": language})
 
     def set_language(self, language: str):
-        self._language = "en" if language == "en" else "ko"
+        self._language = language if language in {"ko", "en", "zh"} else "ko"
         language = self._language
         self.setWindowTitle(f"AutoLog · {tr('title', language)} · {__version__}")
-        self.title_label.setText(tr("title", language))
         self.demo_label.setText(tr("demo", language))
-        self.language_buttons[language].setChecked(True)
+        self.language_button.set_language(language)
         self.settings_button.setToolTip(tr("settings", language))
         self.settings_button.setAccessibleName(tr("settings", language))
         self.delete_button.setText(tr("delete", language))
@@ -453,7 +432,7 @@ class MainWindow(QMainWindow):
         self.packet_window.set_language(language)
         self.monitor_dialog.set_language(language)
         self.monitor_button.setText(tr("monitor_title", language))
-        self.quality_button.setText("기록 품질" if language == "ko" else "Quality")
+        self.quality_button.setText(tr("quality", language))
         self.quality_dialog.set_language(language)
         self.file_manager.set_language(language)
         self.recovery_dialog.set_language(language)
@@ -510,18 +489,6 @@ class MainWindow(QMainWindow):
         for role, card in self._role_cards.items():
             card.setProperty("selected", self.role_checks[role].isChecked())
             refresh_style(card)
-        tone = "neutral"
-        if self._phase in (SessionPhase.RECORDING, SessionPhase.COMPLETED):
-            tone = "ready"
-        elif self._phase in (SessionPhase.PREPARING, SessionPhase.STARTING, SessionPhase.STOPPING):
-            tone = "checking"
-        elif self._phase in (SessionPhase.FAILED, SessionPhase.INCOMPLETE):
-            tone = "error"
-        elif self._phase == SessionPhase.PARTIAL:
-            tone = "attention"
-        self.status_pill.setProperty("tone", tone)
-        self.status_pill.setText(tr("phase_short_" + self._phase.value, self._language))
-        refresh_style(self.status_pill)
         action = "action_unprepared"
         if self._phase in BUSY_PHASES:
             action = "action_" + self._phase.value
@@ -539,7 +506,7 @@ class MainWindow(QMainWindow):
         if self.demo and self._phase == SessionPhase.COMPLETED:
             message = tr("demo_completed", self._language)
         if self._preparation_report and self._phase == SessionPhase.IDLE:
-            message = self._preparation_report.get("message_" + self._language) or message
+            message = report_text(self._preparation_report, "message", self._language) or message
         self.subtitle.setText(message)
         self.subtitle.setToolTip(str(self._preparation_report.get("detail", message)))
 
@@ -552,8 +519,7 @@ class MainWindow(QMainWindow):
         for check in self.role_checks.values():
             check.setEnabled(not busy)
             check.setToolTip(tr("locked" if busy else "ready_tip", self._language))
-        for button in self.language_buttons.values():
-            button.setEnabled(not busy)
+        self.language_button.setEnabled(not busy)
         self.settings_dialog.set_busy(busy)
         self.logging_button.setEnabled(
             not self._file_busy and phase not in (SessionPhase.STOPPING, SessionPhase.INCOMPLETE)
@@ -642,6 +608,8 @@ class MainWindow(QMainWindow):
             self.output_label.fontMetrics().elidedText(output_text, Qt.TextElideMode.ElideMiddle, 412)
         )
         self.output_label.setToolTip(output)
+        self.debug_folder_button.setToolTip(output)
+        self.debug_folder_button.setEnabled(bool(output))
 
     def set_files(self, files: list[str], label: str = ""):
         self._files = list(files)
@@ -759,8 +727,6 @@ class MainWindow(QMainWindow):
             help_text += "\n" + self._debug_path
         self.bug_report_button.setToolTip(help_text)
         self.bug_report_button.setEnabled(bool(self._debug_path))
-        self.debug_folder_button.setToolTip(self._debug_path or help_text)
-        self.debug_folder_button.setEnabled(bool(self._debug_path))
         text = tr("debug_on" if self._debug_path else "debug_off", self._language)
         if self._debug_path:
             text += f" · {Path(self._debug_path).name}"

@@ -45,8 +45,10 @@ def test_backend_debug_status_enables_export_and_surfaces_errors(window):
 
 
 def test_capture_selection_does_not_require_or_create_a_connection(window):
-    assert window.selected_roles() == (Role.ETHERNET,)
+    assert window.selected_roles() == (Role.CAN, Role.ETHERNET)
     prepare_spy = QSignalSpy(window.prepare_requested)
+    window.role_checks[Role.CAN].setChecked(False)
+    assert window.selected_roles() == (Role.ETHERNET,)
     window.role_checks[Role.CAN].setChecked(True)
     assert window.selected_roles() == (Role.CAN, Role.ETHERNET)
     assert window._targets[Role.CAN].connection == ConnectionState.DISCONNECTED
@@ -61,7 +63,7 @@ def test_language_switch_renders_existing_events_and_retains_external_error(wind
     window.add_event(AppEvent("FUTURE_CODE", original="Original unknown message"))
     assert "프로그램 준비 완료" in window.event_list.item(0).text()
     window.set_language("en")
-    assert window.title_label.text() == "Log capture"
+    assert "Log capture" in window.windowTitle()
     assert "Application ready" in window.event_list.item(0).text()
     assert "External tool detail 0x80004005" in window.event_list.item(0).text()
     assert "Original unknown message" in window.event_list.item(1).text()
@@ -178,7 +180,7 @@ def test_settings_applied_language_is_reflected_in_all_views(window):
 
 def test_capture_preview_adds_delimiter_to_user_entered_prefix(window):
     window.set_settings(AppSettings(prefix="Trip", next_index=9, ethernet_format="pcap"))
-    assert window.file_names.text() == "Trip_9.pcap"
+    assert window.file_names.text() == "Trip_9.blf · Trip_9.pcap"
 
 
 def test_incomplete_session_locks_settings_targets_and_capture_restart(window):

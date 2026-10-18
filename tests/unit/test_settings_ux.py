@@ -111,13 +111,14 @@ def test_prepare_immediately_shows_progress_and_then_actionable_result(dialog):
     assert "Configuration missing" in dialog.target_labels[Role.CAN].text()
 
 
-def test_initial_discovery_respects_saved_tool_but_find_again_can_replace_it(dialog):
+def test_inventory_refresh_never_requests_automatic_tool_replacement(dialog):
     spy = QSignalSpy(dialog.discovery_requested)
     dialog._request_discovery()
-    assert spy.at(0)[0] is False
+    assert spy.count() == 1
     dialog.set_discovery_busy(False)
-    dialog.find_button.click()
-    assert spy.at(1)[0] is True
+    dialog._request_discovery()
+    assert spy.count() == 2
+    assert not hasattr(dialog, "find_button")
 
 
 def test_discovery_never_overwrites_a_tool_selected_while_scan_was_running(dialog):
@@ -147,45 +148,42 @@ def test_environment_is_readable_and_details_are_optional(qtbot):
     assert instance.summary.text() == "Check failed"
 
 
-def test_cached_startup_discovery_is_not_restarted_when_settings_open(dialog):
+def test_opening_settings_refreshes_network_inventory(dialog):
     dialog.set_connection_discovery(discovered())
     spy = QSignalSpy(dialog.discovery_requested)
     dialog.show()
-    assert spy.count() == 0
-    assert dialog.find_button.isEnabled()
-    assert not dialog._discovering
+    assert spy.count() == 1
+    assert dialog._discovering
+    assert not dialog.nic_input._timer.isActive()  # Storage tab does not poll counters.
 
 
-def test_discovery_failure_and_timeout_release_the_find_button(dialog, qtbot):
+def test_discovery_timeout_keeps_manual_path_selection_available(dialog, qtbot):
     dialog._discovery_timer.setInterval(20)
     dialog._request_discovery()
     qtbot.waitUntil(lambda: not dialog._discovering, timeout=2000)
-    assert dialog.find_button.isEnabled()
-    assert "다시 찾기" in dialog.tool_status.text()
+    assert dialog.fields["tshark_path"].isEnabled()
+    assert "다시 열어" in dialog.tool_status.text()
     assert dialog.tool_status.property("tone") == "error"
     dialog._request_discovery()
     dialog.set_discovery_error("A failed query")
-    assert dialog.find_button.isEnabled()
+    assert dialog.fields["tshark_path"].isEnabled()
     assert dialog.tool_status.text() == "A failed query"
     dialog.set_connection_discovery(discovered())
     assert dialog.tool_status.property("tone") == "ready"
 
 
-def test_missing_driver_keeps_windows_network_choices_and_exposes_install_action(dialog):
+def test_missing_driver_keeps_network_choices_and_refers_to_separate_guide(dialog):
     report = discovered()
     report["npcap"] = {"status": "missing"}
     report["interfaces"][0]["capture_available"] = False
     dialog.set_connection_discovery(report)
     assert dialog.nic_input.count() == 2
     assert "차량 이더넷" in dialog.nic_input.itemText(1)
-    assert not dialog.npcap_button.isHidden()
+    assert not hasattr(dialog, "npcap_button")
     assert "설치" in dialog.driver_status.text()
-    spy = QSignalSpy(dialog.npcap_requested)
-    dialog.npcap_button.click()
-    assert spy.count() == 1
     report["npcap"] = {"status": "present"}
     dialog.set_connection_discovery(report)
-    assert dialog.npcap_button.isHidden()
+    assert "필요" not in dialog.driver_status.text()
 
 
 def test_unknown_readiness_does_not_become_a_false_connection_error(dialog):

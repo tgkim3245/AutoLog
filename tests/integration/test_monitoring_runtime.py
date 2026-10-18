@@ -105,7 +105,7 @@ def test_quality_warns_once_without_stopping_and_archives_evidence(real):
     assert sum(event.code == "DISK_SPACE_LOW" for event in events(runtime)) == 1
     assert runtime._quality_report["display_drops"] == 20
     prepared = next(kwargs for _, action, kwargs in tools.calls if action == "prepare")
-    assert prepared["params"]["buffer_mib"] == "128"
+    assert prepared["params"]["buffer_mib"] == "64"
     tools.quality["performance"]["disk_free_bytes"] = 2 * 1024 ** 3
     runtime._submit(runtime._query).result(5)
     assert sum(event.code == "DISK_SPACE_RESTORED" for event in events(runtime)) == 1

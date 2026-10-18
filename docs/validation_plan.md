@@ -1,6 +1,6 @@
 # 검증 계획
 
-상태: 요구사항 55개에 대응하는 시나리오 66개(T-01~T-66). CANoe 자동 독립 연결·실제 두 cfg 연결 근거는 [0.8.4 결과](canoe_independent_connection.md), 품질·부하는 [8단계](development_stage_8.md), Ethernet 감시는 [7단계](development_stage_7.md), 수동 복구는 [6단계](development_stage_6.md)를 따른다. 자동 검사 379개와 아래 시나리오 전체의 현장 통과는 구분한다. 실제 CANoe 측정·구간 기록, CAN/Diag 수신/채널 관측, 차량 NIC의 대표 부하·장시간/1 GiB 초과와 팀 배포 검증은 남아 있다. 임계값과 시험 조건이 미확정인 항목에는 실측 결과를 입력하지 않는다.
+상태: 요구사항 55개에 대응하는 시나리오 66개(T-01~T-66). [0.8.5 화면·언어·그래프·진단 ZIP 검사](ui_update_0_8_5.md), CANoe 자동 독립 연결·실제 두 cfg 연결 근거는 [0.8.4 결과](canoe_independent_connection.md), 품질·부하는 [8단계](development_stage_8.md), Ethernet 감시는 [7단계](development_stage_7.md), 수동 복구는 [6단계](development_stage_6.md)를 따른다. 자동 검사 384개와 아래 시나리오 전체의 현장 통과는 구분한다. 실제 CANoe 측정·구간 기록, CAN/Diag 수신/채널 관측, 차량 NIC의 대표 부하·장시간/1 GiB 초과와 팀 배포 검증은 남아 있다. 임계값과 시험 조건이 미확정인 항목에는 실측 결과를 입력하지 않는다.
 
 ## 1. 검증 단계
 

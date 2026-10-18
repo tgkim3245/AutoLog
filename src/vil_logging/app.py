@@ -132,7 +132,6 @@ def main(argv: list[str] | None = None) -> int:
     from vil_logging.ui import MainWindow
     from vil_logging.ui.environment_dialog import EnvironmentDialog
     from vil_logging.ui.i18n import tr
-    from vil_logging.ui.installation_dialog import InstallationDialog
 
     app = QApplication(sys.argv[:1])
     app.setStyle("Fusion")
@@ -226,9 +225,19 @@ def main(argv: list[str] | None = None) -> int:
             window.set_phase(SessionPhase.STOPPING)
             runtime.request_exit()
 
-    def open_debug_folder():
-        if debug.log_path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(debug.log_path.parent)))
+    def open_log_folder():
+        output = window._settings.output_dir.strip()
+        if not output:
+            window.settings_dialog.open_section("storage")
+            return
+        try:
+            folder = Path(output).expanduser().resolve()
+            folder.mkdir(parents=True, exist_ok=True)
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder))):
+                raise OSError("Could not open the capture output folder")
+        except OSError as error:
+            debug.exception("capture_folder.open_failed", error, output_dir=output)
+            QMessageBox.warning(window, tr("debug_folder", window._language), str(error))
 
     def exception_hook(error_type, error, traceback):
         debug.exception("app.uncaught_exception", error)
@@ -248,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     window.prepare_requested.connect(runtime.prepare)
     window.discovery_requested.connect(runtime.discover)
     window.exit_requested.connect(request_exit)
-    window.open_debug_folder_requested.connect(open_debug_folder)
+    window.open_debug_folder_requested.connect(open_log_folder)
     window.rename_requested.connect(runtime.rename_previous)
     window.delete_files_requested.connect(runtime.delete_files)
     window.files_refresh_requested.connect(runtime.refresh_file_history)
@@ -256,9 +265,8 @@ def main(argv: list[str] | None = None) -> int:
     environment_dialog = EnvironmentDialog(window)
     environment_state = {"environment": {}, "connections": {}, "pending": False, "discovering": False,
                          "error": "", "startup_checked": args.demo}
-    installation_dialogs = {}
 
-    def show_environment(*, reset_tool=False):
+    def show_environment():
         environment_dialog.set_language(window._language)
         environment_dialog.set_roles(window.selected_roles())
         environment_dialog.show()
@@ -268,18 +276,7 @@ def main(argv: list[str] | None = None) -> int:
         environment_state["error"] = ""
         environment_dialog.set_busy(True)
         runtime.diagnose()
-        runtime.discover(reset_tool=reset_tool)
-
-    def show_installation(tool):
-        key = (tool, window._language)
-        if key not in installation_dialogs:
-            dialog = InstallationDialog(tool, window._language, environment_dialog)
-            dialog.refresh_requested.connect(lambda: show_environment(reset_tool=True))
-            installation_dialogs[key] = dialog
-        dialog = installation_dialogs[key]
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+        runtime.discover()
 
     def toggle_capture():
         if (not args.demo and runtime.phase in {SessionPhase.IDLE, SessionPhase.COMPLETED, SessionPhase.FAILED}
@@ -290,9 +287,6 @@ def main(argv: list[str] | None = None) -> int:
         runtime.toggle(window.selected_roles())
 
     window.logging_requested.connect(toggle_capture)
-    window.npcap_requested.connect(lambda: show_installation("npcap"))
-    window.settings_dialog.installation_requested.connect(show_installation)
-    environment_dialog.installation_requested.connect(show_installation)
     window.environment_requested.connect(show_environment)
     environment_dialog.refresh_requested.connect(show_environment)
     environment_dialog.settings_requested.connect(window.settings_dialog.open_section)

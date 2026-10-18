@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import queue
 import struct
 import subprocess
+import threading
+import time
 import zipfile
 from pathlib import Path
 
@@ -245,7 +248,53 @@ def test_bug_report_export_contains_current_and_rotated_logs(tmp_path: Path) -> 
         names = archive.namelist()
         assert path.name in names
         assert f"{path.name}.1" in names
+        manifest = json.loads(archive.read("manifest.json"))
+        assert manifest["send_to"] == "Taegon.Kim"
+        assert "To_Taegon.Kim" in report.name
+        assert archive.testzip() is None
+        for item in manifest["files"]:
+            content = archive.read(item["name"])
+            assert len(content) == item["bytes"]
+            assert hashlib.sha256(content).hexdigest() == item["sha256"]
+            assert content == (path.parent / item["name"]).read_bytes()
         all_records = [json.loads(line) for name in names
+                       if name != "manifest.json"
                        for line in archive.read(name).decode("utf-8").splitlines()]
     service.close()
     assert any(record["event"] == "report.event" for record in all_records)
+
+
+def test_export_is_a_complete_snapshot_while_background_logging_continues(tmp_path):
+    service = DebugLogService(tmp_path, max_bytes=2500, backup_count=2)
+    service.enable()
+    began = threading.Event()
+    stop = threading.Event()
+
+    def write():
+        index = 0
+        while not stop.is_set():
+            logging.getLogger("vil_logging.test").debug("background.event", extra={"index": index})
+            began.set()
+            index += 1
+            time.sleep(0.002)
+
+    writer = threading.Thread(target=write)
+    writer.start()
+    try:
+        assert began.wait(2)
+        report = service.export_report(tmp_path / "Desktop")
+        assert writer.is_alive()
+        with zipfile.ZipFile(report) as archive:
+            manifest = json.loads(archive.read("manifest.json"))
+            assert archive.testzip() is None
+            for item in manifest["files"]:
+                content = archive.read(item["name"])
+                assert len(content) == item["bytes"]
+                assert hashlib.sha256(content).hexdigest() == item["sha256"]
+                assert all(json.loads(line)["timestamp_utc"] for line in content.splitlines())
+        again = service.export_report(tmp_path / "Desktop")
+        assert again != report and again.is_file() and report.is_file()
+    finally:
+        stop.set()
+        writer.join(timeout=3)
+        service.close()
