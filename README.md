@@ -4,6 +4,8 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 
 현재 소스 버전은 **0.5.0**입니다. [CANoe 연동과 시험 순서](docs/development_stage_5.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
+대표 .cfg의 [실제 호환성 검토](docs/cfg_compatibility_review.md)에서 두 CANoe의 독립 COM 연결과 CAN 자동 파일명 증가가 적용 전 해결 항목으로 확인됐습니다. 현재 0.5.0의 CAN·Diag 동시 취득은 현장 지원 완료 상태가 아닙니다.
+
 ## 폴더와 Git 관리 범위
 
 | 위치 | 역할 | Git 관리 |
