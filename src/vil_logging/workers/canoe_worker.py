@@ -1,6 +1,7 @@
 """One CANoe COM apartment per target; no CANoe process is force-terminated."""
 
 import os
+import time
 import traceback
 
 from vil_logging.adapters.canoe import CanoeCapture
@@ -20,6 +21,7 @@ def canoe_worker_main(role, pipe):
                 pythoncom.PumpWaitingMessages()
                 continue
             command = pipe.recv()
+            trace_started = time.monotonic()
             capture.emit_trace = lambda fields: pipe.send(WorkerProgress(command, fields, os.getpid()))
             try:
                 if command.action in {"connect", "prepare"}:
@@ -51,8 +53,12 @@ def canoe_worker_main(role, pipe):
                     raise ValueError("Unsupported CANoe command")
                 pipe.send(CommandResult(command, True, state, evidence, os.getpid(), details=details))
             except Exception:
+                details = capture.stats()
+                if any(item.get("event") in {"canoe.instance_reused", "canoe.independent_setup_required"}
+                       and item.get("monotonic", 0) >= trace_started for item in details.get("diagnostics", [])):
+                    details["connection_issue"] = "independent_setup_required"
                 pipe.send(CommandResult(command, False, "unknown", traceback.format_exc(), os.getpid(),
-                                        details=capture.stats()))
+                                        details=details))
     except (EOFError, OSError, BrokenPipeError):
         pass  # Abnormal loss is not a normal stop; preserve the real CANoe process.
     finally:

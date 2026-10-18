@@ -12,6 +12,28 @@ log = logging.getLogger(__name__)
 SETTING = re.compile(rb"(?m)^(SingleCOMClient[ \t]*=[ \t]*)([01])([ \t]*\r?)$")
 
 
+class IndependentConnectionsRequired(RuntimeError):
+    def __init__(self, path, process_ids):
+        self.settings_path = str(path)
+        self.process_ids = process_ids
+        super().__init__("Independent CANoe connections are disabled while a CANoe window is open. "
+                         "Save your work, close all CANoe windows, and enable independent connections in AutoLog.")
+
+
+def check_activation():
+    """Read-only preflight before COM creation; never activate an existing project."""
+    try:
+        path = registered_settings_file()
+        enabled = single_client_enabled(path)
+        processes = canoe_process_ids()
+    except (OSError, ValueError) as error:
+        # Retain the existing identity/configuration checks if settings cannot be read.
+        log.warning("canoe.activation_preflight_unavailable", extra={"fields": {"error": str(error)}})
+        return
+    if not enabled and processes:
+        raise IndependentConnectionsRequired(path, processes)
+
+
 def registered_settings_file(application_path=None):
     """Match the registered COM executable to Vector's recorded SettingsFolder."""
     import winreg

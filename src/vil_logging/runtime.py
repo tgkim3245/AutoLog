@@ -466,24 +466,28 @@ class Runtime:
                 report.update(next_action_ko="위 항목을 조치한 뒤 연결 확인을 다시 누르세요.",
                               next_action_en="Complete the steps above, then check the connection again.")
         else:
-            reused = any(item.get("event") == "canoe.instance_reused"
-                         for item in details.get("diagnostics", []))
+            reused = details.get("connection_issue") == "independent_setup_required"
+            friendly = ("현재 CANoe는 열린 창을 재사용하는 모드입니다. CAN·Diag를 각각 연결하려면 독립 연결 설정이 필요합니다."
+                        if reused else "CANoe 연결에 실패했습니다. 상세 오류를 확인하세요.")
+            detail = ("먼저 CANoe 작업을 저장하고 모든 CANoe 창을 닫으세요. 아래 ‘독립 연결 설정’에서 다중 연결을 적용하세요."
+                      if reused and self._settings.language == "ko" else
+                      "Save your CANoe work and close all CANoe windows. Enable independent connections below."
+                      if reused else result.evidence)
             report = self._preparation_report(
-                role, "error", "CANoe가 이미 열린 다른 구성을 반환했습니다. 독립 COM 연결 설정을 확인하세요." if reused else
-                "CANoe 연결에 실패했습니다. 상세 오류를 확인하세요.",
-                "CANoe reused an existing window. Check independent COM activation." if reused else
-                "CANoe connection failed. Review the error details.", result.evidence)
+                role, "attention" if reused else "error", friendly,
+                "CANoe is reusing an open window. Enable independent connections for separate CAN and Diag projects." if reused else
+                "CANoe connection failed. Review the error details.", detail)
             if reused:
-                report.update(next_action_ko="모든 CANoe 창의 작업을 보관하고 직접 닫은 뒤, 위 ‘CANoe 독립 연결 설정’에서 "
-                              "다중 연결을 적용하세요. 이후 연결 확인을 다시 누르세요. 기존 구성은 바꾸지 않았습니다.",
+                report.update(action="canoe_setup", diagnostic_detail=result.evidence,
+                              next_action_ko="아래 버튼으로 설정을 열어 적용하면 연결을 다시 확인합니다.",
                               next_action_en="Save your work and close all CANoe windows yourself. Open CANoe independent "
                               "connection setup above, enable it, then check again. Existing projects were preserved.")
         self._target(role, connection=ConnectionState.READY if report["status"] == "ready" else
                      ConnectionState.ERROR if report["status"] == "error" else ConnectionState.UNKNOWN,
                      evidence=report["message_ko"] + "\n" + report["detail"])
         self._publish("preparation", report)
-        self._event("TARGET_READY" if report["status"] == "ready" else "TARGET_ATTENTION" if result.success else
-                    "TARGET_ERROR", level="INFO" if result.success else "ERROR", target=role.label,
+        self._event("TARGET_READY" if report["status"] == "ready" else "TARGET_ATTENTION" if report["status"] == "attention" else
+                    "TARGET_ERROR", level="INFO" if result.success else "WARNING" if report["status"] == "attention" else "ERROR", target=role.label,
                     original=report["message_ko"], details=details, error=result.evidence if not result.success else "")
 
     @classmethod

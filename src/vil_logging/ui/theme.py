@@ -66,6 +66,7 @@ QPushButton:focus, QToolButton:focus { border: 2px solid #8B9FF7; padding: 6px 1
 QPushButton:disabled, QToolButton:disabled { color: #9DA9BB; background: #F7F9FC; border-color: #E4E9F1; }
 QPushButton[variant="primary"] { background: #4263EB; color: #FFFFFF; border-color: #4263EB; font-weight: 700; }
 QPushButton[variant="primary"]:hover { background: #3455D8; border-color: #3455D8; }
+QPushButton[variant="primary"]:disabled { color: #9DA9BB; background: #F7F9FC; border-color: #E4E9F1; }
 QPushButton[variant="danger"] { color: #B63B4A; background: #FFFFFF; border-color: #EDD1D7; }
 QPushButton[variant="ghost"] { background: transparent; border-color: transparent; color: #62728B; }
 QPushButton[variant="ghost"]:hover { background: #E7ECF6; color: #334763; }

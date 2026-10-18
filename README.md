@@ -2,7 +2,7 @@
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 공통 logging 버튼으로 기록을 제어합니다.
 
-현재 소스 버전은 **0.8.0**입니다. [기록 품질·캡처 버퍼·부하 검사](docs/development_stage_8.md), [Ethernet 통신 감시](docs/development_stage_7.md), [미완료 기록 복구](docs/development_stage_6.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
+현재 소스 버전은 **0.8.1**입니다. [CAN·Diag 연결 수정과 설정 순서](docs/canoe_connection_hotfix.md), [기록 품질·캡처 버퍼·부하 검사](docs/development_stage_8.md), [Ethernet 통신 감시](docs/development_stage_7.md), [미완료 기록 복구](docs/development_stage_6.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
 **기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. **설정 → Ethernet 연결**의 캡처 버퍼는 기본 64 MiB이고 선택값을 기억합니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
 

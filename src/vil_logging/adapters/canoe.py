@@ -8,6 +8,7 @@ import time
 from collections import deque
 from pathlib import Path
 
+from vil_logging.diagnostics.canoe_setup import IndependentConnectionsRequired
 from vil_logging.storage.blf import inspect_blf
 from vil_logging.storage.file_access import ExclusiveFile, observe
 
@@ -22,6 +23,9 @@ def _same_path(first, second):
 def _create_application():
     from win32com.client import DispatchEx
 
+    from vil_logging.diagnostics.canoe_setup import check_activation
+
+    check_activation()
     return DispatchEx("CANoe.Application")
 
 
@@ -177,7 +181,12 @@ class CanoeCapture:
             self.block, self.index = None, 0
         if self.app is None:
             self._trace("canoe.create_requested", cfg=str(cfg))
-            app = self._create_application()
+            try:
+                app = self._create_application()
+            except IndependentConnectionsRequired as error:
+                self._trace("canoe.independent_setup_required", settings_file=error.settings_path,
+                            process_ids=error.process_ids)
+                raise
             # DispatchEx must give a fresh application. Never replace any existing project.
             current, running, modified = self._fresh_state(app)
             if current.strip() or running or modified:

@@ -16,6 +16,7 @@ class Tools:
         self.fail = None
         self.stopped = set()
         self.connection_details = {}
+        self.failure_details = {}
 
     def request(self, roles, action, session_id, **kwargs):
         self.calls.append((roles, action))
@@ -28,6 +29,7 @@ class Tools:
                      "stop": "stopped", "restore": "stopped", "inspect": "verified", "query": "recording"}[action]
             if not success:
                 state = "unknown"
+                details = self.failure_details
             elif action == "connect":
                 details = self.connection_details
             elif action == "configure":
@@ -175,3 +177,34 @@ def test_connection_report_separates_license_failure_from_managed_filename_optio
         assert "라이선스" in report["message_ko"]
     else:
         assert "기존 로깅 버튼" in report["next_action_ko"]
+
+
+def test_disabled_independent_mode_offers_setup_without_showing_traceback(real):
+    runtime, tools = real
+    tools.fail = (Role.DIAG, "connect")
+    tools.failure_details = {"connection_issue": "independent_setup_required",
+                             "diagnostics": [{"event": "canoe.independent_setup_required"}]}
+    runtime._submit(runtime._prepare_canoe, Role.DIAG).result(5)
+    reports = []
+    while not runtime.messages.empty():
+        kind, value = runtime.messages.get_nowait()
+        if kind == "preparation":
+            reports.append(value)
+    report = reports[-1]
+    assert report["status"] == "attention" and report["action"] == "canoe_setup"
+    assert "Traceback" not in report["detail"]
+    assert report["diagnostic_detail"] == "injected proof"
+    assert tools.calls == [((Role.DIAG,), "connect")]
+
+
+def test_old_reused_instance_journal_never_masks_a_new_unrelated_connection_error(real):
+    runtime, tools = real
+    tools.fail = (Role.DIAG, "connect")
+    tools.failure_details = {"diagnostics": [{"event": "canoe.independent_setup_required"}]}
+    runtime._submit(runtime._prepare_canoe, Role.DIAG).result(5)
+    reports = []
+    while not runtime.messages.empty():
+        kind, value = runtime.messages.get_nowait()
+        if kind == "preparation":
+            reports.append(value)
+    assert reports[-1]["status"] == "error" and "action" not in reports[-1]

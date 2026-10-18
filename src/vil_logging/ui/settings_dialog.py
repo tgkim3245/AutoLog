@@ -121,6 +121,7 @@ class SettingsDialog(QDialog):
         self.result_details: dict[Role, QLabel] = {}
         self.next_actions: dict[Role, QLabel] = {}
         self._preparation_cards: dict[Role, QFrame] = {}
+        self.setup_actions: dict[Role, QPushButton] = {}
         self.setObjectName("settingsDialog")
         self.setMinimumSize(640, 590)
         self.resize(700, 730)
@@ -270,6 +271,10 @@ class SettingsDialog(QDialog):
         from .canoe_setup_dialog import CanoeSetupDialog
         dialog = CanoeSetupDialog(self._language, self)
         dialog.exec()
+        if dialog.applied_enabled is True:
+            for role, key in ((Role.CAN, "can_cfg"), (Role.DIAG, "diag_cfg")):
+                if self._current(key):
+                    self._prepare(role)
 
     @staticmethod
     def _page():
@@ -338,6 +343,13 @@ class SettingsDialog(QDialog):
         self.next_actions[role] = self._helper()
         self.next_actions[role].setObjectName(f"preparation{role.value}NextAction")
         layout.addWidget(self.next_actions[role])
+        if role != Role.ETHERNET:
+            setup = QPushButton()
+            setup.setObjectName(f"setup{role.label}ConnectionButton")
+            setup.clicked.connect(self._open_canoe_setup)
+            setup.hide()
+            self.setup_actions[role] = setup
+            layout.addWidget(setup, 0, Qt.AlignmentFlag.AlignLeft)
         return frame
 
     def showEvent(self, event):
@@ -374,10 +386,13 @@ class SettingsDialog(QDialog):
             self.block_inputs[key].addItem("연결 후 블록 선택" if self._language == "ko" else "Choose block after connection", "")
         self._mark_dirty(key)
 
-    def _save_preferences(self, keys, *, force=False):
+    def _save_preferences(self, keys, *, force=False, skip_pending=False):
         if self._busy or self._updating:
             return
         patch = {key: self._current(key) for key in keys if force or key in self._dirty}
+        if skip_pending:
+            pending = {key: value for _, previous in self._pending_patches for key, value in previous.items()}
+            patch = {key: value for key, value in patch.items() if key not in pending or pending[key] != value}
         if patch:
             # A later edit supersedes only the same fields in an older request.
             # ACKs for the older value must not keep the saving indicator stuck.
@@ -439,7 +454,9 @@ class SettingsDialog(QDialog):
             return
         self.set_preparation_report({"role": role.value, "status": "checking",
             "message_ko": "연결을 확인하고 있습니다…", "message_en": "Checking the connection…", "detail": ""})
-        self._save_preferences(PREFERENCES, force=True)
+        # Never resend clean values: another connection may have just selected
+        # its logging block while the corresponding UI ACK is still in flight.
+        self._save_preferences(PREFERENCES, skip_pending=True)
         self.prepare_requested.emit(role)
 
     def set_settings(self, settings):
@@ -647,7 +664,7 @@ class SettingsDialog(QDialog):
         visible_detail = detail[:500] if status in {"attention", "error"} else ""
         self.result_details[role].setText(visible_detail)
         self.result_details[role].setVisible(bool(visible_detail))
-        self.result_details[role].setToolTip(detail)
+        self.result_details[role].setToolTip(report.get("diagnostic_detail", detail))
         action = report.get("next_action_" + self._language, "")
         if report and not action:
             action = self._t("wait" if status == "checking" else "ready_next" if status == "ready" else
@@ -656,6 +673,11 @@ class SettingsDialog(QDialog):
         self.next_actions[role].setVisible(bool(action))
         self.prepare_buttons[role].setText(self._t("checking" if role in self._preparing else "check"))
         self.prepare_buttons[role].setEnabled(not self._busy and role not in self._preparing)
+        if role in self.setup_actions:
+            setup = self.setup_actions[role]
+            setup.setText("독립 연결 설정…" if self._language == "ko" else "Independent connection setup…")
+            setup.setVisible(report.get("action") == "canoe_setup")
+            setup.setEnabled(not self._busy and not self._preparing)
 
     def set_target(self, target):
         self.targets[target.role] = target
