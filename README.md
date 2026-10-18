@@ -61,6 +61,8 @@ SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉
 
 ## 개발과 문서
 
+현재 구현 현황과 남은 작업은 [구현 계획](docs/implementation_plan.md)의 5절·10절에서 확인합니다.
+
 코드, 검사, 문서, 의존성 정의와 빌드 사양을 함께 커밋합니다. 빌드 결과, 실제 캡처·진단 로그, PC별 설정과 원본 `.cfg`는 제외합니다. 원격은 `https://github.com/tgkim3245/AutoLog.git`입니다.
 
 ```powershell
@@ -71,6 +73,6 @@ git ls-files src
 - [개발·Git 작업 안내](CONTRIBUTING.md)
 - [현재 프로젝트 구조](docs/project_structure.md)
 - [요구사항](docs/requirements.md), [설계](docs/architecture.md), [제어 정책](docs/control_policy.md)
-- [구현 검토](docs/requirements_implementation_review.md), [검증 계획](docs/validation_plan.md)
+- [초기 구현 검토 — 과거 기록](docs/requirements_implementation_review.md), [검증 계획](docs/validation_plan.md)
 - [시험 PC 준비 항목](docs/test_pc_setup.md), [사용자 가이드](user_guide/user_guide_draft.md)
 - [개발 이력](docs/development_log.md), [로컬 산출물 안내](outputs/README.md)

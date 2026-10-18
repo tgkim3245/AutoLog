@@ -46,4 +46,4 @@
 
 ## 3. 현재 상태와 구분
 
-`.gitignore`는 가상환경, 테스트 캐시, PC별 설정, 업무 원본과 `outputs/` 산출물을 제외한다. 새 개발자는 [개발 안내](../CONTRIBUTING.md)에서 Python 환경, 검사와 Git 절차를 확인한다. 개발·배포 단계와 실제 시험 PC에서 남은 작업은 [개발·배포 계획](development_delivery_plan.md)과 [요구사항 구현 검토](requirements_implementation_review.md)를 따른다.
+`.gitignore`는 가상환경, 테스트 캐시, PC별 설정, 업무 원본과 `outputs/` 산출물을 제외한다. 새 개발자는 [개발 안내](../CONTRIBUTING.md)에서 Python 환경, 검사와 Git 절차를 확인한다. 현재 구현 현황과 다음 작업은 [구현 계획 5절·10절](implementation_plan.md), 전체 배포 목표는 [개발·배포 계획](development_delivery_plan.md)을 따른다.
