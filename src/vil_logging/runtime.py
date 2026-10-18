@@ -348,27 +348,50 @@ class Runtime:
                 self._settings = self._repo.save_preferences({key: block})
                 self._publish("settings", self._settings)
             ready = bool(block and details.get("measurement_running") and not details.get("trigger_active")
-                         and not details.get("automatic_splitting"))
+                         and not details.get("view_only"))
             ko = ("측정 실행과 기록 블록을 확인했습니다. logging으로 구간 기록을 시작하세요." if ready else
                   "기록 블록을 선택하고, AutoLog가 연 CANoe 창에서 측정을 시작한 뒤 다시 확인하세요.")
             en = ("Measurement and logging block found. Start segment recording with logging." if ready else
                   "Select a logging block and start measurement in the CANoe window opened by AutoLog, then check again.")
-            if details.get("automatic_splitting"):
-                ko = "선택한 Logging Block의 자동 파일 분할·번호 증가를 해제한 뒤 다시 확인하세요."
-                en = "Disable automatic splitting/incrementation in the selected Logging Block, then check again."
+            if details.get("view_only"):
+                ko = "CANoe가 View Only 상태라 측정할 수 없습니다. 시험 PC에서 CANoe 라이선스를 활성화한 뒤 다시 확인하세요."
+                en = "CANoe is in View Only mode. Activate a measurement license on the test PC, then check again."
+            elif details.get("selection_error"):
+                ko = "기억한 기록 블록을 사용할 수 없습니다. 위 목록에서 BLF 블록을 다시 선택하세요."
+                en = details["selection_error"]
             elif details.get("trigger_active"):
                 ko = "선택한 Logging Block이 이미 기록 중입니다. CANoe에서 해당 블록의 기록을 끝낸 뒤 다시 확인하세요."
                 en = "The selected Logging Block is already recording. Stop that block in CANoe, then check again."
-            report = self._preparation_report(role, "ready" if ready else "attention", ko, en,
-                                              str(details.get("cfg", "")))
+            detail = str(details.get("cfg", ""))
+            if block:
+                detail += ("\n기록 중에는 CANoe의 기존 로깅 버튼·파일 설정을 함께 조작하지 마세요. "
+                           "AutoLog는 선택 블록의 경로·자동 번호 옵션을 구간 동안 적용하고 정지 후 복구합니다."
+                           if self._settings.language == "ko" else
+                           "\nAvoid concurrent CANoe logging controls or filename edits. AutoLog temporarily manages "
+                           "this block's path and filename options, then restores them after stop.")
+            report = self._preparation_report(role, "ready" if ready else "attention", ko, en, detail)
             report.update(blocks=details.get("blocks", []), selected_block=block)
-            if not ready:
+            if ready:
+                report.update(next_action_ko="logging으로 구간 기록을 제어하세요. 기록 중에는 CANoe의 기존 로깅 버튼과 "
+                              "파일 설정을 함께 조작하지 마세요.",
+                              next_action_en="Control segments with logging. Avoid concurrent CANoe logging controls "
+                              "or filename edits during recording.")
+            else:
                 report.update(next_action_ko="위 항목을 조치한 뒤 연결 확인을 다시 누르세요.",
                               next_action_en="Complete the steps above, then check the connection again.")
         else:
+            reused = any(item.get("event") == "canoe.instance_reused"
+                         for item in details.get("diagnostics", []))
             report = self._preparation_report(
-                role, "error", "CANoe 연결에 실패했습니다. 상세 오류를 확인하세요.",
+                role, "error", "CANoe가 이미 열린 다른 구성을 반환했습니다. 독립 COM 연결 설정을 확인하세요." if reused else
+                "CANoe 연결에 실패했습니다. 상세 오류를 확인하세요.",
+                "CANoe reused an existing window. Check independent COM activation." if reused else
                 "CANoe connection failed. Review the error details.", result.evidence)
+            if reused:
+                report.update(next_action_ko="모든 CANoe 창의 작업을 보관하고 직접 닫은 뒤, 위 ‘CANoe 독립 연결 설정’에서 "
+                              "다중 연결을 적용하세요. 이후 연결 확인을 다시 누르세요. 기존 구성은 바꾸지 않았습니다.",
+                              next_action_en="Save your work and close all CANoe windows yourself. Open CANoe independent "
+                              "connection setup above, enable it, then check again. Existing projects were preserved.")
         self._target(role, connection=ConnectionState.READY if report["status"] == "ready" else
                      ConnectionState.ERROR if report["status"] == "error" else ConnectionState.UNKNOWN,
                      evidence=report["message_ko"] + "\n" + report["detail"])
@@ -726,6 +749,21 @@ class Runtime:
                                   params=parameters.get(roles[0], {}) if len(roles) == 1 else {},
                                   **kwargs)
 
+    def _restore_canoe_outputs(self, roles, session_id):
+        if not roles:
+            return
+        try:
+            results = self._request_real(roles, "restore", session_id, timeout=15)
+        except Exception as error:
+            log.exception("canoe.output_restore_request_failed")
+            self._event("OPERATION_ERROR", level="WARNING", original=str(error), roles=[r.value for r in roles])
+            return
+        for role, result in results.items():
+            if not result.success:
+                self._event("OPERATION_ERROR", level="WARNING", target=role.label,
+                            original="CANoe 출력 설정 복구를 확인하지 못했습니다. 다음 연결에서 다시 확인합니다. " + result.evidence,
+                            details=result.details)
+
     def _start_real(self, roles: tuple[Role, ...]) -> None:
         if self._storage_failed:
             raise RuntimeError("Persistent history failed; resolve storage errors before capture")
@@ -763,12 +801,14 @@ class Runtime:
                 if failures:
                     raise RuntimeError("\n".join(failures))
             if self._cancel.is_set():
+                self._restore_canoe_outputs(can_roles, plan.session_id)
                 cleanup_work_directory(session_dir)
                 self._set_phase(SessionPhase.IDLE)
                 self._event("SESSION_CANCELLED", level="WARNING", reserved=False)
                 return
             self._settings = self._repo.reserve(plan)
         except Exception:
+            self._restore_canoe_outputs(can_roles, plan.session_id)
             cleanup_work_directory(session_dir)  # Only empty directories; never remove partial data.
             raise
         self._plan = plan
@@ -833,6 +873,13 @@ class Runtime:
             self._target(role, recording=RecordingState.STOPPING)
         # Send all stops before waiting, so a stalled COM target cannot suppress the others.
         results = self._pool.request(selected, "stop", plan.session_id, timeout=35)
+        self._restore_canoe_outputs(tuple(file.role for file in plan.files
+                                         if file.role != Role.ETHERNET and file.role not in selected), plan.session_id)
+        for role, result in results.items():
+            if result.details.get("output_restore_error"):
+                self._event("OPERATION_ERROR", level="WARNING", target=role.label,
+                            original="BLF는 닫혔지만 CANoe 출력 설정 복구가 필요합니다: " +
+                                     result.details["output_restore_error"], details=result.details)
         confirmed = all(result.success and result.state == "stopped" for result in results.values())
         phase = (SessionPhase.FAILED if self._failure_latched else SessionPhase.COMPLETED
                  ) if confirmed else SessionPhase.INCOMPLETE

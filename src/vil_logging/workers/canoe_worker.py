@@ -32,6 +32,9 @@ def canoe_worker_main(role, pipe):
                 elif command.action == "stop":
                     details = capture.stop(command.session_id)
                     state, evidence = "stopped", "Selected trigger stopped and BLF exclusively accessible; measurement untouched"
+                elif command.action == "restore":
+                    details = capture.restore_output(command.session_id)
+                    state, evidence = "stopped", "Idle output settings restored without saving the configuration"
                 elif command.action == "inspect":
                     details = capture.inspect_file(command.session_id)
                     state, evidence = "verified", "BLF container integrity, record boundaries and counts checked"
@@ -41,6 +44,7 @@ def canoe_worker_main(role, pipe):
                 elif command.action == "shutdown":
                     if capture.attempted and not capture.stop_confirmed:
                         raise RuntimeError("Cannot release CANoe while this segment's normal stop is unconfirmed")
+                    capture.restore_output(capture.session_id)
                     pipe.send(CommandResult(command, True, "stopped", "COM reference released; CANoe window/measurement remain", os.getpid()))
                     break
                 else:

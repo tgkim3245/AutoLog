@@ -160,6 +160,10 @@ class SettingsDialog(QDialog):
         canoe, layout = self._page()
         self.can_hint = self._helper()
         layout.addWidget(self.can_hint)
+        self.canoe_setup_button = QPushButton()
+        self.canoe_setup_button.setObjectName("canoeSetupButton")
+        self.canoe_setup_button.clicked.connect(self._open_canoe_setup)
+        layout.addWidget(self.canoe_setup_button, 0, Qt.AlignmentFlag.AlignLeft)
         for role, key in ((Role.CAN, "can_cfg"), (Role.DIAG, "diag_cfg")):
             form = QFormLayout()
             self._field(form, key, role.label + " .cfg", "cfg")
@@ -252,6 +256,11 @@ class SettingsDialog(QDialog):
         label.setTextFormat(Qt.TextFormat.PlainText)
         label.setProperty("variant", "helper")
         return label
+
+    def _open_canoe_setup(self):
+        from .canoe_setup_dialog import CanoeSetupDialog
+        dialog = CanoeSetupDialog(self._language, self)
+        dialog.exec()
 
     @staticmethod
     def _page():
@@ -574,7 +583,16 @@ class SettingsDialog(QDialog):
                 combo.clear()
                 combo.addItem("기록 블록 선택" if self._language == "ko" else "Choose logging block", "")
                 for item in report["blocks"]:
-                    combo.addItem(f"Logging {item['id']} · {item['name']}", item["id"])
+                    label = f"{item['id']} · {item['name']}"
+                    if item.get("format"):
+                        label += f" · .{item['format']}"
+                    if item.get("compatible") is False:
+                        label += " · 선택 불가" if self._language == "ko" else " · unavailable"
+                    combo.addItem(label, item["id"])
+                    index = combo.count() - 1
+                    combo.setItemData(index, item.get("path", ""), Qt.ItemDataRole.ToolTipRole)
+                    if item.get("compatible") is False:
+                        combo.model().item(index).setEnabled(False)
                 combo.setCurrentIndex(max(0, combo.findData(selected)))
         if report.get("status") == "checking":
             self._preparing.add(role)
@@ -644,6 +662,8 @@ class SettingsDialog(QDialog):
                            (self.scope_hint, "scope")):
             label.setText(self._t(key))
         self.format_label.setText(tr("format", self._language))
+        self.canoe_setup_button.setText("CANoe 독립 연결 설정…" if self._language == "ko" else
+                                        "CANoe independent connection setup…")
         self.format_input.setToolTip(self._t("format_help"))
         self.find_button.setText(self._t("find"))
         for key, label in self.block_labels.items():
@@ -662,7 +682,7 @@ class SettingsDialog(QDialog):
     def set_busy(self, busy):
         self._busy = busy
         for widget in [*self.fields.values(), *self.browse_buttons, self.nic_input,
-                       *self.block_inputs.values(), self.format_input, self.apply_button]:
+                       *self.block_inputs.values(), self.canoe_setup_button, self.format_input, self.apply_button]:
             widget.setEnabled(not busy)
         self.find_button.setEnabled(not busy and not self._discovering)
         self.set_language(self._language)

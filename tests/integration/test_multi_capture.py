@@ -15,6 +15,7 @@ class Tools:
         self.paths = {}
         self.fail = None
         self.stopped = set()
+        self.connection_details = {}
 
     def request(self, roles, action, session_id, **kwargs):
         self.calls.append((roles, action))
@@ -23,10 +24,12 @@ class Tools:
             params = kwargs.get("role_params", {}).get(role, kwargs.get("params", {}))
             details = {}
             success = (role, action) != self.fail
-            state = {"prepare": "ready", "configure": "configured", "start": "recording",
-                     "stop": "stopped", "inspect": "verified", "query": "recording"}[action]
+            state = {"connect": "ready", "prepare": "ready", "configure": "configured", "start": "recording",
+                     "stop": "stopped", "restore": "stopped", "inspect": "verified", "query": "recording"}[action]
             if not success:
                 state = "unknown"
+            elif action == "connect":
+                details = self.connection_details
             elif action == "configure":
                 self.paths[role] = Path(params["temp_path"])
             elif action == "start":
@@ -91,6 +94,7 @@ def test_canoe_output_failure_reserves_no_number_and_starts_nothing(real):
     assert runtime.phase == SessionPhase.FAILED and runtime._settings.next_index == 1
     assert runtime._plan is None
     assert not any(action == "start" for _, action in tools.calls)
+    assert tools.calls[-1] == ((Role.CAN, Role.DIAG), "restore")
     assert not (runtime.data_dir / "captures/.vil_work").exists()
 
 
@@ -119,3 +123,55 @@ def test_same_configuration_for_can_and_diag_is_rejected_before_tool_commands(re
     runtime.save_preferences({"diag_cfg": "C:/can.cfg"}).result(timeout=5)
     runtime.toggle((Role.CAN, Role.DIAG)).result(timeout=5)
     assert runtime._settings.next_index == 1 and not tools.calls
+
+
+def test_reservation_error_restores_both_configured_outputs(real, monkeypatch):
+    runtime, tools = real
+
+    def reject(plan):
+        raise OSError("injected storage failure")
+
+    monkeypatch.setattr(runtime._repo, "reserve", reject)
+    runtime.toggle((Role.CAN, Role.DIAG)).result(timeout=5)
+    assert tools.calls[-1] == ((Role.CAN, Role.DIAG), "restore")
+    assert not any(action == "start" for _, action in tools.calls)
+    assert runtime._settings.next_index == 1
+
+
+def test_cancel_after_configuration_restores_without_reserving(real):
+    runtime, tools = real
+    request = tools.request
+
+    def cancel(roles, action, session_id, **kwargs):
+        result = request(roles, action, session_id, **kwargs)
+        if action == "configure":
+            runtime._cancel.set()
+        return result
+
+    tools.request = cancel
+    runtime.toggle((Role.CAN, Role.DIAG)).result(timeout=5)
+    assert tools.calls[-1] == ((Role.CAN, Role.DIAG), "restore")
+    assert runtime.phase == SessionPhase.IDLE
+    assert runtime._settings.next_index == 1
+    assert not any(action == "start" for _, action in tools.calls)
+
+
+@pytest.mark.parametrize("view_only", [True, False])
+def test_connection_report_separates_license_failure_from_managed_filename_options(real, view_only):
+    runtime, tools = real
+    tools.connection_details = {"selected_block": "1", "measurement_running": True, "trigger_active": False,
+                                "view_only": view_only, "automatic_splitting": ["IncrementAfterTrigger"],
+                                "blocks": [{"id": "1", "name": "CAN_Logging", "format": "blf"}]}
+    runtime._submit(runtime._prepare_canoe, Role.CAN).result(timeout=5)
+    reports = []
+    while not runtime.messages.empty():
+        kind, value = runtime.messages.get_nowait()
+        if kind == "preparation":
+            reports.append(value)
+    report = reports[-1]
+    assert report["selected_block"] == "1" and report["blocks"][0]["name"] == "CAN_Logging"
+    assert report["status"] == ("attention" if view_only else "ready")
+    if view_only:
+        assert "라이선스" in report["message_ko"]
+    else:
+        assert "기존 로깅 버튼" in report["next_action_ko"]

@@ -2,9 +2,9 @@
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 공통 logging 버튼으로 기록을 제어합니다.
 
-현재 소스 버전은 **0.5.0**입니다. [CANoe 연동과 시험 순서](docs/development_stage_5.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
+현재 소스 버전은 **0.5.1**입니다. [대표 구성 수정 결과와 사용 순서](docs/canoe_fix_plan.md), [CANoe 연동](docs/development_stage_5.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
-대표 .cfg의 [실제 호환성 검토](docs/cfg_compatibility_review.md)에서 두 CANoe의 독립 COM 연결과 CAN 자동 파일명 증가가 적용 전 해결 항목으로 확인됐습니다. 현재 0.5.0의 CAN·Diag 동시 취득은 현장 지원 완료 상태가 아닙니다.
+대표 두 .cfg의 독립 연결은 CANoe 19.3.118에서 확인했습니다. CAN+Diag 사용 전 **설정 → CAN·Diag 구성 → CANoe 독립 연결 설정…**에서 다중 연결을 적용하세요. 모든 CANoe 창이 닫힌 상태에서 원본 can.ini를 백업하고 적용하며, 기본 연결로 복구할 수 있습니다. 현재 PC는 **View Only**이므로 라이선스 활성화 후 실제 구간 기록·장비 검증이 남아 있습니다. [최초 검토](docs/cfg_compatibility_review.md)와 [후속 수정 결과](docs/canoe_fix_plan.md)를 구분합니다.
 
 ## 폴더와 Git 관리 범위
 
@@ -57,7 +57,7 @@ SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉
 
 ## 구현 및 검증 범위
 
-기본 앱, 설정·번호·파일 이력, 진단 로그, 파일 관리와 TShark 기반 Ethernet 취득이 구현되어 있습니다. 0.5.0에는 대상별 CANoe COM 실행부, 기존 Logging Block 선택, 측정 유지 중 구간 BLF 시작·정지와 구조 검사·보관을 연결했습니다. **대표 .cfg로 실제 CANoe 구간 기록을 검증하기 전인 시험용 버전**입니다. 차량 통신 판정과 고속·장시간·대용량 검증도 남아 있습니다. 모의 실행은 실제 BLF/PCAP를 만들지 않습니다.
+기본 앱, 설정·번호·파일 이력, 진단 로그, 파일 관리와 TShark 기반 Ethernet 취득이 구현되어 있습니다. 0.5.0의 CANoe 실행부에 이어 0.5.1에서 독립 COM 설정/연결, BLF 블록 선택, 임시 파일명 옵션 관리·복구와 View Only 안내를 보완했습니다. **대표 .cfg로 실제 CANoe 구간 기록을 검증하기 전인 시험용 버전**입니다. 차량 통신 판정과 고속·장시간·대용량 검증도 남아 있습니다. 모의 실행은 실제 BLF/PCAP를 만들지 않습니다.
 
 기존 개발 기록에는 TShark/Npcap 설치 및 localhost 캡처 검증이 남아 있습니다. 이를 실제 차량의 취득 성능이나 모든 패킷의 무손실 저장을 검증한 결과로 해석하지 않습니다. 공통 시작 버튼도 두 도구의 정확한 동시 취득이나 시간 동기화를 보장하지 않습니다.
 

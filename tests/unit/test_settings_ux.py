@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QFileDialog
 
@@ -210,3 +211,14 @@ def test_canoe_block_choices_are_explicit_persisted_and_cleared_for_new_cfg(dial
     assert combo.currentData() == "2"
     dialog.fields["can_cfg"].setText("C:/another.cfg")
     assert combo.currentData() == "" and combo.count() == 1
+
+
+def test_canoe_choices_show_name_format_and_path_and_disable_non_blf(dialog):
+    dialog.set_preparation_report({"role": "can", "status": "attention", "blocks": [
+        {"id": "1", "name": "CAN_Logging", "format": "blf", "path": "C:/can.blf", "compatible": True},
+        {"id": "2", "name": "ETH_Logging", "format": "pcapng", "path": "C:/eth.pcapng", "compatible": False}],
+        "selected_block": "1"})
+    combo = dialog.block_inputs["can_logging_block"]
+    assert "CAN_Logging" in combo.currentText() and ".blf" in combo.currentText()
+    assert combo.itemData(1, Qt.ItemDataRole.ToolTipRole) == "C:/can.blf"
+    assert not combo.model().item(2).isEnabled()
