@@ -47,8 +47,10 @@ def test_empty_selection_does_not_consume_number(runtime_factory):
     assert read_next(runtime) == 1
 
 
-def test_demo_start_stop_reserves_number_once_and_never_creates_captures(runtime_factory):
+@pytest.mark.parametrize("language", ["ko", "en", "zh"])
+def test_demo_start_stop_reserves_number_once_and_never_creates_captures(runtime_factory, language):
     runtime = runtime_factory()
+    runtime.save_preferences({"language": language}).result(timeout=3)
     roles = tuple(Role)
     runtime.toggle(roles).result(timeout=12)
     assert runtime.phase == SessionPhase.RECORDING

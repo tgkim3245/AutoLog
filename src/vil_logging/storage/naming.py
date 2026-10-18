@@ -122,8 +122,8 @@ def validate_settings(
         raise NamingError("The index is too long for a Windows filename")
     if settings.ethernet_format not in {"pcap", "pcapng"}:
         raise NamingError("Ethernet format must be pcap or pcapng")
-    if settings.language not in {"ko", "en"}:
-        raise NamingError("Language must be ko or en")
+    if settings.language not in {"ko", "en", "zh"}:
+        raise NamingError("Language must be ko, en or zh")
     if type(settings.version) is not int or settings.version < 1:
         raise NamingError("Settings version must be a positive integer")
     for choice in (settings.can_logging_block, settings.diag_logging_block):
