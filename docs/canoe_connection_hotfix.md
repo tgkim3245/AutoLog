@@ -24,3 +24,13 @@
 - 한/영 연결 안내와 실행 중 설정 변경 잠금 화면을 확인했다. 근거는 로컬 `Downloads/AutoLog_Builds/hotfix-0.8.1-review/`에 보관했다.
 
 독립 모드를 실제 적용한 뒤 두 구성의 측정/BLF 기록을 수행하는 검증은 현장 작업으로 남긴다. 0.5.1의 독립 연결 실증과 0.8.0의 Ethernet 부하 결과는 각각 해당 문서를 따른다.
+
+## 배포본
+
+깨끗한 소스 커밋 `0f97efd4e3c2ccd6c35500690ed2e2f4249e01a4`에서 최종 배포본을 빌드했다. EXE 제품명 AutoLog·제품/파일 버전 0.8.1과 ZIP CRC·ZIP/EXE SHA256을 확인했다. ZIP을 새 폴더에 풀고 개발용 Python 경로를 제외한 환경에서 모의 시작·기록·정상 종료 및 EXE 옆 개발자로그 58건을 확인했다. 검증 근거는 빌드 폴더의 `verification/result.json`이다.
+
+- ZIP: `C:\Users\tg\Downloads\AutoLog_Builds\AutoLog-0.8.1_20261018_223256\AutoLog-0.8.1_20261018_223256.zip`
+- EXE: 위 폴더의 `AutoLog\AutoLog.exe`
+- ZIP SHA256: `86c652856c6382c0c3af0c3d995cceed8b4b4854947cb2ca556e74e677d91058`
+
+기존 AutoLog를 정상 종료한 뒤 ZIP 전체를 새 폴더에 풀어 실행한다. 이전 PC별 설정은 유지된다. 현재 PC의 다중 연결 모드는 이 배포본 검증으로 자동 변경되지 않으므로, CAN·Diag 동시 연결 전에 위 설정 순서를 수행한다.
