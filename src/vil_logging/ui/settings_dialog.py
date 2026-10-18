@@ -30,7 +30,8 @@ from .i18n import tr
 from .theme import ThemedComboBox, apply_theme, refresh_style
 
 logger = logging.getLogger(__name__)
-PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format")
+PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format",
+               "can_logging_block", "diag_logging_block")
 TEXT = {
     "intro": ("파일과 네트워크 선택은 자동으로 기억합니다.", "File and network choices are saved automatically."),
     "storage": ("저장 설정", "Storage"), "canoe": ("CAN · Diag 구성", "CAN · Diag configuration"),
@@ -53,8 +54,8 @@ TEXT = {
                   "Install Wireshark and find again, or choose tshark.exe."),
     "network_help": ("장비가 연결된 네트워크 이름을 선택하세요. 선택한 장치는 다음 실행에도 기억합니다.",
                      "Choose the network connected to your device. Your choice is remembered for the next launch."),
-    "can_help": ("각 CANoe 대상에 사용할 구성 파일(.cfg)을 선택하고 연결을 확인하세요.",
-                 "Choose the CANoe configuration (.cfg) for each target, then check the connection."),
+    "can_help": (".cfg를 선택하고 연결 확인을 누르면 전용 CANoe 창을 엽니다. 그 창에서 측정을 시작하세요. 구간 기록은 AutoLog로 제어합니다.",
+                 "Choose .cfg and check connection to open a dedicated CANoe window. Start measurement there; control segment recording from AutoLog."),
     "naming_help": ("파일명과 다음 번호를 바꾼 뒤 적용하세요. 번호 앞의 _는 자동으로 넣습니다. 경로 선택은 바로 저장됩니다.",
                     "Apply changes to the filename prefix and next number. An underscore is added before the index. Path choices save immediately."),
     "saved": ("선택을 저장했습니다.", "Choices saved."),
@@ -111,6 +112,8 @@ class SettingsDialog(QDialog):
         self._preparing: set[Role] = set()
         self.targets = {role: TargetSnapshot(role) for role in Role}
         self.fields: dict[str, QLineEdit] = {}
+        self.block_inputs = {}
+        self.block_labels = {}
         self.labels: dict[str, QLabel] = {}
         self.browse_buttons: list[QPushButton] = []
         self.prepare_buttons: dict[Role, QPushButton] = {}
@@ -160,6 +163,15 @@ class SettingsDialog(QDialog):
         for role, key in ((Role.CAN, "can_cfg"), (Role.DIAG, "diag_cfg")):
             form = QFormLayout()
             self._field(form, key, role.label + " .cfg", "cfg")
+            block_key = ("can" if role == Role.CAN else "diag") + "_logging_block"
+            combo = ThemedComboBox()
+            combo.setObjectName(block_key + "ComboBox")
+            self.block_inputs[block_key] = combo
+            combo.addItem("", "")
+            combo.currentIndexChanged.connect(lambda _index, k=block_key: self._block_changed(k))
+            self.block_labels[block_key] = QLabel()
+            form.addRow(self.block_labels[block_key], combo)
+            self.fields[key].textChanged.connect(lambda _value, k=block_key: self._reset_blocks(k))
             layout.addLayout(form)
             layout.addWidget(self._preparation_box(role))
         layout.addStretch()
@@ -322,11 +334,25 @@ class SettingsDialog(QDialog):
             self._dirty.add(key)
 
     def _current(self, key):
+        if key in self.block_inputs:
+            return self.block_inputs[key].currentData() or ""
         if key == "nic_id":
             return self.nic_input.currentData() or ""
         if key == "ethernet_format":
             return self.format_input.currentText()
         return self.fields[key].text().strip()
+
+    def _block_changed(self, key):
+        self._mark_dirty(key)
+        self._save_preferences((key,))
+
+    def _reset_blocks(self, key):
+        if self._updating:
+            return
+        with QSignalBlocker(self.block_inputs[key]):
+            self.block_inputs[key].clear()
+            self.block_inputs[key].addItem("연결 후 블록 선택" if self._language == "ko" else "Choose block after connection", "")
+        self._mark_dirty(key)
 
     def _save_preferences(self, keys, *, force=False):
         if self._busy or self._updating:
@@ -412,6 +438,17 @@ class SettingsDialog(QDialog):
                 with QSignalBlocker(field):
                     field.setText(value)
                     field.setToolTip(value)
+            for key, combo in self.block_inputs.items():
+                value = getattr(settings, key)
+                if key in self._dirty and (self._current(key) != value or key in pending):
+                    continue
+                self._dirty.discard(key)
+                with QSignalBlocker(combo):
+                    index = combo.findData(value)
+                    if index < 0:
+                        combo.addItem(f"Logging {value}", value)
+                        index = combo.count() - 1
+                    combo.setCurrentIndex(index)
             if "ethernet_format" not in self._dirty or (
                 self._current("ethernet_format") == settings.ethernet_format and "ethernet_format" not in pending
             ):
@@ -529,6 +566,16 @@ class SettingsDialog(QDialog):
             logger.warning("ui.preparation_report_invalid")
             return
         self._reports[role] = dict(report)
+        if role != Role.ETHERNET and "blocks" in report:
+            key = ("can" if role == Role.CAN else "diag") + "_logging_block"
+            combo = self.block_inputs[key]
+            selected = self._current(key) if key in self._dirty else report.get("selected_block", "")
+            with QSignalBlocker(combo):
+                combo.clear()
+                combo.addItem("기록 블록 선택" if self._language == "ko" else "Choose logging block", "")
+                for item in report["blocks"]:
+                    combo.addItem(f"Logging {item['id']} · {item['name']}", item["id"])
+                combo.setCurrentIndex(max(0, combo.findData(selected)))
         if report.get("status") == "checking":
             self._preparing.add(role)
         else:
@@ -599,6 +646,9 @@ class SettingsDialog(QDialog):
         self.format_label.setText(tr("format", self._language))
         self.format_input.setToolTip(self._t("format_help"))
         self.find_button.setText(self._t("find"))
+        for key, label in self.block_labels.items():
+            label.setText("기록 블록" if self._language == "ko" else "Logging Block")
+            self.block_inputs[key].setItemText(0, "연결 후 블록 선택" if self._language == "ko" else "Choose block after connection")
         self.install_button.setText("Wireshark " + ("설치·복구" if self._language == "ko" else "install / repair"))
         self.npcap_button.setText(self._t("npcap"))
         for button, key in ((self.environment_button, "environment"), (self.exit_button, "exit"),
@@ -612,7 +662,7 @@ class SettingsDialog(QDialog):
     def set_busy(self, busy):
         self._busy = busy
         for widget in [*self.fields.values(), *self.browse_buttons, self.nic_input,
-                       self.format_input, self.apply_button]:
+                       *self.block_inputs.values(), self.format_input, self.apply_button]:
             widget.setEnabled(not busy)
         self.find_button.setEnabled(not busy and not self._discovering)
         self.set_language(self._language)

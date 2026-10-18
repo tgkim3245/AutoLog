@@ -2,7 +2,7 @@
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 공통 logging 버튼으로 기록을 제어합니다.
 
-현재 소스 버전은 **0.4.5**입니다. [변경 사항](docs/hotfix_0_4_5.md)과 [개발 안내](CONTRIBUTING.md)를 참고하세요.
+현재 소스 버전은 **0.5.0**입니다. [CANoe 연동과 시험 순서](docs/development_stage_5.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
 ## 폴더와 Git 관리 범위
 
@@ -55,7 +55,7 @@ SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉
 
 ## 구현 및 검증 범위
 
-기본 앱, 설정·번호·파일 이력, 진단 로그, 파일 관리와 TShark 기반 Ethernet 취득이 구현되어 있습니다. CAN/Diag 실제 기록, 차량 통신 판정, 실제 시험 PC의 CANoe·NIC 연동과 고속·장시간·대용량 검증은 후속 작업입니다. 모의 실행은 실제 BLF/PCAP를 만들지 않습니다.
+기본 앱, 설정·번호·파일 이력, 진단 로그, 파일 관리와 TShark 기반 Ethernet 취득이 구현되어 있습니다. 0.5.0에는 대상별 CANoe COM 실행부, 기존 Logging Block 선택, 측정 유지 중 구간 BLF 시작·정지와 구조 검사·보관을 연결했습니다. **대표 .cfg로 실제 CANoe 구간 기록을 검증하기 전인 시험용 버전**입니다. 차량 통신 판정과 고속·장시간·대용량 검증도 남아 있습니다. 모의 실행은 실제 BLF/PCAP를 만들지 않습니다.
 
 기존 개발 기록에는 TShark/Npcap 설치 및 localhost 캡처 검증이 남아 있습니다. 이를 실제 차량의 취득 성능이나 모든 패킷의 무손실 저장을 검증한 결과로 해석하지 않습니다. 공통 시작 버튼도 두 도구의 정확한 동시 취득이나 시간 동기화를 보장하지 않습니다.
 

@@ -89,7 +89,7 @@ TEXT = {
                       "Capture or file processing failed. Review recent activity and the actual file path."),
     "action_incomplete": ("상태를 확인할 수 없습니다. 최근 활동과 개발자 로그를 확인하세요.",
                           "State is unconfirmed. Review recent activity and developer logs."),
-    "ethernet_stage": ("Zipy 실제 캡처 사용 가능 · CAN·Diag 연동은 다음 단계", "Live Zipy capture available · CAN/Diag integration pending"),
+    "ethernet_stage": ("CAN·Diag 구간 기록 · Zipy 패킷 캡처", "CAN/Diag segment recording · Zipy packet capture"),
     "phase_short_idle": ("대기", "Idle"),
     "phase_short_preparing": ("준비 중", "Preparing"),
     "phase_short_starting": ("시작 중", "Starting"),
@@ -191,10 +191,9 @@ EVENTS = {
     "SESSION_PARTIAL": ("일부 대상 실패 · 나머지 기록 유지", "Some targets failed · others continue"),
     "SESSION_STOPPING": ("캡처 정지·파일 확인 중", "Stopping capture and checking files"),
     "SESSION_CANCELLED": ("시작 취소 · 번호 예약 전", "Start cancelled before index reservation"),
-    "CAN_ADAPTER_UNAVAILABLE": ("현재는 Zipy 실제 캡처를 지원합니다. CAN·Diag를 해제하고 시작하세요.",
-                                "Live Zipy capture is available. Clear CAN/Diag before starting."),
     "FILE_CHECKING": ("종료 파일 형식·읽기 검사 중", "Checking the closed capture file"),
     "FILE_PUBLISHED": ("캡처 파일 보관 완료", "Capture file saved"),
+    "BLF_PUBLISHED": ("BLF 파일 보관 완료", "BLF file saved"),
     "FILE_ERROR": ("파일 검사·보관 실패 · 작업 파일 유지", "File verification or storage failed · working file preserved"),
     "FILE_OPERATION_STARTED": ("파일 처리 중", "Processing capture files"),
     "FILE_OPERATION_COMPLETED": ("파일 처리 완료 · 다음 번호 유지", "File operation completed · index preserved"),
@@ -237,6 +236,9 @@ def render_event(event: AppEvent, language: str, *, include_details: bool = True
     if event.code == "FILE_PUBLISHED" and "packets" in event.params:
         count = event.params["packets"]
         description += f" · {count} packets" if language == "en" else f" · {count}패킷"
+    if event.code == "BLF_PUBLISHED" and "objects" in event.params:
+        count = event.params["objects"]
+        description += f" · {count} objects" if language == "en" else f" · {count}객체"
     if event.code.startswith("FILE_OPERATION_") and "kind" in event.params:
         description = tr("file_kind_" + event.params["kind"], language) + " · " + description
     details = " · ".join(f"{key}={value}" for key, value in event.params.items())

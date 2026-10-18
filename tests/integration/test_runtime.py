@@ -34,7 +34,7 @@ def read_next(runtime):
 def test_real_mode_cannot_claim_or_start_unvalidated_capture(runtime_factory):
     runtime = runtime_factory(demo=False)
     runtime.toggle((Role.CAN, Role.ETHERNET)).result(timeout=5)
-    assert runtime.phase == SessionPhase.IDLE
+    assert runtime.phase == SessionPhase.FAILED
     assert read_next(runtime) == 1
     assert runtime._plan is None
     assert not list(runtime.data_dir.rglob("*.blf"))

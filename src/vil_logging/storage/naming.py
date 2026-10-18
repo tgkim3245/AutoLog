@@ -122,6 +122,9 @@ def validate_settings(
         raise NamingError("Language must be ko or en")
     if type(settings.version) is not int or settings.version < 1:
         raise NamingError("Settings version must be a positive integer")
+    for choice in (settings.can_logging_block, settings.diag_logging_block):
+        if not isinstance(choice, str) or (choice and (not choice.isdecimal() or not 1 <= int(choice) <= 128)):
+            raise NamingError("Choose a listed CANoe Logging Block")
     if any(not isinstance(role, Role) for role in roles) or len(set(roles)) != len(roles):
         raise NamingError("Capture targets must be unique Role values")
     output = _output_dir(settings)

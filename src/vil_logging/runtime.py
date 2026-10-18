@@ -1,4 +1,4 @@
-"""Background coordinator for the first, explicitly simulated development stage.
+"""Background coordinator for real CANoe/Ethernet and explicit simulation.
 
 SQLite and worker pipes belong to one executor thread. UI callbacks only submit
 requests and consume bounded notifications; they never wait for tool operations.
@@ -28,7 +28,7 @@ from vil_logging.storage.capture_files import cleanup_work_directory, publish_ca
 from vil_logging.storage.file_service import FileResultStorageError, FileService
 from vil_logging.storage.naming import build_plan, find_collisions, validate_settings
 from vil_logging.storage.repository import Repository
-from vil_logging.workers.ethernet_pool import EthernetWorkerPool
+from vil_logging.workers.ethernet_pool import CaptureWorkerPool
 from vil_logging.workers.pool import FakeWorkerPool
 
 log = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class Runtime:
         self._cancel = threading.Event()
         self._repo: Repository | None = None
         self._settings: AppSettings | None = None
-        self._pool = FakeWorkerPool(behaviors) if demo else EthernetWorkerPool()
+        self._pool = FakeWorkerPool(behaviors) if demo else CaptureWorkerPool()
         self._verification_filter = _verification_filter
         self._observation_loss_reported = False
         self._plan: CapturePlan | None = None
@@ -265,6 +265,12 @@ class Runtime:
                 self._event("PREFERENCES_SAVED", fields=changed)
             if any(key in changed for key in ("tshark_path", "nic_id")):
                 self._begin_discovery()
+            for role, prefix in ((Role.CAN, "can"), (Role.DIAG, "diag")):
+                if any(key in changed for key in (prefix + "_cfg", prefix + "_logging_block")):
+                    self._target(role, connection=ConnectionState.UNKNOWN, evidence="CANoe settings changed")
+                    self._publish("preparation", self._preparation_report(
+                        role, "attention", "설정이 변경됐습니다. 연결 확인을 다시 눌러주세요.",
+                        "Settings changed. Check the connection again."))
         except Exception as error:
             log.exception("preferences.save_failed")
             self._event("SETTINGS_ERROR", level="ERROR", original=str(error))
@@ -331,6 +337,46 @@ class Runtime:
         return {"role": role.value, "status": status, "message_ko": message_ko,
                 "message_en": message_en, "detail": detail}
 
+    def _prepare_canoe(self, role):
+        result = self._request_real((role,), "connect", "connection-check",
+                                    parameters={role: self._real_params(role)}, timeout=45)[role]
+        details = result.details
+        if result.success:
+            block = details.get("selected_block", "")
+            if block and not self._real_params(role)["logging_block"]:
+                key = ("can" if role == Role.CAN else "diag") + "_logging_block"
+                self._settings = self._repo.save_preferences({key: block})
+                self._publish("settings", self._settings)
+            ready = bool(block and details.get("measurement_running") and not details.get("trigger_active")
+                         and not details.get("automatic_splitting"))
+            ko = ("측정 실행과 기록 블록을 확인했습니다. logging으로 구간 기록을 시작하세요." if ready else
+                  "기록 블록을 선택하고, AutoLog가 연 CANoe 창에서 측정을 시작한 뒤 다시 확인하세요.")
+            en = ("Measurement and logging block found. Start segment recording with logging." if ready else
+                  "Select a logging block and start measurement in the CANoe window opened by AutoLog, then check again.")
+            if details.get("automatic_splitting"):
+                ko = "선택한 Logging Block의 자동 파일 분할·번호 증가를 해제한 뒤 다시 확인하세요."
+                en = "Disable automatic splitting/incrementation in the selected Logging Block, then check again."
+            elif details.get("trigger_active"):
+                ko = "선택한 Logging Block이 이미 기록 중입니다. CANoe에서 해당 블록의 기록을 끝낸 뒤 다시 확인하세요."
+                en = "The selected Logging Block is already recording. Stop that block in CANoe, then check again."
+            report = self._preparation_report(role, "ready" if ready else "attention", ko, en,
+                                              str(details.get("cfg", "")))
+            report.update(blocks=details.get("blocks", []), selected_block=block)
+            if not ready:
+                report.update(next_action_ko="위 항목을 조치한 뒤 연결 확인을 다시 누르세요.",
+                              next_action_en="Complete the steps above, then check the connection again.")
+        else:
+            report = self._preparation_report(
+                role, "error", "CANoe 연결에 실패했습니다. 상세 오류를 확인하세요.",
+                "CANoe connection failed. Review the error details.", result.evidence)
+        self._target(role, connection=ConnectionState.READY if report["status"] == "ready" else
+                     ConnectionState.ERROR if report["status"] == "error" else ConnectionState.UNKNOWN,
+                     evidence=report["message_ko"] + "\n" + report["detail"])
+        self._publish("preparation", report)
+        self._event("TARGET_READY" if report["status"] == "ready" else "TARGET_ATTENTION" if result.success else
+                    "TARGET_ERROR", level="INFO" if result.success else "ERROR", target=role.label,
+                    original=report["message_ko"], details=details, error=result.evidence if not result.success else "")
+
     @classmethod
     def _check_connection(cls, role: Role, settings: AppSettings) -> tuple[dict, dict | None]:
         def report(status, ko, en, detail=""):
@@ -355,11 +401,10 @@ class Runtime:
             if not canoe.get("executables"):
                 return report("error", "CANoe 설치를 찾지 못했습니다. 시험 PC의 CANoe 설치를 확인하세요.",
                               "CANoe was not found. Check its installation on the test PC.", str(path)), None
-            result = report("attention", "구성 파일과 CANoe 설치를 확인했습니다. 실제 연결은 시험 PC에서 확인할 예정입니다.",
-                          "Configuration and CANoe found. Actual connection will be verified on the test PC.",
+            result = report("attention", "구성 파일과 CANoe 설치를 확인했습니다. 전용 CANoe 창을 연결합니다.",
+                          "Configuration and CANoe found. Connecting a dedicated CANoe window.",
                           str(path.resolve()))
-            result.update(next_action_ko="선택한 구성은 기억했습니다. 시험 PC에서 실제 장비와의 연결을 확인합니다.",
-                          next_action_en="Your configuration is saved. Verify the real device connection on the test PC.")
+            result["canoe_preflight"] = True
             return result, None
         from vil_logging.diagnostics.connections import discover_connections
         connections = discover_connections(settings.tshark_path, settings.nic_id)
@@ -413,10 +458,15 @@ class Runtime:
                     connections["tshark"].get("path") == self._settings.tshark_path))
         else:
             key = "can_cfg" if role == Role.CAN else "diag_cfg"
-            changed = getattr(captured, key) != getattr(self._settings, key)
+            block_key = ("can" if role == Role.CAN else "diag") + "_logging_block"
+            changed = (getattr(captured, key) != getattr(self._settings, key) or
+                       getattr(captured, block_key) != getattr(self._settings, block_key))
         if changed:
             report = self._preparation_report(role, "attention", "설정이 변경됐습니다. 연결 준비를 다시 눌러주세요.",
                                                "Settings changed. Check readiness again.")
+        elif role != Role.ETHERNET and report.get("canoe_preflight"):
+            self._prepare_canoe(role)
+            return
         elif connections is not None:
             self._accept_discovery(connections)
         log.info("connection.prepare_completed", extra={"report": report, "settings_changed": changed,
@@ -501,7 +551,7 @@ class Runtime:
                 self._set_phase(SessionPhase.IDLE)
                 return
             if not self.demo:
-                self._start_ethernet(roles)
+                self._start_real(roles)
                 return
             if self._storage_failed:
                 raise RuntimeError("Persistent history failed; restart after resolving storage errors")
@@ -582,7 +632,7 @@ class Runtime:
             return True
         plan = self._plan
         if not self.demo:
-            return self._stop_ethernet(roles)
+            return self._stop_real(roles)
         selected = roles if roles is not None else self._issued_roles
         self._set_phase(SessionPhase.STOPPING)
         self._event("SESSION_STOPPING")
@@ -626,7 +676,8 @@ class Runtime:
     def _query(self) -> None:
         if self.phase not in {SessionPhase.RECORDING, SessionPhase.PARTIAL} or not self._plan:
             return
-        results = self._pool.request(self._plan.roles, "query", self._plan.session_id, timeout=0.6)
+        results = self._pool.request(self._plan.roles, "query", self._plan.session_id,
+                                      timeout=1.5 if any(role != Role.ETHERNET for role in self._plan.roles) else 0.6)
         any_recording = False
         for role, result in results.items():
             if result.success and result.state == "recording":
@@ -661,62 +712,107 @@ class Runtime:
         packets = self._pool.drain_packets() if self._pool is not None else []
         return [packet for packet in packets if not self._plan or packet.session_id == self._plan.session_id]
 
-    def _start_ethernet(self, roles: tuple[Role, ...]) -> None:
-        if roles != (Role.ETHERNET,):
-            self._event("CAN_ADAPTER_UNAVAILABLE", level="WARNING")
-            self._set_phase(SessionPhase.IDLE)
-            return
+    def _real_params(self, role: Role) -> dict:
+        if role == Role.ETHERNET:
+            return {"tshark_path": self._settings.tshark_path, "nic_id": self._settings.nic_id,
+                    "file_format": self._settings.ethernet_format}
+        key = "can" if role == Role.CAN else "diag"
+        return {"cfg_path": getattr(self._settings, key + "_cfg"),
+                "logging_block": getattr(self._settings, key + "_logging_block")}
+
+    def _request_real(self, roles, action, session_id, parameters=None, **kwargs):
+        parameters = parameters or {}
+        return self._pool.request(roles, action, session_id, role_params=parameters,
+                                  params=parameters.get(roles[0], {}) if len(roles) == 1 else {},
+                                  **kwargs)
+
+    def _start_real(self, roles: tuple[Role, ...]) -> None:
         if self._storage_failed:
             raise RuntimeError("Persistent history failed; resolve storage errors before capture")
+        if Role.CAN in roles and Role.DIAG in roles:
+            if Path(self._settings.can_cfg).resolve() == Path(self._settings.diag_cfg).resolve():
+                raise ValueError("CAN and Diag require distinct .cfg files for independent control.")
         self._event("SESSION_PREPARING")
         validate_settings(self._settings, roles)
         plan = build_plan(self._settings, roles)
         self._repo.check_file_claims([str(file.final_path) for file in plan.files])
         if collisions := find_collisions(plan):
             raise FileExistsError("Existing outputs are preserved: " + ", ".join(map(str, collisions)))
-        prepared = self._pool.request(roles, "prepare", plan.session_id, timeout=12, cancel=self._cancel,
-                                      params={"tshark_path": self._settings.tshark_path,
-                                              "nic_id": self._settings.nic_id,
-                                              "file_format": self._settings.ethernet_format})[Role.ETHERNET]
-        self._target(Role.ETHERNET, connection=ConnectionState.READY if prepared.success else ConnectionState.ERROR,
-                     evidence=prepared.evidence)
+        prepared = self._request_real(roles, "prepare", plan.session_id, timeout=45, cancel=self._cancel,
+                                      parameters={role: self._real_params(role) for role in roles})
+        for role, result in prepared.items():
+            self._target(role, connection=ConnectionState.READY if result.success else ConnectionState.ERROR,
+                         evidence=result.evidence)
         if self._cancel.is_set():
             self._set_phase(SessionPhase.IDLE)
             self._event("SESSION_CANCELLED", level="WARNING", reserved=False)
             return
-        if not prepared.success:
-            raise RuntimeError(prepared.evidence)
-        file = plan.files[0]
-        file.temp_path.parent.mkdir(parents=True, exist_ok=False)
-        self._settings = self._repo.reserve(plan)
+        failures = [f"{role.label}: {result.evidence}" for role, result in prepared.items() if not result.success]
+        if failures:
+            raise RuntimeError("\n".join(failures))
+        session_dir = plan.files[0].temp_path.parent
+        session_dir.mkdir(parents=True, exist_ok=False)
+        try:
+            can_roles = tuple(role for role in roles if role != Role.ETHERNET)
+            if can_roles:
+                configured = self._request_real(
+                    can_roles, "configure", plan.session_id, timeout=15, cancel=self._cancel,
+                    parameters={file.role: {"temp_path": str(file.temp_path)} for file in plan.files})
+                failures = [f"{role.label}: {result.evidence}" for role, result in configured.items()
+                            if not result.success]
+                if failures:
+                    raise RuntimeError("\n".join(failures))
+            if self._cancel.is_set():
+                cleanup_work_directory(session_dir)
+                self._set_phase(SessionPhase.IDLE)
+                self._event("SESSION_CANCELLED", level="WARNING", reserved=False)
+                return
+            self._settings = self._repo.reserve(plan)
+        except Exception:
+            cleanup_work_directory(session_dir)  # Only empty directories; never remove partial data.
+            raise
         self._plan = plan
         self._observation_loss_reported = False
         self._publish("settings", self._settings)
         self._publish("packets_clear", None)
-        self._publish("files", ([str(file.temp_path)], "recording"))
+        self._publish("files", ([str(file.temp_path) for file in plan.files], "recording"))
         self._set_phase(SessionPhase.STARTING)
-        self._repo.update_session(plan.session_id, SessionPhase.STARTING, tool_binding=prepared.details)
+        self._repo.update_session(plan.session_id, SessionPhase.STARTING,
+                                  tool_binding={role.value: result.details for role, result in prepared.items()})
         self._event("SESSION_STARTING", index=str(plan.index), demo=False)
         if self._cancel.is_set():
             self._failure_latched = True
-            self._stop_ethernet(())
+            self._stop_real(())
             return
-        self._issued_roles = roles
-        self._target(Role.ETHERNET, recording=RecordingState.STARTING)
-        params = {"temp_path": str(file.temp_path)}
-        if self._verification_filter:
-            params["verification_filter"] = self._verification_filter
-        result = self._pool.request(roles, "start", plan.session_id, timeout=18, cancel=self._cancel,
-                                    params=params)[Role.ETHERNET]
-        self._target(Role.ETHERNET, recording=RecordingState.RECORDING if result.success else RecordingState.UNKNOWN,
-                     observation=ObservationState.NOT_CONFIGURED, evidence=result.evidence)
-        if self._cancel.is_set() or not result.success:
-            self._failure_latched = True
-            self._target_failures[Role.ETHERNET] = result.evidence
-            self._stop_ethernet()
-            return
-        self._repo.update_capture_file(plan.session_id, Role.ETHERNET, "writing",
-                                       actual_path=str(file.temp_path), start_evidence=result.details)
+        groups = [(Role.ETHERNET,)] if Role.ETHERNET in roles else []
+        if can_group := tuple(role for role in roles if role != Role.ETHERNET):
+            groups.append(can_group)
+        for group in groups:
+            if self._cancel.is_set():
+                self._failure_latched = True
+                self._stop_real()
+                return
+            self._issued_roles += group  # Intent precedes COM/pipe calls, including timeouts.
+            for role in group:
+                self._target(role, recording=RecordingState.STARTING)
+            parameters = {file.role: {"temp_path": str(file.temp_path)} for file in plan.files}
+            if self._verification_filter and Role.ETHERNET in group:
+                parameters[Role.ETHERNET]["verification_filter"] = self._verification_filter
+            results = self._request_real(group, "start", plan.session_id, timeout=18, cancel=self._cancel,
+                                         parameters=parameters)
+            for role, result in results.items():
+                self._target(role, recording=RecordingState.RECORDING if result.success else RecordingState.UNKNOWN,
+                             observation=ObservationState.NOT_CONFIGURED, evidence=result.evidence)
+                if not result.success:
+                    self._target_failures[role] = result.evidence
+                else:
+                    file = next(file for file in plan.files if file.role == role)
+                    self._repo.update_capture_file(plan.session_id, role, "writing",
+                                                   actual_path=str(file.temp_path), start_evidence=result.details)
+            if self._cancel.is_set() or not all(result.success for result in results.values()):
+                self._failure_latched = True
+                self._stop_real()
+                return
         self._repo.update_session(plan.session_id, SessionPhase.RECORDING)
         with self._lock:
             cancelled = self._cancel.is_set()
@@ -724,69 +820,75 @@ class Runtime:
                 self._set_phase(SessionPhase.RECORDING)
         if cancelled:
             self._failure_latched = True
-            self._stop_ethernet()
+            self._stop_real()
             return
         self._event("SESSION_RECORDING", demo=False)
 
-    def _stop_ethernet(self, roles: tuple[Role, ...] | None = None) -> bool:
+    def _stop_real(self, roles: tuple[Role, ...] | None = None) -> bool:
         plan = self._plan
-        file = plan.files[0]
         selected = self._issued_roles if roles is None else roles
         self._set_phase(SessionPhase.STOPPING)
         self._event("SESSION_STOPPING")
-        self._target(Role.ETHERNET, recording=RecordingState.STOPPING)
+        for role in selected:
+            self._target(role, recording=RecordingState.STOPPING)
+        # Send all stops before waiting, so a stalled COM target cannot suppress the others.
         results = self._pool.request(selected, "stop", plan.session_id, timeout=35)
         confirmed = all(result.success and result.state == "stopped" for result in results.values())
-        phase = SessionPhase.FAILED if self._failure_latched else SessionPhase.COMPLETED
-        actual_path = file.temp_path
-        inspection = None
-        if not confirmed:
-            phase = SessionPhase.INCOMPLETE
-            self._target(Role.ETHERNET, recording=RecordingState.UNKNOWN,
-                         observation=ObservationState.UNKNOWN,
-                         evidence="Normal capture stop is unconfirmed; preserve the working path")
-        else:
-            self._target(Role.ETHERNET, recording=RecordingState.ERROR if self._failure_latched else RecordingState.STOPPED,
-                         observation=ObservationState.NOT_MONITORED,
-                         evidence=self._target_failures.get(Role.ETHERNET, "Normal stop confirmed"))
+        phase = (SessionPhase.FAILED if self._failure_latched else SessionPhase.COMPLETED
+                 ) if confirmed else SessionPhase.INCOMPLETE
+        actual_paths, inspections = [], {}
         try:
-            if confirmed and file.temp_path.exists():
-                self._repo.update_capture_file(plan.session_id, Role.ETHERNET, "closed",
-                                               actual_path=str(file.temp_path))
-                self._event("FILE_CHECKING", path=str(file.temp_path))
-                checked = self._pool.request((Role.ETHERNET,), "inspect", plan.session_id, timeout=65)[Role.ETHERNET]
-                if not checked.success:
-                    phase = SessionPhase.FAILED
-                    self._repo.update_capture_file(plan.session_id, Role.ETHERNET, "failed",
-                                                   actual_path=str(file.temp_path), error=checked.evidence)
-                    self._event("FILE_ERROR", level="ERROR", original=checked.evidence,
-                                path=str(file.temp_path))
-                else:
-                    inspection = checked.details
-                    self._repo.update_capture_file(plan.session_id, Role.ETHERNET, "publishing",
-                                                   actual_path=str(file.temp_path), inspection=inspection)
-                    try:
-                        actual_path = publish_capture(file, inspection)
-                    except (OSError, ValueError) as error:
+            for file in plan.files:
+                role, actual_path = file.role, file.temp_path
+                stopped = role not in selected or (results[role].success and results[role].state == "stopped")
+                self._target(role, recording=(RecordingState.ERROR if role in self._target_failures else
+                                              RecordingState.STOPPED) if stopped else RecordingState.UNKNOWN,
+                             observation=ObservationState.NOT_MONITORED if stopped else ObservationState.UNKNOWN,
+                             evidence=self._target_failures.get(role, "Normal stop confirmed") if stopped else
+                                      results[role].evidence)
+                if not stopped:
+                    self._repo.update_capture_file(plan.session_id, role, "unknown", actual_path=str(actual_path))
+                elif not file.temp_path.exists():
+                    if phase != SessionPhase.INCOMPLETE:
                         phase = SessionPhase.FAILED
-                        self._repo.update_capture_file(plan.session_id, Role.ETHERNET, "failed",
-                                                       actual_path=str(file.temp_path), error=str(error))
-                        self._event("FILE_ERROR", level="ERROR", original=str(error), path=str(file.temp_path))
+                    self._repo.update_capture_file(plan.session_id, role, "not_created")
+                else:
+                    self._repo.update_capture_file(plan.session_id, role, "closed", actual_path=str(actual_path))
+                    self._event("FILE_CHECKING", target=role.label, path=str(actual_path))
+                    checked = self._pool.request((role,), "inspect", plan.session_id,
+                                                 timeout=120 if role != Role.ETHERNET else 65)[role]
+                    if not checked.success:
+                        if phase != SessionPhase.INCOMPLETE:
+                            phase = SessionPhase.FAILED
+                        self._repo.update_capture_file(plan.session_id, role, "failed",
+                                                       actual_path=str(actual_path), error=checked.evidence)
+                        self._event("FILE_ERROR", level="ERROR", target=role.label,
+                                    original=checked.evidence, path=str(actual_path))
                     else:
-                        self._repo.update_capture_file(plan.session_id, Role.ETHERNET, "published",
+                        inspection = checked.details
+                        inspections[role.value] = inspection
+                        self._repo.update_capture_file(plan.session_id, role, "publishing",
                                                        actual_path=str(actual_path), inspection=inspection)
-                        self._event("FILE_PUBLISHED", path=str(actual_path), packets=inspection["packet_count"],
-                                    bytes=inspection["bytes"])
-                    if inspection.get("summary_drops") or inspection.get("parse_errors") or inspection.get("reader_errors"):
-                        self._event("OBSERVATION_LOSS", level="WARNING", counters=inspection)
-            elif confirmed:
-                # A cancellation or a failed Start can stop before creating a file.
-                phase = SessionPhase.FAILED
-                self._repo.update_capture_file(plan.session_id, Role.ETHERNET, "not_created")
-            else:
-                self._repo.update_capture_file(plan.session_id, Role.ETHERNET, "unknown",
-                                               actual_path=str(file.temp_path))
-            self._repo.update_session(plan.session_id, phase, demo=False, inspection=inspection,
+                        try:
+                            actual_path = publish_capture(file, inspection)
+                        except (OSError, ValueError) as error:
+                            if phase != SessionPhase.INCOMPLETE:
+                                phase = SessionPhase.FAILED
+                            self._repo.update_capture_file(plan.session_id, role, "failed",
+                                                           actual_path=str(file.temp_path), error=str(error))
+                            self._event("FILE_ERROR", level="ERROR", target=role.label,
+                                        original=str(error), path=str(file.temp_path))
+                        else:
+                            self._repo.update_capture_file(plan.session_id, role, "published",
+                                                           actual_path=str(actual_path), inspection=inspection)
+                            self._event("FILE_PUBLISHED" if role == Role.ETHERNET else "BLF_PUBLISHED",
+                                        target=role.label, path=str(actual_path), bytes=inspection["bytes"],
+                                        packets=inspection.get("packet_count", 0),
+                                        objects=inspection.get("object_count", 0))
+                        if inspection.get("summary_drops") or inspection.get("parse_errors") or inspection.get("reader_errors"):
+                            self._event("OBSERVATION_LOSS", level="WARNING", target=role.label, counters=inspection)
+                actual_paths.append(str(actual_path))
+            self._repo.update_session(plan.session_id, phase, demo=False, inspections=inspections,
                                       stop_results={role.value: {"success": result.success, "state": result.state,
                                                                 "evidence": result.evidence, "details": result.details}
                                                     for role, result in results.items()})
@@ -795,22 +897,18 @@ class Runtime:
             phase = SessionPhase.INCOMPLETE
             log.exception("capture.finalization_failed")
             self._event("OPERATION_ERROR", level="ERROR", original=str(error))
+            actual_paths = [str(file.final_path if file.final_path.is_file() else file.temp_path) for file in plan.files]
         try:
-            if cleanup_work_directory(file.temp_path.parent):
-                log.debug("storage.work_directory_removed", extra={
-                    "path": str(file.temp_path.parent),
-                })
+            cleanup_work_directory(plan.files[0].temp_path.parent)
         except OSError as error:
-            log.exception("storage.work_directory_cleanup_failed", extra={
-                "path": str(file.temp_path.parent),
-            })
-            self._event("FILE_CLEANUP_WARNING", level="WARNING", original=str(error),
-                        path=str(file.temp_path.parent))
+            log.exception("storage.work_directory_cleanup_failed")
+            self._event("FILE_CLEANUP_WARNING", level="WARNING", original=str(error))
         self._set_phase(phase)
-        self._publish("files", ([str(actual_path)], "completed" if phase == SessionPhase.COMPLETED else
+        self._publish("files", (actual_paths, "completed" if phase == SessionPhase.COMPLETED else
                                  "incomplete" if phase == SessionPhase.INCOMPLETE else "failed"))
         self._event("SESSION_" + phase.value.upper(), level="INFO" if phase == SessionPhase.COMPLETED else "WARNING",
-                    demo=False, files_created=file.final_path.is_file() or file.temp_path.is_file())
+                    demo=False, files_created=any(file.final_path.is_file() or file.temp_path.is_file()
+                                                   for file in plan.files))
         self._refresh_file_history()
         return phase != SessionPhase.INCOMPLETE
 

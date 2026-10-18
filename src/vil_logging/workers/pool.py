@@ -7,7 +7,7 @@ import threading
 import time
 from collections.abc import Mapping
 
-from vil_logging.contracts.commands import Command, CommandResult, FakeBehavior
+from vil_logging.contracts.commands import Command, CommandResult, FakeBehavior, WorkerProgress
 from vil_logging.contracts.models import PacketSummary, Role
 from vil_logging.workers.fake_worker import worker_main
 
@@ -38,6 +38,14 @@ class FakeWorkerPool:
         log.info("worker.spawn", extra={"fields": {"role": role.value, "pid": process.pid}})
 
     @staticmethod
+    def _log_progress(reply: WorkerProgress):
+        log.info("command.progress", extra={"fields": {
+            "command_id": reply.command.command_id, "session_id": reply.command.session_id,
+            "role": reply.command.role.value, "action": reply.command.action, "worker_pid": reply.pid,
+            **reply.fields,
+        }})
+
+    @staticmethod
     def _log_late_reply(reply: CommandResult, expected_command_id: str = "") -> None:
         log.warning("command.stale_reply", extra={"fields": {
             "command_id": reply.command.command_id, "expected_command_id": expected_command_id,
@@ -54,7 +62,11 @@ class FakeWorkerPool:
             try:
                 if not pipe.poll():
                     break
-                self._log_late_reply(pipe.recv())
+                reply = pipe.recv()
+                if isinstance(reply, WorkerProgress):
+                    self._log_progress(reply)
+                else:
+                    self._log_late_reply(reply)
             except (EOFError, OSError, BrokenPipeError):
                 break
 
@@ -62,6 +74,7 @@ class FakeWorkerPool:
         self, roles: tuple[Role, ...], action: str, session_id: str, *,
         timeout: float = 3.0, cancel: threading.Event | None = None,
         params: dict | None = None,
+        role_params: dict | None = None,
     ) -> dict[Role, CommandResult]:
         if self._closed:
             raise RuntimeError("worker pool is closed")
@@ -69,7 +82,8 @@ class FakeWorkerPool:
         results = {}
         started = time.monotonic()
         for role in roles:
-            command = Command(action=action, role=role, session_id=session_id, params=dict(params or {}))
+            values = (role_params or {}).get(role, params or {})
+            command = Command(action=action, role=role, session_id=session_id, params=dict(values))
             try:
                 self._ensure(role)
                 self._drain_late_replies(role)
@@ -102,6 +116,9 @@ class FakeWorkerPool:
                 except (EOFError, BrokenPipeError, OSError) as error:
                     results[role] = CommandResult(command, False, "unknown", str(error))
                     del pending[role]
+                    continue
+                if isinstance(reply, WorkerProgress):
+                    self._log_progress(reply)
                     continue
                 if reply.command != command:
                     self._log_late_reply(reply, command.command_id)

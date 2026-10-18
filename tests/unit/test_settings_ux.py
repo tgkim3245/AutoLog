@@ -196,3 +196,17 @@ def test_settings_identify_running_version(dialog):
     from vil_logging import __version__
     assert __version__ in dialog.windowTitle()
     assert __version__ in dialog.version_label.text()
+
+
+def test_canoe_block_choices_are_explicit_persisted_and_cleared_for_new_cfg(dialog):
+    dialog.set_preparation_report({"role": "can", "status": "attention", "blocks": [
+        {"id": "1", "name": "first.blf"}, {"id": "2", "name": "second.blf"}], "selected_block": ""})
+    combo = dialog.block_inputs["can_logging_block"]
+    assert combo.currentData() == ""
+    spy = QSignalSpy(dialog.preferences_changed)
+    combo.setCurrentIndex(2)
+    assert spy.at(0)[0] == {"can_logging_block": "2"}
+    dialog.set_settings(replace(dialog._settings, can_logging_block="2", version=5))
+    assert combo.currentData() == "2"
+    dialog.fields["can_cfg"].setText("C:/another.cfg")
+    assert combo.currentData() == "" and combo.count() == 1

@@ -212,7 +212,7 @@ class Repository:
         Capture preparation still performs full filesystem/tool validation.
         """
         allowed = {"can_cfg", "diag_cfg", "tshark_path", "output_dir", "nic_id",
-                   "language", "ethernet_format"}
+                   "language", "ethernet_format", "can_logging_block", "diag_logging_block"}
         if not isinstance(patch, dict) or set(patch) - allowed:
             raise RepositoryError("Unsupported connection preference fields")
         if any(not isinstance(value, str) or any(ord(char) < 32 for char in value)
@@ -222,10 +222,18 @@ class Repository:
             raise RepositoryError("Unsupported display language")
         if "ethernet_format" in patch and patch["ethernet_format"] not in {"pcap", "pcapng"}:
             raise RepositoryError("Unsupported Ethernet file format")
+        for key in ("can_logging_block", "diag_logging_block"):
+            if key in patch and patch[key] and (not patch[key].isdecimal() or not 1 <= int(patch[key]) <= 128):
+                raise RepositoryError("Logging Block must be a listed 1-based index")
         with self._transaction("save_preferences") as connection:
             current = self._read_settings()
             if current is None:
                 raise RepositoryError("Load settings before saving preferences")
+            patch = dict(patch)
+            for prefix in ("can", "diag"):
+                cfg_key, block_key = prefix + "_cfg", prefix + "_logging_block"
+                if cfg_key in patch and patch[cfg_key] != getattr(current, cfg_key) and block_key not in patch:
+                    patch[block_key] = ""
             if all(getattr(current, key) == value for key, value in patch.items()):
                 return current
             updated = replace(current, **patch, version=current.version + 1)

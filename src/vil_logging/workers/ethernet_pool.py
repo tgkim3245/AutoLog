@@ -1,4 +1,4 @@
-"""The real worker shares command correlation, not simulator cleanup policy."""
+"""Real CANoe/TShark workers share correlation, with separate ownership rules."""
 
 import logging
 import os
@@ -8,13 +8,14 @@ from uuid import uuid4
 
 from vil_logging.contracts.commands import Command
 from vil_logging.contracts.models import Role
+from vil_logging.workers.canoe_worker import canoe_worker_main
 from vil_logging.workers.ethernet_worker import ethernet_worker_main
 from vil_logging.workers.pool import FakeWorkerPool
 
 log = logging.getLogger(__name__)
 
 
-class EthernetWorkerPool(FakeWorkerPool):
+class CaptureWorkerPool(FakeWorkerPool):
     def __init__(self):
         super().__init__()
         self._jobs = {}
@@ -44,7 +45,18 @@ class EthernetWorkerPool(FakeWorkerPool):
 
     def _ensure(self, role):
         if role != Role.ETHERNET:
-            raise ValueError("CANoe capture is not enabled in this stage")
+            if role not in {Role.CAN, Role.DIAG}:
+                raise ValueError("Unsupported capture role")
+            if role not in self._processes:
+                parent, child = self._context.Pipe()
+                process = self._context.Process(target=canoe_worker_main, args=(role, child),
+                                                name=f"AutoLog-CANoe-{role.value}", daemon=True)
+                process.start()
+                child.close()
+                # CANoe is a user-visible COM server, never part of the kill-on-close capture job.
+                self._pipes[role], self._processes[role] = parent, process
+                log.info("worker.canoe_spawn", extra={"role": role.value, "worker_pid": process.pid})
+            return
         if role in self._processes:
             return
         parent, child = self._context.Pipe()
@@ -85,7 +97,7 @@ class EthernetWorkerPool(FakeWorkerPool):
             return
         if not abnormal and self._processes:
             for result in self.request(tuple(self._processes), "query", "shutdown-check", timeout=2).values():
-                if not result.success or result.state in {"recording", "starting", "unknown"}:
+                if not result.success or result.state not in {"stopped", "ready"}:
                     raise RuntimeError("Real capture shutdown is unconfirmed; keep the application open")
         self._closed = True
         for role, pipe in self._pipes.items():
@@ -108,3 +120,6 @@ class EthernetWorkerPool(FakeWorkerPool):
             process.close()
         self._packets.cancel_join_thread()
         self._packets.close()
+
+
+EthernetWorkerPool = CaptureWorkerPool  # Compatibility for previous verification scripts.

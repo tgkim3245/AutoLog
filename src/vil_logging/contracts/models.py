@@ -67,6 +67,8 @@ class AppSettings:
     ethernet_format: str = "pcap"
     can_cfg: str = ""
     diag_cfg: str = ""
+    can_logging_block: str = ""
+    diag_logging_block: str = ""
     nic_id: str = ""
     tshark_path: str = ""
     language: str = "ko"

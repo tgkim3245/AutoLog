@@ -29,6 +29,13 @@ class CommandResult:
 
 
 @dataclass(frozen=True)
+class WorkerProgress:
+    command: Command
+    fields: dict[str, Any]
+    pid: int = 0
+
+
+@dataclass(frozen=True)
 class FakeBehavior:
     start_delay: float = 0.05
     stop_delay: float = 0.03

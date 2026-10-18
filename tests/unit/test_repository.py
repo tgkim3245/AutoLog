@@ -233,3 +233,16 @@ def test_invalid_preference_patch_is_atomic(tmp_path, patch):
         repository.save_preferences({"diag_cfg": "D:/valid.cfg", **patch})
     assert repository.load_settings() == settings
     repository.close()
+
+
+def test_logging_block_choice_survives_restart_and_resets_with_configuration(tmp_path):
+    repository, _, _ = open_repository(tmp_path)
+    repository.save_preferences({"can_cfg": "C:/first.cfg", "can_logging_block": "2"})
+    repository.close()
+    repository = Repository(tmp_path / "metadata.sqlite3")
+    assert repository.load_settings().can_logging_block == "2"
+    updated = repository.save_preferences({"can_cfg": "C:/second.cfg"})
+    assert updated.can_logging_block == ""
+    with pytest.raises(RepositoryError):
+        repository.save_preferences({"diag_logging_block": "-1"})
+    repository.close()

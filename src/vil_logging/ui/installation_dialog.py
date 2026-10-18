@@ -31,11 +31,11 @@ GUIDES = {
         "1. 회사에서 사용하는 CANoe 설치본과 라이선스를 준비하세요.\n"
         "2. CANoe와 사용하는 Vector 장비 드라이버를 설치하세요.\n"
         "3. CANoe에서 라이선스를 확인한 뒤 AutoLog에서 .cfg를 선택하세요.\n"
-        "현재 AutoLog의 CAN/Diag 실제 기록 연동은 개발 중입니다.",
+        "CAN/Diag 구간 기록은 시험 PC의 구성과 장비로 검증해야 합니다.",
         "1. Obtain your company-approved CANoe installer and license.\n"
         "2. Install CANoe and the drivers for your Vector hardware.\n"
         "3. Verify the license in CANoe, then select the .cfg in AutoLog.\n"
-        "Real CAN/Diag recording integration is still under development.")),
+        "Verify CAN/Diag segment recording with your test PC configuration and hardware.")),
 }
 
 
