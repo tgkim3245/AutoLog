@@ -467,21 +467,37 @@ class Runtime:
                               next_action_en="Complete the steps above, then check the connection again.")
         else:
             reused = details.get("connection_issue") == "independent_setup_required"
-            friendly = ("현재 CANoe는 열린 창을 재사용하는 모드입니다. CAN·Diag를 각각 연결하려면 독립 연결 설정이 필요합니다."
-                        if reused else "CANoe 연결에 실패했습니다. 상세 오류를 확인하세요.")
-            detail = ("먼저 CANoe 작업을 저장하고 모든 CANoe 창을 닫으세요. 아래 ‘독립 연결 설정’에서 다중 연결을 적용하세요."
-                      if reused and self._settings.language == "ko" else
-                      "Save your CANoe work and close all CANoe windows. Enable independent connections below."
-                      if reused else result.evidence)
+            if reused:
+                if self._settings.language == "ko":
+                    friendly = ("CAN과 Diag의 .cfg를 각각 다른 CANoe 인스턴스에 연결해야 합니다. "
+                                "현재 기본 COM 연결은 열린 창을 재사용할 수 있습니다.")
+                    detail = ("CANoe 작업을 저장하고 모든 CANoe 창을 닫으세요. "
+                              "‘CANoe cfg별 연결 설정’에서 cfg마다 별도 인스턴스를 켜세요.")
+                    next_action_en = "Save your work and close all CANoe windows yourself. Open CANoe per-cfg " \
+                                     "connection setup above, enable one instance per cfg, then check again. " \
+                                     "Existing projects were preserved."
+                else:
+                    friendly = ("The CAN and Diag .cfg files need separate CANoe instances. "
+                                "Default COM activation may reuse an open window.")
+                    detail = ("Save CANoe work and close every CANoe window. Enable one CANoe instance per cfg "
+                              "in the per-cfg connection setup.")
+                    next_action_en = "Save your work and close all CANoe windows yourself. Open CANoe per-cfg " \
+                                     "connection setup above, enable one instance per cfg, then check again. " \
+                                     "Existing projects were preserved."
+            else:
+                friendly = ("CANoe 연결에 실패했습니다. 상세 오류를 확인하세요." if self._settings.language == "ko" else
+                            "CANoe connection failed. Review the detailed error.")
+                detail = result.evidence
+                next_action_en = ""
             report = self._preparation_report(
                 role, "attention" if reused else "error", friendly,
-                "CANoe is reusing an open window. Enable independent connections for separate CAN and Diag projects." if reused else
-                "CANoe connection failed. Review the error details.", detail)
+                friendly if self._settings.language == "en" else
+                "The CAN and Diag .cfg files need separate CANoe instances. Default COM activation may reuse an open window."
+                if reused else "CANoe connection failed. Review the error details.", detail)
             if reused:
                 report.update(action="canoe_setup", diagnostic_detail=result.evidence,
                               next_action_ko="아래 버튼으로 설정을 열어 적용하면 연결을 다시 확인합니다.",
-                              next_action_en="Save your work and close all CANoe windows yourself. Open CANoe independent "
-                              "connection setup above, enable it, then check again. Existing projects were preserved.")
+                              next_action_en=next_action_en)
         self._target(role, connection=ConnectionState.READY if report["status"] == "ready" else
                      ConnectionState.ERROR if report["status"] == "error" else ConnectionState.UNKNOWN,
                      evidence=report["message_ko"] + "\n" + report["detail"])

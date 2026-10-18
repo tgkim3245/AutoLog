@@ -766,7 +766,7 @@ class SettingsDialog(QDialog):
         self.prepare_buttons[role].setEnabled(not self._busy and role not in self._preparing)
         if role in self.setup_actions:
             setup = self.setup_actions[role]
-            setup.setText("독립 연결 설정…" if self._language == "ko" else "Independent connection setup…")
+            setup.setText("cfg별 CANoe 연결 설정…" if self._language == "ko" else "CANoe per-cfg connection setup…")
             setup.setVisible(report.get("action") == "canoe_setup")
             setup.setEnabled(not self._busy and not self._preparing)
 
@@ -812,8 +812,8 @@ class SettingsDialog(QDialog):
             "기본 64 MiB · 드라이버에 요청하는 버퍼입니다. 실제 적용량과 무손실 캡처를 보장하지 않습니다."
             if self._language == "ko" else
             "Default 64 MiB · Requested driver buffer; actual allocation and lossless capture are not guaranteed.")
-        self.canoe_setup_button.setText("CANoe 독립 연결 설정…" if self._language == "ko" else
-                                        "CANoe independent connection setup…")
+        self.canoe_setup_button.setText("CANoe cfg별 연결 설정…" if self._language == "ko" else
+                                        "CANoe per-cfg connection setup…")
         self.format_input.setToolTip(self._t("format_help"))
         self.find_button.setText(self._t("find"))
         for key, label in self.block_labels.items():

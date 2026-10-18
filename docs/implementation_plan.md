@@ -1,7 +1,7 @@
 # 프로그램 구현 작업 계획
 
 작성일: 2026-10-17 (Asia/Seoul)
-현황 갱신: 2026-10-18, 소스 버전 0.8.2. 현재 작업별 진행은 **5절**, 다음 작업 순서는 **10절**을 기준으로 본다. 작업 ID와 최종 완료 기준은 기존 계획을 유지한다. [0.5.1 수정](canoe_fix_plan.md)에서 CANoe 독립 연결·출력 옵션 복구, [0.6.0](development_stage_6.md)에서 수동 복구, [0.7.0](development_stage_7.md)에서 Ethernet 감시, [0.8.0](development_stage_8.md)에서 품질 계측·부하 검사, [0.8.1](canoe_connection_hotfix.md)에서 독립 연결 안내·두 연결 간 설정 되돌림을 수정하고, [0.8.2](../README.md)에서 CAN·Diag 설정 짝을 분명히 했다. 실제 CAN/Diag 구간 기록은 라이선스 준비 후 검증한다.
+현황 갱신: 2026-10-18, 소스 버전 0.8.3. 현재 작업별 진행은 **5절**, 다음 작업 순서는 **10절**을 기준으로 본다. 작업 ID와 최종 완료 기준은 기존 계획을 유지한다. [0.5.1 수정](canoe_fix_plan.md)에서 CANoe 독립 연결·출력 옵션 복구, [0.6.0](development_stage_6.md)에서 수동 복구, [0.7.0](development_stage_7.md)에서 Ethernet 감시, [0.8.0](development_stage_8.md)에서 품질 계측·부하 검사, [0.8.1](canoe_connection_hotfix.md)에서 연결 오류와 설정 되돌림을 수정했다. [0.8.2](../README.md)에서 CAN·Diag 설정 짝을 분명히 하고, [0.8.3](../README.md)에서 cfg별 CANoe 연결 이유를 안내한다. 실제 CAN/Diag 구간 기록은 라이선스 준비 후 검증한다.
 
 현재 구현: Qt UI·설정/번호/이력, TShark Ethernet 취득·최근 패킷·명시적 규칙 감시, 완료 파일 관리·미완료 수동 복구, 상시 진단·버그리포트와 버전별 자동 빌드. CAN/Diag COM 제어는 시험용이며 대표 .cfg 측정·기록, CAN/Diag 수신 이벤트·하드웨어 채널 관측, 실제 차량·고부하·새 PC 검증이 남아 있다. 최신 검증 근거는 [7단계 결과](development_stage_7.md)를 따른다.
 기준: [요구사항](requirements.md), [제어 정책](control_policy.md), [설계](architecture.md), [검증 계획](validation_plan.md).
