@@ -250,6 +250,10 @@ TEXT.update({
 })
 
 EVENTS = {
+    "DISK_SPACE_LOW": ("저장 공간 1 GiB 이하 · 저장 위치 확인 필요", "Free disk space ≤1 GiB · check output location"),
+    "DISK_SPACE_RESTORED": ("저장 공간 여유 회복", "Free disk space recovered"),
+    "CAPTURE_DROP_REPORTED": ("종료 파일에서 원본 패킷 누락 통계 확인 · 기록 품질 확인", "Closed file reports packet drops · review capture quality"),
+    "CAPTURE_SUMMARY_MISMATCH": ("파일·해석 패킷 수 차이 · 기록 품질 확인", "File and decoded counts differ · review capture quality"),
     "MONITOR_MISSING": ("감시 흐름 미수신 · 기록 유지", "Selected flow missing · capture continues"),
     "MONITOR_SOURCE": ("감시 흐름 출처 불일치 · 기록 유지", "Unexpected flow source · capture continues"),
     "MONITOR_RECOVERED": ("감시 흐름 수신 복귀 확인", "Selected flow reception restored"),

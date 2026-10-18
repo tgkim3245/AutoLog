@@ -56,8 +56,25 @@ def main(argv: list[str] | None = None) -> int:
                         help="Verify recovery using generated offline BLF/PCAP/PCAPNG files only")
     parser.add_argument("--verify-monitoring", action="store_true",
                         help="Verify monitoring with generated localhost packets only")
+    parser.add_argument("--verify-load", action="store_true", help="Numbered localhost load test; never opens a physical NIC")
+    parser.add_argument("--load-duration", type=int, default=10, help="Load duration in seconds (default 10)")
+    parser.add_argument("--load-pps", type=int, default=1000, help="Generated packets per second (default 1000)")
+    parser.add_argument("--load-payload", type=int, default=512, help="UDP payload bytes (default 512)")
     parser.add_argument("--version", action="version", version=__version__)
     args = parser.parse_args(argv)
+    if args.verify_load:
+        if any((args.demo, args.smoke_test, args.diagnose, args.verify_monitoring, args.verify_ethernet,
+                args.verify_file_management, args.verify_recovery, args.smoke_debug_log, args.smoke_discovery)):
+            parser.error("--verify-load requires a separate verification run")
+        from vil_logging.diagnostics.load_test import validate_load, verify_load
+        try:
+            validate_load(args.load_duration, args.load_pps, args.load_payload)
+        except ValueError as error:
+            parser.error(str(error))
+        folder = args.data_dir or default_data_dir() / "development" / "load-verification" / uuid4().hex
+        report = verify_load(folder, duration=args.load_duration, pps=args.load_pps, payload_size=args.load_payload)
+        print(json.dumps({key: value for key, value in report.items() if key != "samples"}, ensure_ascii=False))
+        return 0 if report["passed"] else 2
     if args.verify_monitoring:
         if args.demo or args.smoke_test or args.verify_ethernet or args.verify_file_management or args.verify_recovery:
             parser.error("--verify-monitoring requires a separate verification run")
@@ -320,6 +337,8 @@ def main(argv: list[str] | None = None) -> int:
                 window.set_files(*value)
             elif kind == "capture_history":
                 window.set_capture_history(value)
+            elif kind == "capture_quality":
+                window.set_capture_quality(value)
             elif kind == "file_operations":
                 window.file_manager.set_operations(value)
             elif kind == "file_busy":

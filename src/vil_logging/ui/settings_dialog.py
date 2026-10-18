@@ -30,7 +30,7 @@ from .i18n import tr
 from .theme import ThemedComboBox, apply_theme, refresh_style
 
 logger = logging.getLogger(__name__)
-PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format",
+PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format", "ethernet_buffer_mib",
                "can_logging_block", "diag_logging_block")
 TEXT = {
     "intro": ("파일과 네트워크 선택은 자동으로 기억합니다.", "File and network choices are saved automatically."),
@@ -213,7 +213,16 @@ class SettingsDialog(QDialog):
         self.format_input.addItems(["pcap", "pcapng"])
         self.format_input.currentTextChanged.connect(self._format_changed)
         form.addRow(self.format_label, self.format_input)
+        self.buffer_label = QLabel()
+        self.buffer_input = ThemedComboBox()
+        self.buffer_input.setObjectName("ethernetBufferComboBox")
+        for value in (16, 32, 64, 128, 256):
+            self.buffer_input.addItem(f"{value} MiB", str(value))
+        self.buffer_input.currentIndexChanged.connect(self._buffer_changed)
+        form.addRow(self.buffer_label, self.buffer_input)
         layout.addLayout(form)
+        self.buffer_hint = self._helper()
+        layout.addWidget(self.buffer_hint)
         self.network_hint = self._helper()
         layout.addWidget(self.network_hint)
         self.driver_status = self._helper()
@@ -349,6 +358,8 @@ class SettingsDialog(QDialog):
             return self.nic_input.currentData() or ""
         if key == "ethernet_format":
             return self.format_input.currentText()
+        if key == "ethernet_buffer_mib":
+            return self.buffer_input.currentData()
         return self.fields[key].text().strip()
 
     def _block_changed(self, key):
@@ -398,6 +409,10 @@ class SettingsDialog(QDialog):
         self._mark_dirty("ethernet_format")
         self._save_preferences(("ethernet_format",))
 
+    def _buffer_changed(self, _index):
+        self._mark_dirty("ethernet_buffer_mib")
+        self._save_preferences(("ethernet_buffer_mib",))
+
     def _nic_changed(self, _index):
         self._mark_dirty("nic_id")
         self._save_preferences(("nic_id",))
@@ -413,7 +428,8 @@ class SettingsDialog(QDialog):
             return
         values = {key: self._current(key) for key in self.fields}
         values.update(next_index=next_index, nic_id=self._current("nic_id"),
-                      ethernet_format=self.format_input.currentText())
+                      ethernet_format=self.format_input.currentText(),
+                      ethernet_buffer_mib=self._current("ethernet_buffer_mib"))
         self._save_preferences(PREFERENCES)
         self.feedback.clear()
         self.settings_applied.emit(replace(self._settings, **values))
@@ -465,6 +481,15 @@ class SettingsDialog(QDialog):
                 with QSignalBlocker(self.format_input):
                     self.format_input.setCurrentText(settings.ethernet_format)
             selected = self._current("nic_id") if "nic_id" in self._dirty else settings.nic_id
+            key = "ethernet_buffer_mib"
+            if key not in self._dirty or (self._current(key) == settings.ethernet_buffer_mib and key not in pending):
+                self._dirty.discard(key)
+                with QSignalBlocker(self.buffer_input):
+                    index = self.buffer_input.findData(settings.ethernet_buffer_mib)
+                    if index < 0:
+                        self.buffer_input.addItem(f"{settings.ethernet_buffer_mib} MiB", settings.ethernet_buffer_mib)
+                        index = self.buffer_input.count() - 1
+                    self.buffer_input.setCurrentIndex(index)
             if selected == settings.nic_id and "nic_id" not in pending:
                 self._dirty.discard("nic_id")
             self._render_networks(selected)
@@ -662,6 +687,11 @@ class SettingsDialog(QDialog):
                            (self.scope_hint, "scope")):
             label.setText(self._t(key))
         self.format_label.setText(tr("format", self._language))
+        self.buffer_label.setText("캡처 버퍼" if self._language == "ko" else "Capture buffer")
+        self.buffer_hint.setText(
+            "기본 64 MiB · 드라이버에 요청하는 버퍼입니다. 실제 적용량과 무손실 캡처를 보장하지 않습니다."
+            if self._language == "ko" else
+            "Default 64 MiB · Requested driver buffer; actual allocation and lossless capture are not guaranteed.")
         self.canoe_setup_button.setText("CANoe 독립 연결 설정…" if self._language == "ko" else
                                         "CANoe independent connection setup…")
         self.format_input.setToolTip(self._t("format_help"))
@@ -682,7 +712,8 @@ class SettingsDialog(QDialog):
     def set_busy(self, busy):
         self._busy = busy
         for widget in [*self.fields.values(), *self.browse_buttons, self.nic_input,
-                       *self.block_inputs.values(), self.canoe_setup_button, self.format_input, self.apply_button]:
+                       *self.block_inputs.values(), self.canoe_setup_button, self.format_input,
+                       self.buffer_input, self.apply_button]:
             widget.setEnabled(not busy)
         self.find_button.setEnabled(not busy and not self._discovering)
         self.set_language(self._language)

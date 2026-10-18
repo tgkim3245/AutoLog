@@ -13,6 +13,7 @@ from pathlib import Path
 
 from vil_logging.adapters.external import external_environment, launch_capture, request_normal_stop
 from vil_logging.contracts.models import PacketSummary
+from vil_logging.diagnostics.capture_quality import CaptureMetrics, validate_buffer
 from vil_logging.diagnostics.connections import (
     _find_tshark,
     _nic_key,
@@ -22,6 +23,7 @@ from vil_logging.diagnostics.connections import (
 from vil_logging.diagnostics.environment import _version_response
 from vil_logging.monitors.engine import MonitorEngine
 from vil_logging.monitors.rules import address, parse_rules
+from vil_logging.storage.pcapng_stats import capture_loss_report
 
 FIELDS = ("frame.time_epoch", "eth.src", "eth.dst", "ip.src", "ipv6.src", "ip.dst", "ipv6.dst",
           "_ws.col.Protocol", "frame.len")
@@ -86,6 +88,8 @@ class TSharkCapture:
         self._monitor = MonitorEngine()
         self._monitor_error = ""
         self._stdout_eof = False
+        self._metrics = CaptureMetrics()
+        self._last_delay = self._max_delay = None
 
     def prepare(self, params: dict) -> dict:
         if self.process and self.process.poll() is None:
@@ -106,12 +110,14 @@ class TSharkCapture:
         file_format = params.get("file_format", "pcap")
         if file_format not in {"pcap", "pcapng"}:
             raise ValueError("Unsupported capture format")
+        buffer_mib = validate_buffer(params.get("buffer_mib", "64"))
         capinfos = Path(tool["path"]).with_name("capinfos.exe")
         version = _version_response(capinfos)
         if version["status"] != "present" or "Capinfos" not in version.get("stdout", ""):
             raise ValueError("파일 검사 도구 capinfos.exe가 필요합니다. Wireshark 설치를 확인하세요.")
         self.binding = {"tshark_path": tool["path"], "nic_id": selected["id"],
                         "nic_name": selected["name"], "file_format": file_format,
+                        "requested_buffer_mib": buffer_mib,
                         "capinfos_path": str(capinfos), "tool_version": tool["version"]}
         return self.binding.copy()
 
@@ -120,6 +126,14 @@ class TSharkCapture:
             raise RuntimeError("Prepare the capture binding first")
         if self.process and self.process.poll() is None:
             raise RuntimeError("A capture is already active")
+        for thread in self._threads:
+            thread.join(timeout=2)
+        if any(thread.is_alive() for thread in self._threads):
+            raise RuntimeError("Previous capture readers have not finished; a new session is blocked")
+        if self.process:
+            for stream in (self.process.stdout, self.process.stderr):
+                if stream and not stream.closed:
+                    stream.close()
         path = Path(params["temp_path"])
         if path.exists() or path.is_symlink() or not path.parent.is_dir():
             raise ValueError("The private capture path is not empty or its folder is unavailable")
@@ -132,6 +146,8 @@ class TSharkCapture:
         self._read_errors = []
         self._last_packet = None
         self._stdout_eof = False
+        self._metrics = CaptureMetrics()
+        self._last_delay = self._max_delay = None
         self._monitor_error = ""
         try:
             self._monitor = MonitorEngine(parse_rules(params.get("monitor_rules_json", "")), session_id)
@@ -140,6 +156,7 @@ class TSharkCapture:
             self._monitor_error = str(error)
         self._stop_requested = self._started = False
         arguments = [self.binding["tshark_path"], "-n", "-l", "-P", "-i", self.binding["nic_id"],
+                     "-B", str(self.binding.get("requested_buffer_mib", 64)),
                      "-w", str(path), "-F", self.binding["file_format"], "-T", "fields",
                      "-E", "separator=/t", "-E", "occurrence=f", "-E", "escape=y"]
         for field in FIELDS:
@@ -192,6 +209,10 @@ class TSharkCapture:
                 with self._stats_lock:
                     self._parsed += 1
                     self._last_packet = packet.timestamp
+                    delay = (time.time() - packet.captured_epoch) * 1000
+                    self._last_delay = round(delay, 3) if delay >= 0 else None
+                    if self._last_delay is not None:
+                        self._max_delay = max(self._max_delay or 0, self._last_delay)
                     self._monitor_call("feed", packet)
                 try:
                     self.packets.put_nowait(packet)
@@ -237,6 +258,14 @@ class TSharkCapture:
                      "parse_errors": self._parse_errors, "reader_errors": list(self._read_errors),
                      "last_packet_utc": self._last_packet, "started": self._started,
                      "monitor": self._monitor_call("snapshot", reader_ok=not self._stdout_eof and not self._read_errors)}
+            last_delay, max_delay = self._last_delay, self._max_delay
+        # Filesystem I/O stays outside the receive lock: slow storage must not
+        # stop stdout draining just to update a status panel.
+        try:
+            stats["performance"] = self._metrics.sample(self.path, stats["parsed_packets"],
+                                                        last_delay=last_delay, max_delay=max_delay)
+        except Exception as error:
+            stats["performance"] = {"error": str(error), "sampled_epoch": time.time()}
         stats.update(capture_pid=self.process.pid if self.process else None,
                      exit_code=self.process.poll() if self.process else None,
                      temp_path=str(self.path) if self.path else "", session_id=self.session_id,
@@ -267,9 +296,11 @@ class TSharkCapture:
             self.process.stderr.close()
         with self._stats_lock:
             self._monitor_call("stop")
+        self._metrics.finish()
         return self.stats()
 
     def inspect_file(self, session_id: str, timeout: float = 60) -> dict:
+        deadline = time.monotonic() + timeout
         if session_id != self.session_id or self.process is None or self.process.poll() is None:
             raise ValueError("Capture closure is not confirmed for this session")
         if not self._stop_requested or self.process.returncode != 0:
@@ -290,9 +321,17 @@ class TSharkCapture:
         allowed = {"pcap", "nsecpcap"} if self.binding["file_format"] == "pcap" else {"pcapng"}
         if file_type not in allowed or packet_count < 0:
             raise ValueError("Recorded file type does not match the selected format")
+        loss = capture_loss_report(self.path, self.binding["file_format"],
+                                   timeout=max(.01, min(15, deadline - time.monotonic())))
         after = self.path.stat()
         if (before.st_size, before.st_mtime_ns, before.st_ino) != (after.st_size, after.st_mtime_ns, after.st_ino):
             raise ValueError("Capture file changed during inspection")
+        statistics = self.stats()
+        consistency = {"file_packets": packet_count, "parsed_packets": statistics["parsed_packets"],
+                       "same_count": packet_count == statistics["parsed_packets"],
+                       "unparsed_file_packets": max(0, packet_count - statistics["parsed_packets"]),
+                       "scope": "count_comparison_only"}
         return {"actual_format": file_type, "packet_count": packet_count, "bytes": after.st_size,
                 "mtime_ns": after.st_mtime_ns, "inode": after.st_ino,
-                "validation": "capinfos_full_read", "warning": result.stderr[-4096:], **self.stats()}
+                "capture_loss": loss, "summary_consistency": consistency,
+                "validation": "capinfos_full_read", "warning": result.stderr[-4096:], **statistics}

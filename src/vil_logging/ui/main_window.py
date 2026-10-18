@@ -44,6 +44,7 @@ from .file_manager_dialog import FileManagerDialog, confirm_delete
 from .i18n import render_event, tr
 from .monitor_dialog import MonitorDialog, monitor_description
 from .packet_window import PacketWindow
+from .quality_dialog import QualityDialog
 from .recovery_dialog import RecoveryDialog
 from .settings_dialog import SettingsDialog
 from .theme import COLOR, STYLE, ThemedCheckBox, apply_theme, refresh_style
@@ -206,6 +207,11 @@ class MainWindow(QMainWindow):
         self.monitor_button.setProperty("compact", True)
         self.monitor_button.clicked.connect(self._show_monitor)
         target_heading.addWidget(self.monitor_button)
+        self.quality_button = QPushButton()
+        self.quality_button.setObjectName("openQualityButton")
+        self.quality_button.setProperty("compact", True)
+        self.quality_button.clicked.connect(self._show_quality)
+        target_heading.addWidget(self.quality_button)
         target_heading.addWidget(self.selection_count)
         outer.addLayout(target_heading)
         cards = QHBoxLayout()
@@ -358,6 +364,7 @@ class MainWindow(QMainWindow):
         self.settings_dialog.environment_requested.connect(self.environment_requested)
         self.settings_dialog.exit_requested.connect(self.exit_requested)
         self.packet_window = PacketWindow(self)
+        self.quality_dialog = QualityDialog(self)
         self.monitor_dialog = MonitorDialog(self)
         self.monitor_dialog.preferences_changed.connect(self.preferences_changed)
         self.file_manager = FileManagerDialog(self)
@@ -446,6 +453,8 @@ class MainWindow(QMainWindow):
         self.packet_window.set_language(language)
         self.monitor_dialog.set_language(language)
         self.monitor_button.setText(tr("monitor_title", language))
+        self.quality_button.setText("기록 품질" if language == "ko" else "Quality")
+        self.quality_dialog.set_language(language)
         self.file_manager.set_language(language)
         self.recovery_dialog.set_language(language)
         self.set_recovery(self._recovery_report)
@@ -468,6 +477,14 @@ class MainWindow(QMainWindow):
 
     def selected_roles(self) -> tuple[Role, ...]:
         return tuple(role for role, check in self.role_checks.items() if check.isChecked())
+
+    def _show_quality(self):
+        self.quality_dialog.show()
+        self.quality_dialog.raise_()
+        self.quality_dialog.activateWindow()
+
+    def set_capture_quality(self, report):
+        self.quality_dialog.set_report(report)
 
     def _selection_changed(self, *_):
         logger.debug("Capture selection changed: %s", [role.value for role in self.selected_roles()])

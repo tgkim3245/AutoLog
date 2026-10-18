@@ -33,6 +33,8 @@ class Tools:
         self.display_drops = 0
         self.query_error = None
         self.report_age = 0
+        self.quality = None
+        self.stop_error = None
 
     def request(self, roles, action, session_id, **kwargs):
         self.calls.append((tuple(roles), action, kwargs))
@@ -56,7 +58,11 @@ class Tools:
                 info = self.paths[role].stat()
                 details = {"inode": info.st_ino, "bytes": info.st_size, "mtime_ns": info.st_mtime_ns,
                            "actual_format": "pcap", "packet_count": 1}
-            success = not (action == "query" and role == self.query_error)
+            success = not ((action == "query" and role == self.query_error) or
+                           (action == "stop" and role == self.stop_error))
+            if self.quality is not None and role == Role.ETHERNET:
+                details.update(deepcopy(self.quality))
+                details["session_id"] = self.session_override or session_id
             if not success:
                 state = "error"
             results[role] = CommandResult(Command(action, role, session_id), success, state, "generated evidence", details=details)
@@ -83,6 +89,55 @@ def real(tmp_path):
 
 def events(runtime):
     return runtime._submit(runtime._repo.recent_events).result(5)
+
+
+def test_quality_warns_once_without_stopping_and_archives_evidence(real):
+    runtime, tools = real
+    tools.quality = {"performance": {"disk_free_bytes": 100, "sampled_epoch": time.time()},
+                     "parsed_packets": 1, "summary_drops": 20,
+                     "capture_loss": {"status": "loss_reported", "driver_dropped": 2, "os_dropped": None},
+                     "summary_consistency": {"same_count": True}}
+    runtime.save_preferences({"ethernet_buffer_mib": "128"}).result(5)
+    runtime.toggle((Role.ETHERNET,)).result(5)
+    for _ in range(3):
+        runtime._submit(runtime._query).result(5)
+    assert runtime.phase == SessionPhase.RECORDING
+    assert sum(event.code == "DISK_SPACE_LOW" for event in events(runtime)) == 1
+    assert runtime._quality_report["display_drops"] == 20
+    prepared = next(kwargs for _, action, kwargs in tools.calls if action == "prepare")
+    assert prepared["params"]["buffer_mib"] == "128"
+    tools.quality["performance"]["disk_free_bytes"] = 2 * 1024 ** 3
+    runtime._submit(runtime._query).result(5)
+    assert sum(event.code == "DISK_SPACE_RESTORED" for event in events(runtime)) == 1
+    runtime.toggle((Role.ETHERNET,)).result(5)
+    assert runtime.phase == SessionPhase.COMPLETED
+    assert runtime._quality_report["state"] == "archived"
+    assert runtime._quality_report["capture_loss"]["driver_dropped"] == 2
+    stored = runtime._submit(runtime._repo.captures).result(5)[0]
+    assert stored["details"]["capture_quality"] == runtime._quality_report
+    assert sum(event.code == "CAPTURE_DROP_REPORTED" for event in events(runtime)) == 1
+    reopened = Runtime(runtime.data_dir)
+    try:
+        reopened.initialize().result(5)
+        assert reopened._quality_report["state"] == "historical"
+        assert reopened._quality_report["capture_loss"]["driver_dropped"] == 2
+    finally:
+        reopened.close_for_test()
+
+
+def test_quality_rejects_old_session_and_failed_stop_never_looks_archived(real):
+    runtime, tools = real
+    tools.quality = {"performance": {"sampled_epoch": time.time()}, "parsed_packets": 1}
+    runtime.toggle((Role.ETHERNET,)).result(5)
+    tools.session_override = "previous-session"
+    tools.quality["parsed_packets"] = 999
+    runtime._submit(runtime._query).result(5)
+    assert runtime._quality_report["parsed_packets"] == 1
+    tools.stop_error = Role.ETHERNET
+    runtime.toggle((Role.ETHERNET,)).result(5)
+    assert runtime.phase == SessionPhase.INCOMPLETE
+    assert runtime._quality_report["state"] == "unknown"
+    assert runtime._plan.files[0].temp_path.is_file()
 
 
 def test_monitor_criteria_persist_without_schema_change_or_invented_defaults(tmp_path):

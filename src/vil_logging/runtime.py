@@ -26,6 +26,7 @@ from vil_logging.contracts.models import (
     TargetSnapshot,
     utc_now,
 )
+from vil_logging.diagnostics.capture_quality import LOW_SPACE_BYTES, SPACE_RECOVERY_BYTES
 from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
 from vil_logging.storage.file_service import FileResultStorageError, FileService
@@ -62,6 +63,8 @@ class Runtime:
         self._monitor_reports = {}
         self._monitor_counts = {}
         self._monitor_last_persist = 0
+        self._quality_report = {}
+        self._disk_warning = False
         self._plan: CapturePlan | None = None
         self._issued_roles: tuple[Role, ...] = ()
         self._snapshots = {role: TargetSnapshot(role) for role in Role}
@@ -199,6 +202,13 @@ class Runtime:
         if file_recovery:
             self._event("FILE_OPERATIONS_RECOVERED", level="WARNING", results=file_recovery)
         self._refresh_file_history()
+        if not self.demo:
+            for capture in self._repo.captures():
+                quality = capture.get("details", {}).get("capture_quality")
+                if quality:
+                    self._quality_report = {**quality, "state": "historical" if quality.get("state") == "archived" else "unknown"}
+                    self._publish("capture_quality", dict(self._quality_report))
+                    break
 
     def refresh_file_history(self) -> Future:
         return self._submit(self._refresh_file_history)
@@ -647,6 +657,9 @@ class Runtime:
         self._monitor_reports = {}
         self._monitor_counts = {}
         self._monitor_last_persist = 0
+        self._quality_report = {}
+        self._disk_warning = False
+        self._publish("capture_quality", {})
         for role in Role:
             self._target(role, observation=ObservationState.NOT_MONITORED, observation_details={})
         try:
@@ -789,6 +802,8 @@ class Runtime:
                 if not self.demo:
                     details = result.details
                     self._accept_monitor(role, details)
+                    if role == Role.ETHERNET:
+                        self._accept_quality(details)
                     if details.get("summary_drops", 0) and not self._observation_loss_reported:
                         self._observation_loss_reported = True
                         self._event("DISPLAY_SUMMARY_LOSS", level="WARNING", target=role.label,
@@ -799,6 +814,9 @@ class Runtime:
             self._target(role, recording=state, observation=ObservationState.UNKNOWN,
                          evidence=result.evidence, observation_details={"status": "unknown", "reasons": ["recorder_unavailable"]})
             self._monitor_reports[role.value] = {"status": "unknown", "rules": [], "reasons": ["recorder_unavailable"]}
+            if role == Role.ETHERNET:
+                self._quality_report = {**self._quality_report, "state": "unknown", "error": result.evidence}
+                self._publish("capture_quality", dict(self._quality_report))
             if previous != state:
                 self._failure_latched = True
                 self._target_failures[role] = result.evidence
@@ -857,8 +875,42 @@ class Runtime:
 
     def _persist_monitors(self):
         if self._plan and self._monitor_reports and time.monotonic() - self._monitor_last_persist >= 5:
-            self._repo.update_session(self._plan.session_id, self.phase, monitoring=dict(self._monitor_reports))
+            self._repo.update_session(self._plan.session_id, self.phase, monitoring=dict(self._monitor_reports),
+                                      capture_quality=dict(self._quality_report))
+            log.info("capture.quality_sample", extra={"fields": dict(self._quality_report)})
             self._monitor_last_persist = time.monotonic()
+
+    def _accept_quality(self, details, *, closed=False, path=None):
+        if not self._plan or details.get("session_id") != self._plan.session_id:
+            return
+        metrics = details.get("performance", {})
+        loss = details.get("capture_loss", {"status": "unknown", "reason": "capture_in_progress"})
+        report = {"session_id": self._plan.session_id, "state": "archived" if closed else "recording",
+                  "metrics": metrics, "capture_loss": loss, "parsed_packets": details.get("parsed_packets", 0),
+                  "display_drops": details.get("summary_drops", 0), "parse_errors": details.get("parse_errors", 0),
+                  "reader_errors": details.get("reader_errors", []), "binding": details.get("binding", {}),
+                  "packet_count": details.get("packet_count"), "summary_consistency": details.get("summary_consistency"),
+                  "path": str(path or details.get("temp_path", "")), "sampled_epoch": metrics.get("sampled_epoch")}
+        free = metrics.get("disk_free_bytes")
+        if free is not None and free <= LOW_SPACE_BYTES and not self._disk_warning:
+            self._disk_warning = True
+            self._event("DISK_SPACE_LOW", level="WARNING", free_bytes=free, path=report["path"])
+        elif self._disk_warning and free is not None and free > SPACE_RECOVERY_BYTES:
+            self._disk_warning = False
+            self._event("DISK_SPACE_RESTORED", free_bytes=free)
+        if closed and loss.get("status") == "loss_reported":
+            self._event("CAPTURE_DROP_REPORTED", level="WARNING", counters=loss)
+        if closed and report["summary_consistency"] and not report["summary_consistency"]["same_count"]:
+            self._event("CAPTURE_SUMMARY_MISMATCH", level="WARNING", evidence=report["summary_consistency"])
+        self._quality_report = report
+        self._publish("capture_quality", report)
+        if closed:
+            log.info("capture.quality_final", extra={"fields": report})
+
+    def _quality_unknown(self, error):
+        if self._quality_report:
+            self._quality_report = {**self._quality_report, "state": "unknown", "error": str(error)}
+            self._publish("capture_quality", dict(self._quality_report))
 
     def drain_packets(self):
         packets = self._pool.drain_packets() if self._pool is not None else []
@@ -867,7 +919,7 @@ class Runtime:
     def _real_params(self, role: Role) -> dict:
         if role == Role.ETHERNET:
             return {"tshark_path": self._settings.tshark_path, "nic_id": self._settings.nic_id,
-                    "file_format": self._settings.ethernet_format}
+                    "file_format": self._settings.ethernet_format, "buffer_mib": self._settings.ethernet_buffer_mib}
         key = "can" if role == Role.CAN else "diag"
         return {"cfg_path": getattr(self._settings, key + "_cfg"),
                 "logging_block": getattr(self._settings, key + "_logging_block")}
@@ -978,6 +1030,8 @@ class Runtime:
                     self._target_failures[role] = result.evidence
                 else:
                     self._accept_monitor(role, result.details)
+                    if role == Role.ETHERNET:
+                        self._accept_quality(result.details)
                     file = next(file for file in plan.files if file.role == role)
                     self._repo.update_capture_file(plan.session_id, role, "writing",
                                                    actual_path=str(file.temp_path), start_evidence=result.details)
@@ -1070,6 +1124,8 @@ class Runtime:
                                         target=role.label, path=str(actual_path), bytes=inspection["bytes"],
                                         packets=inspection.get("packet_count", 0),
                                         objects=inspection.get("object_count", 0))
+                            if role == Role.ETHERNET:
+                                self._accept_quality(inspection, closed=True, path=actual_path)
                         if inspection.get("parse_errors") or inspection.get("reader_errors"):
                             self._event("OBSERVATION_LOSS", level="WARNING", target=role.label, counters=inspection)
                         if inspection.get("summary_drops") and not self._observation_loss_reported:
@@ -1077,8 +1133,11 @@ class Runtime:
                             self._event("DISPLAY_SUMMARY_LOSS", level="WARNING", target=role.label,
                                         count=inspection["summary_drops"])
                 actual_paths.append(str(actual_path))
+                if role == Role.ETHERNET and self._quality_report.get("state") != "archived":
+                    self._quality_unknown("Normal closure, inspection or archival was not confirmed; inspect preserved files.")
             self._repo.update_session(plan.session_id, phase, demo=False, inspections=inspections,
                                       monitoring=dict(self._monitor_reports),
+                                      capture_quality=dict(self._quality_report),
                                       inspection=inspections.get(Role.ETHERNET.value),
                                       stop_results={role.value: {"success": result.success, "state": result.state,
                                                                 "evidence": result.evidence, "details": result.details}
@@ -1086,6 +1145,7 @@ class Runtime:
         except Exception as error:
             self._storage_failed = True
             phase = SessionPhase.INCOMPLETE
+            self._quality_unknown(error)
             log.exception("capture.finalization_failed")
             self._event("OPERATION_ERROR", level="ERROR", original=str(error))
             actual_paths = [str(file.final_path if file.final_path.is_file() else file.temp_path) for file in plan.files]
