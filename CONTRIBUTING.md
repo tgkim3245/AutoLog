@@ -44,7 +44,7 @@ py -3.14 -m venv .venv
 **SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 변경합니다.** 프로젝트 패키지 버전, 앱 표시 버전, EXE 파일 속성과 출력 폴더명이 같은 값을 사용합니다. 빌드 시 버전을 자동 증가시키지는 않습니다.
 
 ```text
-outputs/AutoLog-0.4.5_20261018_153000/
+AutoLog-0.4.5_20261018_153000/
 ├─ AutoLog/
 │  ├─ AutoLog.exe
 │  ├─ _internal/
@@ -57,7 +57,9 @@ outputs/AutoLog-0.4.5_20261018_153000/
 
 폴더명 뒤 날짜·시각은 같은 버전의 재빌드를 구분합니다. 기존 결과는 덮어쓰지 않습니다. EXE와 `_internal/`을 포함한 `AutoLog/` 전체 또는 생성한 ZIP을 배포합니다. `build_info.json`에는 SW 버전, 빌드 시각, Git 커밋·미커밋 변경 여부와 해시를 기록합니다. 오류 원문은 해당 폴더의 `build.log`에서 확인합니다.
 
-빌드 로직은 `packaging/build_release.py`, PyInstaller 사양은 `packaging/app.spec`입니다. 중간 분석 파일은 `outputs/build/<빌드명>/`에 남겨 빌드 오류 확인에 사용합니다. 실행·빌드 결과는 Git에서 제외합니다. 배포 전 실행 흐름과 장비 연동을 확인하고 검증 범위를 릴리스 문서에 기록합니다.
+프로젝트가 사용자 `Documents` 안에 있으면 보호 폴더 쓰기를 시도하지 않고 `%USERPROFILE%\Downloads\AutoLog_Builds\` 아래에 저장합니다. 그 외에는 프로젝트 `outputs/`를 사용하며, 폴더 쓰기 보호가 확인되면 다운로드 위치를 사용합니다. 이 PC에서 확인된 제어된 폴더 액세스 차단도 이 방식으로 처리하며 보안 설정은 변경하지 않습니다. 실제 결과 경로는 실행 화면과 빌드 로그에 표시합니다. 위치를 직접 정하려면 `build.cmd --output-root "D:\AutoLog_Builds"`를 사용합니다.
+
+빌드 로직은 `packaging/build_release.py`, PyInstaller 사양은 `packaging/app.spec`입니다. 중간 분석 파일은 선택된 산출물 위치의 `build/<빌드명>/`에 남겨 빌드 오류 확인에 사용합니다. 실행·빌드 결과는 Git에서 제외합니다. 배포 전 실행 흐름과 장비 연동을 확인하고 검증 범위를 릴리스 문서에 기록합니다.
 
 ## Git 작업
 

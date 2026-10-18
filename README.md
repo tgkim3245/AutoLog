@@ -35,7 +35,9 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 
 Python 3.14 x64 환경 준비와 검사 절차는 [개발 안내](CONTRIBUTING.md)에 있습니다. `run.cmd`는 프로젝트 `.venv`를 먼저 찾고 기존 AppData 개발 환경도 지원합니다.
 
-**`build.cmd`를 더블클릭하면** 버전별 Windows 배포 폴더와 ZIP을 만듭니다. 결과는 `outputs/AutoLog-<SW버전>_<날짜_시각>/`에 저장하며 같은 버전을 다시 빌드해도 기존 파일을 덮어쓰지 않습니다. `AutoLog.exe`와 `_internal/`을 포함한 폴더 전체 또는 생성한 ZIP을 배포합니다.
+**`build.cmd`를 더블클릭하면** 버전별 Windows 배포 폴더와 ZIP을 만듭니다. 결과는 빌드 저장소 아래 `AutoLog-<SW버전>_<날짜_시각>/`에 저장하며 같은 버전을 다시 빌드해도 기존 파일을 덮어쓰지 않습니다. `AutoLog.exe`와 `_internal/`을 포함한 폴더 전체 또는 생성한 ZIP을 배포합니다.
+
+프로젝트가 사용자 `Documents` 안에 있는 이 PC의 기본 빌드 저장소는 `%USERPROFILE%\Downloads\AutoLog_Builds\`입니다. 그 외 경로에서는 프로젝트 `outputs/`를 사용하며 쓰기가 보호된 경우 다운로드 위치를 사용합니다. 실제 저장 경로는 빌드 화면에 표시하며 보안 설정은 변경하지 않습니다.
 
 SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉니다. 앱, 패키지, EXE 속성, 빌드 폴더명이 이 값을 함께 사용합니다. 빌드 상세 정보와 오류는 결과 폴더의 `build_info.json`과 `build.log`에 있습니다.
 

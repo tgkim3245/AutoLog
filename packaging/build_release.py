@@ -131,10 +131,30 @@ def new_output_directory(root: Path, name: str) -> Path:
     raise RuntimeError("Unable to reserve a new build folder.")
 
 
-def build(root: Path, app_name: str, app_version: str, packages: dict) -> Path:
+def build(
+    root: Path, app_name: str, app_version: str, packages: dict,
+    output_root: Path | None = None,
+) -> Path:
     built_at = datetime.now().astimezone()
     build_id = f"{app_name}-{app_version}_{built_at:%Y%m%d_%H%M%S}"
-    output = new_output_directory(root / "outputs", build_id)
+    location_note = None
+    if output_root is not None:
+        output = new_output_directory(output_root.expanduser().resolve(), build_id)
+    elif root.is_relative_to(Path.home() / "Documents"):
+        location_note = "Source is in Documents; building in Downloads/AutoLog_Builds."
+        output = new_output_directory(Path.home() / "Downloads/AutoLog_Builds", build_id)
+    else:
+        try:
+            output = new_output_directory(root / "outputs", build_id)
+        except OSError as error:
+            if getattr(error, "winerror", None) not in (2, 3, 5) or not (root / "outputs").is_dir():
+                raise
+            location_note = (
+                "Project outputs could not be written. Using Downloads/AutoLog_Builds "
+                "without changing Windows security settings. "
+                f"Original error: {error}"
+            )
+            output = new_output_directory(Path.home() / "Downloads/AutoLog_Builds", build_id)
     logger = logging.getLogger("autolog.build")
     logger.setLevel(logging.INFO)
     logger.propagate = False
@@ -155,7 +175,7 @@ def build(root: Path, app_name: str, app_version: str, packages: dict) -> Path:
     }
     try:
         write_json(output / "build_info.json", info)
-        work = root / "outputs" / "build" / output.name
+        work = output.parent / "build" / output.name
         work.mkdir(parents=True, exist_ok=False)
         command = [
             sys.executable, "-m", "PyInstaller", "--noconfirm",
@@ -164,6 +184,8 @@ def build(root: Path, app_name: str, app_version: str, packages: dict) -> Path:
         ]
         environment = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
         logger.info("Building %s %s", app_name, app_version)
+        if location_note:
+            logger.info("%s", location_note)
         logger.info("Output: %s", output)
         with subprocess.Popen(
             command, cwd=root, env=environment, stdout=subprocess.PIPE,
@@ -210,6 +232,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build a versioned AutoLog EXE folder and ZIP.")
     parser.add_argument("--no-pause", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--check", action="store_true", help="Check version and tools without building.")
+    parser.add_argument("--output-root", type=Path, help="Choose the parent folder for build results.")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     try:
@@ -219,7 +242,7 @@ def main() -> int:
             print(json.dumps({"app_name": app_name, "version": app_version, "packages": packages,
                               "python": sys.executable}, indent=2))
             return 0
-        build(root, app_name, app_version, packages)
+        build(root, app_name, app_version, packages, args.output_root)
         return 0
     except (Exception, KeyboardInterrupt) as error:
         print(f"Build error: {error}", file=sys.stderr)
