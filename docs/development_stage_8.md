@@ -41,4 +41,20 @@
 - 표시 큐를 의도적으로 비우지 않아 요약 **299,000건**이 누락됐지만, 저장 파일 번호 300,000개와 해석 건수는 모두 일치했다. 관측한 최대 해석 지연은 약 **508.55ms**였다. pcap의 원본 드라이버/OS 누락 카운터는 확인 불가로 유지했다. 이 결과는 이 로컬 조건에만 해당한다.
 - 소스 시험 근거: `Downloads/AutoLog_Builds/stage8-load-63746c3ab7964381a108585e2e7356da/result.json`. 한/영 메인·품질 창과 Ethernet 설정 화면은 `Downloads/AutoLog_Builds/stage8-ui-review/`에서 확인했다. 실제 로그/화면/캡처는 Git에 포함하지 않는다.
 
-배포본 빌드·압축 해제 실행 결과는 검증 후 이 문서에 추가한다. 차량 NIC 고부하·30분 초과/60분 목표·1 GiB 초과 기록, CPU/메모리 지원 범위, 실제 CAN/Diag 측정과 Python 없는 별도 PC 검증은 아직 남아 있다.
+## 배포본 검증
+
+깨끗한 소스 커밋 `c60acca09bd669861d5eb523c02526ca22d46479`에서 폴더 EXE/ZIP을 빌드했다. EXE 제품명 AutoLog, 제품/파일 버전 0.8.0, ZIP CRC·SHA256과 EXE SHA256을 확인했다. ZIP을 새 폴더에 풀고 Python 개발 경로를 제외한 환경에서 다음을 통과했다.
+
+- 모의 시작·기록·정상 종료, EXE 옆 개발자로그 59건.
+- 512바이트 payload, 60초·300,000개, PCAP 168,000,024바이트의 번호/내용 대조. 누락/중복/손상 0건, 최대 해석 지연 약 518.65ms.
+- 4096바이트 payload, 60초·300,000개, PCAP **1,243,200,024바이트(약 1.16 GiB)**의 전체 읽기·정상 보관·번호/내용 대조. 누락/중복/손상/다른 시험 패킷/범위 밖 번호 0건, 실제 약 4,999.93 packets/s·payload 기준 163.84 Mbit/s, 최대 해석 지연 약 506.66ms. 화면 큐를 비우지 않아 요약 299,000건은 의도적으로 누락됐다.
+- 기존 Ethernet 감시 5항목, PCAP/PCAPNG 캡처 6항목, 복구 3항목과 파일 관리 5항목.
+
+실제 차량 NIC나 CANoe는 열지 않았다. 이 결과는 생성한 localhost UDP 조건의 60초 취득과 1 GiB 초과 파일 검사 근거이며, 차량 NIC의 회선 성능·모든 프레임/포맷·장시간 지원 결과로 확대하지 않는다. 차량 대표 부하·30분 초과/60분 목표, CPU/메모리 지원 범위, 실제 CAN/Diag 측정과 Python 없는 별도 PC 검증은 남아 있다.
+
+배포 파일:
+
+- `C:\Users\tg\Downloads\AutoLog_Builds\AutoLog-0.8.0_20261018_214226\AutoLog\AutoLog.exe`
+- `C:\Users\tg\Downloads\AutoLog_Builds\AutoLog-0.8.0_20261018_214226\AutoLog-0.8.0_20261018_214226.zip`
+- ZIP SHA256: `1ee7575120d5828bf4370ad0da5f23b88334f6973285e5db67e98f2df655522a`
+- 검증 근거: 빌드 폴더의 `verification/result.json`, `verification/load/result.json`, `verification/load-large/result.json`과 각 기존 시험의 `result.json`. 원본 빌드와 압축 해제 확인본은 같은 EXE 해시다. ZIP의 `AutoLog` 폴더 전체를 풀어 사용한다.
