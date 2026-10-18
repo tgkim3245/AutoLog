@@ -89,11 +89,13 @@ def main(argv: list[str] | None = None) -> int:
 
     from vil_logging.contracts.models import AppEvent, SessionPhase
     from vil_logging.diagnostics.debug_log import DebugLogService
+    from vil_logging.diagnostics.readiness import missing_dependencies
     from vil_logging.instance import SingleInstance
     from vil_logging.runtime import Runtime
     from vil_logging.ui import MainWindow
     from vil_logging.ui.environment_dialog import EnvironmentDialog
     from vil_logging.ui.i18n import tr
+    from vil_logging.ui.installation_dialog import InstallationDialog
 
     app = QApplication(sys.argv[:1])
     app.setStyle("Fusion")
@@ -203,7 +205,6 @@ def main(argv: list[str] | None = None) -> int:
 
     sys.excepthook = exception_hook
     threading.excepthook = thread_exception_hook
-    window.logging_requested.connect(lambda: runtime.toggle(window.selected_roles()))
     window.bug_report_requested.connect(export_bug_report)
     window.settings_applied.connect(lambda settings: runtime.apply_naming(settings, window.selected_roles()))
     window.preferences_changed.connect(runtime.save_preferences)
@@ -214,13 +215,14 @@ def main(argv: list[str] | None = None) -> int:
     window.rename_requested.connect(runtime.rename_previous)
     window.delete_files_requested.connect(runtime.delete_files)
     window.files_refresh_requested.connect(runtime.refresh_file_history)
-    window.npcap_requested.connect(lambda: QDesktopServices.openUrl(QUrl("https://npcap.com/#download")))
     environment_dialog = EnvironmentDialog(window)
     environment_state = {"environment": {}, "connections": {}, "pending": False, "discovering": False,
-                         "error": ""}
+                         "error": "", "startup_checked": args.demo}
+    installation_dialogs = {}
 
-    def show_environment():
+    def show_environment(*, reset_tool=False):
         environment_dialog.set_language(window._language)
+        environment_dialog.set_roles(window.selected_roles())
         environment_dialog.show()
         environment_dialog.raise_()
         environment_dialog.activateWindow()
@@ -228,17 +230,54 @@ def main(argv: list[str] | None = None) -> int:
         environment_state["error"] = ""
         environment_dialog.set_busy(True)
         runtime.diagnose()
-        runtime.discover()
+        runtime.discover(reset_tool=reset_tool)
 
+    def show_installation(tool):
+        key = (tool, window._language)
+        if key not in installation_dialogs:
+            dialog = InstallationDialog(tool, window._language, environment_dialog)
+            dialog.refresh_requested.connect(lambda: show_environment(reset_tool=True))
+            installation_dialogs[key] = dialog
+        dialog = installation_dialogs[key]
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def toggle_capture():
+        if (not args.demo and runtime.phase in {SessionPhase.IDLE, SessionPhase.COMPLETED, SessionPhase.FAILED}
+                and missing_dependencies(environment_state["environment"], environment_state["connections"],
+                                         window.selected_roles())):
+            show_environment()
+            return
+        runtime.toggle(window.selected_roles())
+
+    window.logging_requested.connect(toggle_capture)
+    window.npcap_requested.connect(lambda: show_installation("npcap"))
+    window.settings_dialog.installation_requested.connect(show_installation)
+    environment_dialog.installation_requested.connect(show_installation)
     window.environment_requested.connect(show_environment)
     environment_dialog.refresh_requested.connect(show_environment)
     environment_dialog.settings_requested.connect(window.settings_dialog.open_section)
 
     def update_environment():
+        environment_dialog.set_roles(window.selected_roles())
         environment_dialog.set_report(environment_state["environment"], environment_state["connections"])
         environment_dialog.set_busy(environment_state["pending"] or environment_state["discovering"])
         if environment_state["error"]:
             environment_dialog.set_error(environment_state["error"])
+            if not environment_state["startup_checked"]:
+                environment_state["startup_checked"] = True
+                environment_dialog.show()
+        if (not environment_state["startup_checked"] and environment_state["environment"]
+                and environment_state["connections"]):
+            environment_state["startup_checked"] = True
+            missing = missing_dependencies(environment_state["environment"], environment_state["connections"],
+                                           window.selected_roles())
+            debug.log("readiness.startup_checked", missing=sorted(missing))
+            if missing:
+                environment_dialog.show()
+                environment_dialog.raise_()
+                environment_dialog.activateWindow()
 
     def drain():
         nonlocal last_debug_error, exiting
@@ -322,6 +361,9 @@ def main(argv: list[str] | None = None) -> int:
     runtime.initialize()
     if not args.smoke_test or args.smoke_discovery:
         runtime.discover()
+    if not args.demo:
+        environment_state["pending"] = True
+        runtime.diagnose()
     window.show()
     smoke = {"started": False, "stopped": False, "passed": False,
              "discovery_passed": not args.smoke_discovery}

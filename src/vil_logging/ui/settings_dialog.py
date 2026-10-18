@@ -83,6 +83,7 @@ TEXT = {
 
 
 class SettingsDialog(QDialog):
+    installation_requested = Signal(str)
     settings_applied = Signal(object)
     preferences_changed = Signal(object)
     prepare_requested = Signal(object)
@@ -179,6 +180,9 @@ class SettingsDialog(QDialog):
         self.find_button.setObjectName("discoverConnectionsButton")
         self.find_button.clicked.connect(lambda: self._request_discovery(reset_tool=True))
         layout.addWidget(self.find_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.install_button = QPushButton()
+        self.install_button.clicked.connect(lambda: self.installation_requested.emit("wireshark"))
+        layout.addWidget(self.install_button, 0, Qt.AlignmentFlag.AlignLeft)
         form = QFormLayout()
         self.network_label = QLabel()
         self.nic_input = ThemedComboBox()
@@ -595,6 +599,7 @@ class SettingsDialog(QDialog):
         self.format_label.setText(tr("format", self._language))
         self.format_input.setToolTip(self._t("format_help"))
         self.find_button.setText(self._t("find"))
+        self.install_button.setText("Wireshark " + ("설치·복구" if self._language == "ko" else "install / repair"))
         self.npcap_button.setText(self._t("npcap"))
         for button, key in ((self.environment_button, "environment"), (self.exit_button, "exit"),
                             (self.apply_button, "apply"), (self.close_button, "close")):

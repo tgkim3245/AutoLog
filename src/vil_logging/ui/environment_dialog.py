@@ -16,12 +16,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vil_logging.contracts.models import Role
+
 from .theme import apply_theme, refresh_style
 
 
 class EnvironmentDialog(QDialog):
     refresh_requested = Signal()
     settings_requested = Signal(str)
+    installation_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,6 +33,8 @@ class EnvironmentDialog(QDialog):
         self._connections = {}
         self._busy = False
         self._error = ""
+        self._roles = tuple(Role)
+        self._install_actions = {}
         self.setObjectName("environmentDialog")
         self.resize(660, 740)
         self.setMinimumSize(580, 520)
@@ -61,8 +66,9 @@ class EnvironmentDialog(QDialog):
         cards_layout = QVBoxLayout(body)
         cards_layout.setContentsMargins(0, 0, 3, 0)
         cards_layout.setSpacing(10)
+        self._cards_layout = cards_layout
         self.cards = {}
-        for key, section in (("canoe", "canoe"), ("tshark", "ethernet"),
+        for key, section in (("canoe", "canoe"), ("tshark", "ethernet"), ("helpers", "ethernet"),
                              ("network", "ethernet"), ("npcap", "ethernet")):
             card = QFrame()
             card.setProperty("panel", True)
@@ -84,7 +90,7 @@ class EnvironmentDialog(QDialog):
             layout.addWidget(message)
             action = QPushButton()
             action.setProperty("variant", "ghost")
-            action.clicked.connect(lambda _checked=False, value=section: self.settings_requested.emit(value))
+            action.clicked.connect(lambda _checked=False, value=key, target=section: self._act(value, target))
             layout.addWidget(action, 0, Qt.AlignmentFlag.AlignLeft)
             self.cards[key] = (name, status, message, action)
             cards_layout.addWidget(card)
@@ -122,6 +128,21 @@ class EnvironmentDialog(QDialog):
     def _t(self, ko: str, en: str) -> str:
         return en if self._language == "en" else ko
 
+    def set_roles(self, roles):
+        self._roles = tuple(roles)
+        order = ["tshark", "npcap", "helpers", "network", "canoe"]
+        if Role.ETHERNET not in self._roles:
+            order = ["canoe", "tshark", "npcap", "helpers", "network"]
+        for index, key in enumerate(order):
+            self._cards_layout.insertWidget(index, self.cards[key][0].parentWidget())
+        self._render()
+
+    def _act(self, key, section):
+        if key in self._install_actions:
+            self.installation_requested.emit(self._install_actions[key])
+        else:
+            self.settings_requested.emit(section)
+
     def _toggle_details(self, checked: bool):
         self.details.setVisible(checked)
         self.details_button.setArrowType(Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow)
@@ -157,7 +178,7 @@ class EnvironmentDialog(QDialog):
         self.details_button.setText(self._t("기술 상세 보기", "Technical details"))
         self.scope.setText(self._t("이 확인은 패킷 기록을 시작하지 않습니다. 실제 장비 취득은 별도로 확인합니다.",
                                   "This check does not start recording. Live acquisition is verified separately."))
-        self.refresh_button.setText(self._t("다시 확인", "Refresh"))
+        self.refresh_button.setText(self._t("설치·설정 후 다시 확인", "Check after setup"))
         self.close_button.setText(self._t("닫기", "Close"))
         self._render()
 
@@ -201,10 +222,20 @@ class EnvironmentDialog(QDialog):
         driver_message = driver.get("message_" + self._language) or self._t(
             "실시간 Ethernet 취득에는 Npcap 드라이버가 필요합니다. Wireshark 설치 항목에서 확인하세요.",
             "Live Ethernet capture needs Npcap. Check this component in the Wireshark installer.")
+        helpers_ok = all(data.get(name, {}).get("version_check", {}).get("status") == "present"
+                         for name in ("dumpcap", "capinfos"))
+        helpers_message = self._t("dumpcap·capinfos를 확인했습니다.", "dumpcap and capinfos were found.") if helpers_ok else self._t(
+            "캡처·완료 파일 검사에 dumpcap과 capinfos가 필요합니다. Wireshark를 설치하거나 복구하세요.",
+            "Capture and file inspection require dumpcap and capinfos. Install or repair Wireshark.")
+        self._install_actions = {key: tool for key, tool, ready in (
+            ("canoe", "canoe", canoe_ok), ("tshark", "wireshark", tool_ok),
+            ("helpers", "wireshark", helpers_ok), ("npcap", "npcap", driver_ok)) if not ready}
         rows = {
             "canoe": ("CANoe", canoe_ok, canoe_message, self._t("구성 파일 설정", "Choose configuration")),
             "tshark": (self._t("캡처 도구", "Capture tool"), tool_ok, tool_message,
                        self._t("캡처 도구 설정", "Capture tool settings")),
+            "helpers": (self._t("캡처·파일 검사 도구", "Capture and file inspection"), helpers_ok,
+                        helpers_message, self._t("Ethernet 설정", "Ethernet settings")),
             "network": (self._t("Ethernet 네트워크", "Ethernet network"), network_ok, network_message,
                         self._t("네트워크 선택", "Choose network")),
             "npcap": (self._t("캡처 드라이버 · Npcap", "Capture driver · Npcap"), driver_ok,
@@ -212,13 +243,18 @@ class EnvironmentDialog(QDialog):
         }
         for key, (title, ready, message, action) in rows.items():
             name_label, status_label, message_label, action_button = self.cards[key]
+            applicable = ((Role.CAN in self._roles or Role.DIAG in self._roles) if key == "canoe"
+                          else Role.ETHERNET in self._roles)
             name_label.setText(title)
-            status_label.setText(self._t("확인됨", "Found") if ready else self._t("확인 필요", "Needs attention"))
-            status_label.setProperty("tone", "ready" if ready else "attention")
+            status_label.setText(self._t("선택 대상 아님", "Not selected") if not applicable else
+                                 self._t("확인됨", "Found") if ready else self._t("확인 필요", "Needs attention"))
+            status_label.setProperty("tone", "neutral" if not applicable else "ready" if ready else "attention")
             refresh_style(status_label)
             message_label.setText(message)
-            action_button.setText(action)
-        attention = sum(not row[1] for row in rows.values())
+            action_button.setText(self._t("설치·복구 안내", "Install / repair") if key in self._install_actions else action)
+        attention = sum(not row[1] for key, row in rows.items() if
+                        ((Role.CAN in self._roles or Role.DIAG in self._roles) if key == "canoe"
+                         else Role.ETHERNET in self._roles))
         self.summary.setText(self._t("확인 중…", "Checking…") if self._busy else
                              self._t(f"{attention}곳 확인 필요", f"{attention} need attention") if attention else
                              self._t("설정 확인 완료", "Checks complete"))
