@@ -26,7 +26,15 @@
 - 장비 없는 기본 검사 **296개**, Ruff 정적 검사를 통과했다. 새 복구 검사 24개에는 손상·열린 파일·늦은 목적지 충돌·확인 후 파일 변경·DB 의도/결과 실패·재실행 경로 회수·100개 이전 이력·복수 미완료와 동시 시작 차단·현재 기록 보호·체크 기본 해제·한/영 UI가 포함된다.
 - 소스의 `--verify-recovery`에서 생성한 0객체 BLF, 0패킷 PCAP/PCAPNG의 DB 재실행·배타 접근 보호·전체 읽기·보관·빈 폴더 정리·번호 유지 3건을 통과했다. CANoe와 실제 NIC는 열지 않았다.
 - 한국어·영어 복구 화면, 최소 780×580 화면과 메인 알림 배치를 확인했다. offscreen 이미지 확인에는 Windows 설치 글꼴을 명시적으로 로드했다.
-- 빌드·배포본 검증 결과와 경로는 이 문서에 추가한다. 실제 차량 장애 복구와 라이선스 활성화 후 CAN/Diag 취득 시험은 남아 있다.
+- 깨끗한 소스 커밋 `2c5677f5598431d3ad667d3039473e4c49f06189`에서 Windows 배포본을 빌드했다. EXE 제품명 AutoLog, 제품/파일 버전 0.6.0, ZIP CRC·SHA256과 EXE SHA256을 확인했다.
+- ZIP을 새 폴더에 풀고 Python 개발 경로를 제외한 환경에서 EXE 모의 시작·기록·정상 종료(개발자로그 56건), 복구 검사 3건, 기존 파일 관리 검사 5건을 통과했다. 실제 차량 장애 복구와 라이선스 활성화 후 CAN/Diag 취득 시험은 남아 있다.
+
+배포 파일:
+
+- `C:\Users\tg\Downloads\AutoLog_Builds\AutoLog-0.6.0_20261018_202335\AutoLog\AutoLog.exe`
+- `C:\Users\tg\Downloads\AutoLog_Builds\AutoLog-0.6.0_20261018_202335\AutoLog-0.6.0_20261018_202335.zip`
+- ZIP SHA256: `3a52473bdd9c472e057a0d3ffac76797d9d81d290fa27a150d3fc59149112b70`
+- 배포 검증 근거: 위 빌드 폴더의 `verification/result.json`, `verification/recovery/result.json`, `verification/files/result.json`. 화면 확인은 `Downloads/AutoLog_Builds/stage6-review-20261018/`의 이미지에 보관한다. 산출물과 실제 로그는 Git에 포함하지 않는다.
 
 배포본의 장비 없는 복구 검사는 새 폴더를 지정하여 실행한다. PCAP 판독에는 설치된 Wireshark의 capinfos가 필요하다.
 
