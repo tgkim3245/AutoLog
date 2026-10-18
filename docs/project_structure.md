@@ -10,7 +10,8 @@
     ├─ .gitignore / .gitattributes / .editorconfig
     ├─ pyproject.toml / requirements.lock
     ├─ CONTRIBUTING.md
-    ├─ run.cmd / run_demo.cmd
+    ├─ run.cmd / run_demo.cmd          소스 실행
+    ├─ build.cmd                      버전별 배포본 자동 빌드
     ├─ src/
     │  └─ vil_logging/                실제 앱 패키지
     │  │  ├─ app.py / runtime.py      앱 시작과 실행 조립
@@ -23,7 +24,7 @@
     ├─ tests/unit/                    장비 없는 단위 검사
     ├─ tests/integration/             파일·프로세스 통합 검사
     ├─ tests/hardware/                명시적으로 실행하는 장비 검사
-    ├─ packaging/app.spec             PyInstaller 사양
+    ├─ packaging/                     자동 빌드 로직과 PyInstaller 사양
     ├─ licenses/                      배포 라이선스 고지
     ├─ docs/                          요구사항·설계·검증·개발 기록
     │  ├─ design/wireframe.html        HTML 화면 시안

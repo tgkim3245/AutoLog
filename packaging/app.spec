@@ -4,6 +4,10 @@ from importlib.metadata import distribution
 import sys
 
 project_root = Path(SPECPATH).parent
+sys.path.insert(0, str(Path(SPECPATH)))
+from build_release import read_app_metadata, windows_version_info
+
+app_name, app_version = read_app_metadata(project_root)
 license_data = [(str(path), 'licenses') for path in (project_root / 'licenses').glob('*') if path.is_file()]
 python_license = Path(sys.base_prefix) / 'LICENSE.txt'
 if python_license.exists():
@@ -28,6 +32,7 @@ a = Analysis(
     noarchive=False,
 )
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='AutoLog', debug=False,
-          bootloader_ignore_signals=False, strip=False, upx=False, console=False)
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='AutoLog')
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=app_name, debug=False,
+          bootloader_ignore_signals=False, strip=False, upx=False, console=False,
+          version=windows_version_info(app_name, app_version))
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name=app_name)

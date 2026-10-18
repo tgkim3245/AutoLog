@@ -11,6 +11,7 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 | `src/vil_logging/` | 실제 Python 앱 소스. 메인 화면은 `ui/main_window.py`, 실행 진입점은 `app.py` | 포함 |
 | `tests/` | 단위·통합 검사와 시험 PC용 장비 검사 | 포함 |
 | `packaging/app.spec` | 소스에서 Windows EXE를 만드는 PyInstaller 사양 | 포함 |
+| `build.cmd` | 버전별 EXE 폴더와 배포 ZIP을 만드는 자동 빌드 실행 파일 | 포함 |
 | `docs/` | 요구사항, 설계, 개발 이력, 시험 PC 준비 안내 | 포함 |
 | `docs/design/wireframe.html` | 과거 HTML 화면 시안. 실행 앱의 UI 소스는 `src/vil_logging/ui/` | 포함 |
 | `user_guide/` | 사용자 가이드와 성과·발표 자료 | 포함 |
@@ -34,7 +35,9 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 
 Python 3.14 x64 환경 준비와 검사 절차는 [개발 안내](CONTRIBUTING.md)에 있습니다. `run.cmd`는 프로젝트 `.venv`를 먼저 찾고 기존 AppData 개발 환경도 지원합니다.
 
-Windows 배포본은 `packaging/app.spec`으로 빌드합니다. `AutoLog.exe`와 `_internal/`을 포함한 폴더 전체를 함께 사용합니다. 현재 소스와 과거 `outputs/`의 배포본은 버전이 다를 수 있습니다. 이번 저장소 정리는 새 EXE 빌드와 별개의 작업입니다.
+**`build.cmd`를 더블클릭하면** 버전별 Windows 배포 폴더와 ZIP을 만듭니다. 결과는 `outputs/AutoLog-<SW버전>_<날짜_시각>/`에 저장하며 같은 버전을 다시 빌드해도 기존 파일을 덮어쓰지 않습니다. `AutoLog.exe`와 `_internal/`을 포함한 폴더 전체 또는 생성한 ZIP을 배포합니다.
+
+SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉니다. 앱, 패키지, EXE 속성, 빌드 폴더명이 이 값을 함께 사용합니다. 빌드 상세 정보와 오류는 결과 폴더의 `build_info.json`과 `build.log`에 있습니다.
 
 ## 실제 기록과 개발자로그
 

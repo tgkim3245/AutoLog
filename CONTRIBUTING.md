@@ -33,17 +33,31 @@ py -3.14 -m venv .venv
 
 ## 빌드
 
-개발 환경을 준비한 뒤 프로젝트 루트에서 Windows 폴더 배포본을 생성합니다. 빌드 사양은 `packaging/app.spec`이며 산출물과 PyInstaller 작업 파일은 `outputs/` 아래에 둡니다.
+개발 환경을 준비한 뒤 루트의 **`build.cmd`를 더블클릭**하면 Windows 배포 폴더와 ZIP을 자동으로 만듭니다. 현재 작업 디렉터리와 관계없이 프로젝트 경로를 찾고, `run.cmd`처럼 프로젝트 가상환경 또는 기존 AppData 개발 환경을 사용합니다.
 
 ```powershell
-$buildPython = Join-Path $PWD '.venv\Scripts\python.exe'
-$buildOutput = Join-Path $PWD 'outputs\dev'
-$buildWork = Join-Path $PWD 'outputs\build'
-New-Item -ItemType Directory -Force -Path $buildOutput, $buildWork | Out-Null
-& $buildPython -m PyInstaller --noconfirm --workpath $buildWork --distpath $buildOutput packaging\app.spec
+.\build.cmd
+# 환경과 버전만 확인하는 자동화용 실행
+.\build.cmd --no-pause --check
 ```
 
-배포 폴더는 `outputs/dev/AutoLog/`입니다. EXE와 `_internal/`을 포함한 폴더 전체를 함께 사용합니다. `outputs/`의 과거 EXE는 소스 변경으로 갱신되지 않습니다. 배포 전에는 버전, 실행 흐름, 개발자 로그 경로 및 외부 도구 검색 결과를 확인하고 검증 범위를 릴리스 문서에 기록합니다.
+**SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 변경합니다.** 프로젝트 패키지 버전, 앱 표시 버전, EXE 파일 속성과 출력 폴더명이 같은 값을 사용합니다. 빌드 시 버전을 자동 증가시키지는 않습니다.
+
+```text
+outputs/AutoLog-0.4.5_20261018_153000/
+├─ AutoLog/
+│  ├─ AutoLog.exe
+│  ├─ _internal/
+│  └─ build_info.json
+├─ AutoLog-0.4.5_20261018_153000.zip
+├─ AutoLog-0.4.5_20261018_153000.zip.sha256.txt
+├─ build_info.json
+└─ build.log
+```
+
+폴더명 뒤 날짜·시각은 같은 버전의 재빌드를 구분합니다. 기존 결과는 덮어쓰지 않습니다. EXE와 `_internal/`을 포함한 `AutoLog/` 전체 또는 생성한 ZIP을 배포합니다. `build_info.json`에는 SW 버전, 빌드 시각, Git 커밋·미커밋 변경 여부와 해시를 기록합니다. 오류 원문은 해당 폴더의 `build.log`에서 확인합니다.
+
+빌드 로직은 `packaging/build_release.py`, PyInstaller 사양은 `packaging/app.spec`입니다. 중간 분석 파일은 `outputs/build/<빌드명>/`에 남겨 빌드 오류 확인에 사용합니다. 실행·빌드 결과는 Git에서 제외합니다. 배포 전 실행 흐름과 장비 연동을 확인하고 검증 범위를 릴리스 문서에 기록합니다.
 
 ## Git 작업
 
