@@ -213,3 +213,4 @@
 - 결과는 `outputs/AutoLog-<버전>_<날짜_시각>/`에 새로 생성하여 이전 결과를 덮어쓰지 않는다. 빌드 시각, Git 커밋·변경 여부, 도구 버전, EXE·ZIP 해시를 기록한다.
 - 다른 작업 폴더에서 실행한 `--check`, setuptools 버전 해석과 Ruff 검사를 통과했다. 실제 빌드 과정과 결과는 해당 산출물 폴더의 `build.log`와 `build_info.json`에 보관한다.
 - 이 PC의 실제 빌드 시작 시 Windows Defender 이벤트 1123으로 Python의 Documents 쓰기 차단을 확인했다. 보안 설정은 유지하고 Documents 안의 프로젝트는 쓰기 시도 없이 Downloads/AutoLog_Builds에 빌드하도록 보완했다. 다른 보호 경로에서도 다운로드 위치를 사용할 수 있다.
+- 소스 `49eda3f`에서 `AutoLog-0.4.5_20261018_131648` 빌드와 ZIP을 생성했다. EXE 파일·제품 버전 0.4.5, ZIP 무결성·해시와 압축 해제 후 모의 실행을 통과했다. Python 개발 경로가 없는 환경에서 종료 코드 0과 진단 로그 55건을 확인했다.
