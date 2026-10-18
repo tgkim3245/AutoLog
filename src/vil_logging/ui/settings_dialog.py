@@ -54,9 +54,9 @@ TEXT = {
                   "Install Wireshark and find again, or choose tshark.exe."),
     "network_help": ("장비가 연결된 네트워크 이름을 선택하세요. 선택한 장치는 다음 실행에도 기억합니다.",
                      "Choose the network connected to your device. Your choice is remembered for the next launch."),
-    "can_help": ("CAN과 Diag는 한 세트지만 파일과 BLF 기록 블록은 각각 지정합니다. 두 연결을 확인하고 측정은 CANoe에서 시작하세요.",
-                 "CAN and Diag form one set with separate cfg and BLF choices. Check both connections, then start measurement in CANoe."),
-    "canoe_set_title": ("CAN + Diag 로깅 세트", "CAN + Diag logging set"),
+    "can_help": ("각 .cfg를 별도 CANoe 창으로 열어 독립적으로 연결합니다. 해당 카드에서 그 구성의 BLF 기록 블록 하나를 지정하세요.",
+                 "Each .cfg opens in its own CANoe instance. Choose one BLF logging block from that configuration in its card."),
+    "canoe_set_title": ("CANoe 구성별 연결", "Separate CANoe connections"),
     "can_heading": ("CAN", "CAN"), "can_subtitle": ("차량 CAN 메시지 · BLF 기록", "Vehicle CAN messages · BLF logging"),
     "diag_heading": ("Diag", "Diag"), "diag_subtitle": ("진단 메시지 · BLF 기록", "Diagnostic messages · BLF logging"),
     "can_cfg_label": ("CAN 구성 파일 (.cfg)", "CAN configuration (.cfg)"),
@@ -135,10 +135,10 @@ class SettingsDialog(QDialog):
         self.target_labels: dict[Role, QLabel] = {}
         self.target_headings: dict[Role, QLabel] = {}
         self.target_subtitles: dict[Role, QLabel] = {}
+        self.connection_summaries: dict[Role, QLabel] = {}
         self.result_details: dict[Role, QLabel] = {}
         self.next_actions: dict[Role, QLabel] = {}
         self._preparation_cards: dict[Role, QFrame] = {}
-        self.setup_actions: dict[Role, QPushButton] = {}
         self.setObjectName("settingsDialog")
         self.setMinimumSize(640, 590)
         self.resize(700, 730)
@@ -190,10 +190,6 @@ class SettingsDialog(QDialog):
         header_copy.addWidget(self.canoe_set_title)
         header_copy.addWidget(self.can_hint)
         header_layout.addLayout(header_copy, 1)
-        self.canoe_setup_button = QPushButton()
-        self.canoe_setup_button.setObjectName("canoeSetupButton")
-        self.canoe_setup_button.clicked.connect(self._open_canoe_setup)
-        header_layout.addWidget(self.canoe_setup_button, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(set_header)
         for role, key, number in ((Role.CAN, "can_cfg", "01"), (Role.DIAG, "diag_cfg", "02")):
             layout.addWidget(self._canoe_target_card(role, key, number))
@@ -285,15 +281,6 @@ class SettingsDialog(QDialog):
         label.setProperty("variant", "helper")
         return label
 
-    def _open_canoe_setup(self):
-        from .canoe_setup_dialog import CanoeSetupDialog
-        dialog = CanoeSetupDialog(self._language, self)
-        dialog.exec()
-        if dialog.applied_enabled is True:
-            for role, key in ((Role.CAN, "can_cfg"), (Role.DIAG, "diag_cfg")):
-                if self._current(key):
-                    self._prepare(role)
-
     @staticmethod
     def _page():
         page = QWidget()
@@ -360,6 +347,7 @@ class SettingsDialog(QDialog):
         title_row.addWidget(title)
         title_row.addStretch()
         subtitle = self._helper()
+        subtitle.setWordWrap(False)
         self.target_subtitles[role] = subtitle
         title_row.addWidget(subtitle, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         heading.addLayout(title_row, 1)
@@ -416,6 +404,11 @@ class SettingsDialog(QDialog):
         self.prepare_buttons[role] = button
         row.addWidget(button)
         layout.addLayout(row)
+        if role != Role.ETHERNET:
+            summary = self._helper()
+            summary.setObjectName(f"connected{role.label}Configuration")
+            self.connection_summaries[role] = summary
+            layout.addWidget(summary)
         status = self._helper()
         status.setObjectName(f"preparation{role.value}Status")
         status.setProperty("variant", "status")
@@ -426,13 +419,6 @@ class SettingsDialog(QDialog):
         self.next_actions[role] = self._helper()
         self.next_actions[role].setObjectName(f"preparation{role.value}NextAction")
         layout.addWidget(self.next_actions[role])
-        if role != Role.ETHERNET:
-            setup = QPushButton()
-            setup.setObjectName(f"setup{role.label}ConnectionButton")
-            setup.clicked.connect(self._open_canoe_setup)
-            setup.hide()
-            self.setup_actions[role] = setup
-            layout.addWidget(setup, 0, Qt.AlignmentFlag.AlignLeft)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -745,7 +731,7 @@ class SettingsDialog(QDialog):
         label.setText(title + (" · " + message if message else ""))
         label.setProperty("tone", status)
         refresh_style(label)
-        detail = str(report.get("detail", ""))
+        detail = str(report.get("detail_" + self._language, report.get("detail", "")))
         visible_detail = detail[:500] if status in {"attention", "error"} else ""
         self.result_details[role].setText(visible_detail)
         self.result_details[role].setVisible(bool(visible_detail))
@@ -764,11 +750,14 @@ class SettingsDialog(QDialog):
             button_key = "checking" if role in self._preparing else "check"
         self.prepare_buttons[role].setText(self._t(button_key))
         self.prepare_buttons[role].setEnabled(not self._busy and role not in self._preparing)
-        if role in self.setup_actions:
-            setup = self.setup_actions[role]
-            setup.setText("cfg별 CANoe 연결 설정…" if self._language == "ko" else "CANoe per-cfg connection setup…")
-            setup.setVisible(report.get("action") == "canoe_setup")
-            setup.setEnabled(not self._busy and not self._preparing)
+        if role in self.connection_summaries:
+            summary = self.connection_summaries[role]
+            cfg = str(report.get("connected_cfg", ""))
+            pid = report.get("canoe_pid", 0)
+            caption = "연결된 구성" if self._language == "ko" else "Connected configuration"
+            summary.setText(f"{caption} · {Path(cfg).name}" + (f" · CANoe PID {pid}" if pid else ""))
+            summary.setToolTip(cfg)
+            summary.setVisible(bool(cfg))
 
     def set_target(self, target):
         self.targets[target.role] = target
@@ -812,8 +801,6 @@ class SettingsDialog(QDialog):
             "기본 64 MiB · 드라이버에 요청하는 버퍼입니다. 실제 적용량과 무손실 캡처를 보장하지 않습니다."
             if self._language == "ko" else
             "Default 64 MiB · Requested driver buffer; actual allocation and lossless capture are not guaranteed.")
-        self.canoe_setup_button.setText("CANoe cfg별 연결 설정…" if self._language == "ko" else
-                                        "CANoe per-cfg connection setup…")
         self.format_input.setToolTip(self._t("format_help"))
         self.find_button.setText(self._t("find"))
         for key, label in self.block_labels.items():
@@ -832,7 +819,7 @@ class SettingsDialog(QDialog):
     def set_busy(self, busy):
         self._busy = busy
         for widget in [*self.fields.values(), *self.browse_buttons, self.nic_input,
-                       *self.block_inputs.values(), self.canoe_setup_button, self.format_input,
+                       *self.block_inputs.values(), self.format_input,
                        self.buffer_input, self.apply_button]:
             widget.setEnabled(not busy)
         self.find_button.setEnabled(not busy and not self._discovering)

@@ -31,12 +31,12 @@ GUIDES = {
         "1. 회사에서 사용하는 CANoe 설치본과 라이선스를 준비하세요.\n"
         "2. CANoe와 사용하는 Vector 장비 드라이버를 설치하세요.\n"
         "3. CANoe에서 라이선스를 확인한 뒤 AutoLog에서 .cfg를 선택하세요.\n"
-        "4. CAN과 Diag의 .cfg를 모두 쓸 때는 설정 → CAN·Diag 구성 → CANoe cfg별 연결 설정을 적용하세요.\n"
+        "4. 각 .cfg에서 연결 확인을 누르면 AutoLog가 전용 CANoe 창을 엽니다. 처음 연결할 때 기존 CANoe를 닫으라는 안내가 나오면 저장 후 모두 닫고 다시 연결하세요.\n"
         "CAN/Diag 구간 기록은 시험 PC의 구성과 장비로 검증해야 합니다.",
         "1. Obtain your company-approved CANoe installer and license.\n"
         "2. Install CANoe and the drivers for your Vector hardware.\n"
         "3. Verify the license in CANoe, then select the .cfg in AutoLog.\n"
-        "4. When using both .cfg files, use Settings → CAN·Diag → CANoe per-cfg connection setup.\n"
+        "4. Check each .cfg connection to open its dedicated CANoe window. If initial setup needs existing CANoe windows closed, save and close them, then reconnect.\n"
         "Verify CAN/Diag segment recording with your test PC configuration and hardware.")),
 }
 

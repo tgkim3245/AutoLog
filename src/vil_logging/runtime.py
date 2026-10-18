@@ -448,15 +448,15 @@ class Runtime:
             elif details.get("trigger_active"):
                 ko = "선택한 Logging Block이 이미 기록 중입니다. CANoe에서 해당 블록의 기록을 끝낸 뒤 다시 확인하세요."
                 en = "The selected Logging Block is already recording. Stop that block in CANoe, then check again."
-            detail = str(details.get("cfg", ""))
-            if block:
-                detail += ("\n기록 중에는 CANoe의 기존 로깅 버튼·파일 설정을 함께 조작하지 마세요. "
-                           "AutoLog는 선택 블록의 경로·자동 번호 옵션을 구간 동안 적용하고 정지 후 복구합니다."
-                           if self._settings.language == "ko" else
-                           "\nAvoid concurrent CANoe logging controls or filename edits. AutoLog temporarily manages "
-                           "this block's path and filename options, then restores them after stop.")
+            detail_ko = ("기록 중에는 CANoe의 기존 로깅 버튼·파일 설정을 함께 조작하지 마세요. "
+                         "AutoLog는 선택 블록의 경로·자동 번호 옵션을 구간 동안 적용하고 정지 후 복구합니다.") if block else ""
+            detail_en = ("Avoid concurrent CANoe logging controls or filename edits. AutoLog temporarily manages "
+                         "this block's path and filename options, then restores them after stop.") if block else ""
+            detail = detail_ko if self._settings.language == "ko" else detail_en
             report = self._preparation_report(role, "ready" if ready else "attention", ko, en, detail)
-            report.update(blocks=details.get("blocks", []), selected_block=block)
+            report.update(blocks=details.get("blocks", []), selected_block=block,
+                          connected_cfg=details.get("cfg", ""), canoe_pid=details.get("canoe_pid", 0),
+                          detail_ko=detail_ko, detail_en=detail_en)
             if ready:
                 report.update(next_action_ko="logging으로 구간 기록을 제어하세요. 기록 중에는 CANoe의 기존 로깅 버튼과 "
                               "파일 설정을 함께 조작하지 마세요.",
@@ -466,38 +466,32 @@ class Runtime:
                 report.update(next_action_ko="위 항목을 조치한 뒤 연결 확인을 다시 누르세요.",
                               next_action_en="Complete the steps above, then check the connection again.")
         else:
-            reused = details.get("connection_issue") == "independent_setup_required"
-            if reused:
-                if self._settings.language == "ko":
-                    friendly = ("CAN과 Diag의 .cfg를 각각 다른 CANoe 인스턴스에 연결해야 합니다. "
-                                "현재 기본 COM 연결은 열린 창을 재사용할 수 있습니다.")
-                    detail = ("CANoe 작업을 저장하고 모든 CANoe 창을 닫으세요. "
-                              "‘CANoe cfg별 연결 설정’에서 cfg마다 별도 인스턴스를 켜세요.")
-                    next_action_en = "Save your work and close all CANoe windows yourself. Open CANoe per-cfg " \
-                                     "connection setup above, enable one instance per cfg, then check again. " \
-                                     "Existing projects were preserved."
-                else:
-                    friendly = ("The CAN and Diag .cfg files need separate CANoe instances. "
-                                "Default COM activation may reuse an open window.")
-                    detail = ("Save CANoe work and close every CANoe window. Enable one CANoe instance per cfg "
-                              "in the per-cfg connection setup.")
-                    next_action_en = "Save your work and close all CANoe windows yourself. Open CANoe per-cfg " \
-                                     "connection setup above, enable one instance per cfg, then check again. " \
-                                     "Existing projects were preserved."
+            issue = details.get("connection_issue", "")
+            restart = issue == "restart_required"
+            setup_failed = issue == "setup_failed"
+            ko = ("기존 CANoe를 한 번 모두 종료해야 합니다. 작업을 저장하고 닫은 뒤 연결 확인을 다시 누르세요."
+                  if restart else "CANoe 독립 연결을 자동 준비하지 못했습니다. 설치 설정 접근 오류를 확인하세요."
+                  if setup_failed else "CANoe 연결에 실패했습니다. 상세 오류를 확인하세요.")
+            en = ("Close existing CANoe windows once after saving your work, then check the connection again."
+                  if restart else "Could not prepare independent CANoe connections automatically. Review setup access."
+                  if setup_failed else "CANoe connection failed. Review the detailed error.")
+            if restart:
+                detail = ("AutoLog가 필요한 설정을 자동 적용하고 각 .cfg를 별도 CANoe 창으로 엽니다. 연결 방식 선택은 필요 없습니다."
+                          if self._settings.language == "ko" else
+                          "AutoLog will prepare the required mode and open each .cfg in its own CANoe instance automatically.")
+            elif setup_failed:
+                detail = ("CANoe 설치 설정을 읽거나 적용하지 못했습니다. 설정 파일: " if self._settings.language == "ko" else
+                          "Could not read or apply the CANoe installation setting. Settings file: ") + details.get("settings_path", "")
             else:
-                friendly = ("CANoe 연결에 실패했습니다. 상세 오류를 확인하세요." if self._settings.language == "ko" else
-                            "CANoe connection failed. Review the detailed error.")
                 detail = result.evidence
-                next_action_en = ""
             report = self._preparation_report(
-                role, "attention" if reused else "error", friendly,
-                friendly if self._settings.language == "en" else
-                "The CAN and Diag .cfg files need separate CANoe instances. Default COM activation may reuse an open window."
-                if reused else "CANoe connection failed. Review the error details.", detail)
-            if reused:
-                report.update(action="canoe_setup", diagnostic_detail=result.evidence,
-                              next_action_ko="아래 버튼으로 설정을 열어 적용하면 연결을 다시 확인합니다.",
-                              next_action_en=next_action_en)
+                role, "attention" if restart else "error", ko, en, detail)
+            if restart or setup_failed:
+                report.update(diagnostic_detail=result.evidence, connection_issue=issue,
+                              next_action_ko="모든 CANoe 창을 닫고 이 카드의 연결 확인을 다시 누르세요."
+                              if restart else "버그리포트에 기록된 설치 설정 오류를 확인하세요.",
+                              next_action_en="Close all CANoe windows and check this connection again."
+                              if restart else "Review the installation error in the bug report.")
         self._target(role, connection=ConnectionState.READY if report["status"] == "ready" else
                      ConnectionState.ERROR if report["status"] == "error" else ConnectionState.UNKNOWN,
                      evidence=report["message_ko"] + "\n" + report["detail"])

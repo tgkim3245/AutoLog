@@ -1,9 +1,10 @@
-"""Explicit CANoe COM setup; never mutate global settings during connection."""
+"""Prepare CANoe's required independent-client mode before creating any instance."""
 
 import ctypes
 import logging
 import os
 import re
+from contextlib import contextmanager
 from ctypes import wintypes
 from pathlib import Path
 from uuid import uuid4
@@ -12,26 +13,62 @@ log = logging.getLogger(__name__)
 SETTING = re.compile(rb"(?m)^(SingleCOMClient[ \t]*=[ \t]*)([01])([ \t]*\r?)$")
 
 
-class IndependentConnectionsRequired(RuntimeError):
-    def __init__(self, path, process_ids):
+class CanoeActivationError(RuntimeError):
+    def __init__(self, issue, message, *, path="", process_ids=()):
+        self.connection_issue = issue
         self.settings_path = str(path)
-        self.process_ids = process_ids
-        super().__init__("Independent CANoe connections are disabled while a CANoe window is open. "
-                         "Save your work, close all CANoe windows, and enable independent connections in AutoLog.")
+        self.process_ids = list(process_ids)
+        super().__init__(message)
 
 
-def check_activation():
-    """Read-only preflight before COM creation; never activate an existing project."""
+@contextmanager
+def activation_guard():
+    """Serialize setup and activation across CAN/Diag worker processes."""
+    import win32event
+
+    handle = win32event.CreateMutex(None, False, r"Local\AutoLog.CANoeActivation")
+    try:
+        acquired = win32event.WaitForSingleObject(handle, 30_000)
+        if acquired not in (win32event.WAIT_OBJECT_0, win32event.WAIT_ABANDONED):
+            raise TimeoutError("Timed out waiting for the other CANoe connection to finish opening.")
+        try:
+            yield
+        finally:
+            win32event.ReleaseMutex(handle)
+    finally:
+        handle.Close()
+
+
+def ensure_independent_activation():
+    """Mandatory connection prerequisite, applied automatically with an original backup.
+
+    Existing CANoe processes must be closed once if they started in shared mode.
+    They are never stopped or reconfigured by this helper.
+    Caller holds activation_guard through subsequent DispatchEx activation.
+    """
+    path = ""
     try:
         path = registered_settings_file()
-        enabled = single_client_enabled(path)
+        expected = path.read_bytes()
+        matches = list(SETTING.finditer(expected))
+        if len(matches) != 1:
+            raise ValueError("Expected exactly one SingleCOMClient=0 or 1 entry in can.ini.")
+        if matches[0][2] == b"1":
+            return {"changed": False, "path": str(path), "enabled": True}
         processes = canoe_process_ids()
-    except (OSError, ValueError) as error:
-        # Retain the existing identity/configuration checks if settings cannot be read.
-        log.warning("canoe.activation_preflight_unavailable", extra={"fields": {"error": str(error)}})
-        return
-    if not enabled and processes:
-        raise IndependentConnectionsRequired(path, processes)
+        if processes:
+            raise CanoeActivationError(
+                "restart_required", "CANoe is running in shared COM mode. Save your work and close all CANoe "
+                "windows once, then reconnect. AutoLog will prepare independent connections automatically.",
+                path=path, process_ids=processes)
+        result = set_single_client(path, True, expected=expected)
+        log.info("canoe.independent_mode_prepared", extra={"fields": result})
+        return result
+    except CanoeActivationError:
+        raise
+    except Exception as error:
+        raise CanoeActivationError(
+            "setup_failed", f"Could not prepare required independent CANoe connections: {error}", path=path) from error
 
 
 def registered_settings_file(application_path=None):
@@ -108,7 +145,7 @@ def canoe_process_ids():
 
 
 def set_single_client(path, enabled, *, expected):
-    """User-requested one-byte change, exclusive handle, backup, readback, no elevation."""
+    """One-byte mode change with exclusive handle, backup, readback and no elevation."""
     import win32file
 
     if canoe_process_ids():

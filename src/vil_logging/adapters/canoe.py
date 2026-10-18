@@ -6,9 +6,10 @@ logging block, or start/stop measurement. COM stays in the worker's STA thread.
 
 import time
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 
-from vil_logging.diagnostics.canoe_setup import IndependentConnectionsRequired
+from vil_logging.diagnostics.canoe_setup import CanoeActivationError
 from vil_logging.storage.blf import inspect_blf
 from vil_logging.storage.file_access import ExclusiveFile, observe
 
@@ -20,13 +21,34 @@ def _same_path(first, second):
     return str(Path(first).resolve()).casefold() == str(Path(second).resolve()).casefold()
 
 
+@dataclass
+class ActivatedApplication:
+    application: object
+    process_id: int
+    setup: dict
+
+
 def _create_application():
     from win32com.client import DispatchEx
 
-    from vil_logging.diagnostics.canoe_setup import check_activation
+    from vil_logging.diagnostics.canoe_setup import (
+        activation_guard,
+        canoe_process_ids,
+        ensure_independent_activation,
+    )
 
-    check_activation()
-    return DispatchEx("CANoe.Application")
+    with activation_guard():
+        setup = ensure_independent_activation()
+        before = set(canoe_process_ids())
+        app = DispatchEx("CANoe.Application")
+        created = set(canoe_process_ids()) - before
+        if len(created) != 1:
+            raise CanoeActivationError(
+                "restart_required", "CANoe did not create exactly one new independent process. "
+                "No configuration was opened or replaced. Close existing CANoe windows and reconnect.",
+                path=setup["path"], process_ids=sorted(before),
+            )
+        return ActivatedApplication(app, created.pop(), setup)
 
 
 def _identity(obj):
@@ -47,6 +69,7 @@ class CanoeCapture:
         self.attempted = False
         self.stop_confirmed = False
         self.version = ""
+        self.canoe_pid = 0
         self.journal = deque(maxlen=40)
         self.emit_trace = None
         self._output_snapshot = None
@@ -60,7 +83,7 @@ class CanoeCapture:
 
     def stats(self):
         return {"cfg": self.cfg, "logging_block": self.index, "session_id": self.session_id,
-                "canoe_version": self.version,
+                "canoe_version": self.version, "canoe_pid": self.canoe_pid,
                 "path": str(self.path or ""), "start_attempted": self.attempted,
                 "stop_confirmed": self.stop_confirmed,
                 "output_restore_pending": self._output_snapshot is not None,
@@ -162,6 +185,7 @@ class CanoeCapture:
             except Exception as error:
                 self._trace("canoe.idle_reference_lost", error=str(error))
                 self.app = self.block = None
+                self.canoe_pid = 0
                 current_cfg = ""
         if self.app is not None:
             if not _same_path(current_cfg, self.cfg) and not _same_path(current_cfg, cfg):
@@ -182,20 +206,25 @@ class CanoeCapture:
         if self.app is None:
             self._trace("canoe.create_requested", cfg=str(cfg))
             try:
-                app = self._create_application()
-            except IndependentConnectionsRequired as error:
-                self._trace("canoe.independent_setup_required", settings_file=error.settings_path,
-                            process_ids=error.process_ids)
+                created = self._create_application()
+            except CanoeActivationError as error:
+                self._trace("canoe.activation_failed", connection_issue=error.connection_issue,
+                            settings_file=error.settings_path, process_ids=error.process_ids)
                 raise
+            if isinstance(created, ActivatedApplication):
+                app = created.application
+                self.canoe_pid = created.process_id
+                self._trace("canoe.independent_instance_created", canoe_pid=self.canoe_pid,
+                            setup=created.setup, requested_cfg=str(cfg))
+            else:
+                app = created  # Injected test/application factories.
             # DispatchEx must give a fresh application. Never replace any existing project.
             current, running, modified = self._fresh_state(app)
             if current.strip() or running or modified:
                 self._trace("canoe.instance_reused", requested=str(cfg), current=current, modified=modified)
-                raise RuntimeError(
+                raise CanoeActivationError("restart_required",
                     "CANoe returned an existing configuration; refusing to replace it. "
-                    "Independent COM activation is unavailable. Close only unused CANoe windows and reconnect. "
-                    "For CAN + Diag, verify Vector's SingleCOMClient setting and license on the test PC; "
-                    "AutoLog does not change the global can.ini. "
+                    "Independent COM activation is unavailable. Save and close existing CANoe windows, then reconnect. "
                     f"Requested: {cfg}; returned: {current}")
             app.Visible = True
             self.app, self.cfg = app, str(cfg)
@@ -206,7 +235,7 @@ class CanoeCapture:
                 self.version = str(self.app.Version.FullName)
             except Exception:
                 self.version = "unknown"
-            self._trace("canoe.configuration_opened", cfg=self.cfg)
+            self._trace("canoe.configuration_opened", cfg=self.cfg, canoe_pid=self.canoe_pid)
         self._validate()
         collection = self.app.Configuration.OnlineSetup.LoggingCollection
         count = int(collection.Count)

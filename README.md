@@ -2,7 +2,7 @@
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 공통 logging 버튼으로 기록을 제어합니다.
 
-현재 소스 버전은 **0.8.3**입니다. 설정의 CAN·Diag 영역은 한 로깅 세트로 묶어 cfg마다 기록 블록 하나와 연결 상태를 함께 표시합니다. CANoe 연결 설정 안내에는 두 cfg를 별도 CANoe 인스턴스에 붙이는 이유와 전역 설정 영향을 명시합니다. [CAN·Diag 연결 수정과 설정 순서](docs/canoe_connection_hotfix.md), [기록 품질·캡처 버퍼·부하 검사](docs/development_stage_8.md), [Ethernet 통신 감시](docs/development_stage_7.md), [미완료 기록 복구](docs/development_stage_6.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
+현재 소스 버전은 **0.8.4**입니다. CAN과 Diag의 **연결 확인**을 누르면 각 .cfg가 별도 CANoe 창에 연결됩니다. 연결 방식 선택창은 없으며 각 카드에 연결된 .cfg와 CANoe PID를 표시합니다. [자동 독립 연결 수정](docs/canoe_independent_connection.md), [기록 품질·캡처 버퍼·부하 검사](docs/development_stage_8.md), [Ethernet 통신 감시](docs/development_stage_7.md), [미완료 기록 복구](docs/development_stage_6.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
 **기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. **설정 → Ethernet 연결**의 캡처 버퍼는 기본 64 MiB이고 선택값을 기억합니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
 
@@ -10,7 +10,7 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 
 비정상 종료 후에는 메인의 **미완료 확인 N건** 또는 **파일 관리 → 미완료 기록 복구**에서 파일을 검토합니다. 외부 기록 종료를 직접 확인한 뒤 **검사 후 보관**하거나 **파일 유지하고 미완료 정리**할 수 있습니다. 파일과 소비한 번호를 유지하며 복구 세션은 실패 이력으로 남깁니다.
 
-대표 두 .cfg의 독립 연결은 CANoe 19.3.118에서 확인했습니다. CAN과 Diag는 각각 하나의 .cfg를 사용하고, 각 .cfg에서 선택한 BLF 기록 블록 하나를 제어합니다. 두 .cfg를 모두 쓸 때는 **설정 → CAN·Diag 구성 → CANoe cfg별 연결 설정…**에서 각 연결에 별도 CANoe 인스턴스를 사용하도록 설정합니다. 이는 CANoe 설치 전체의 COM 동작을 바꾸므로 모든 CANoe 창이 닫혀야 적용할 수 있으며, 원본 can.ini를 백업하고 기본 공유 모드로 복구할 수 있습니다. 현재 PC는 **View Only**이므로 라이선스 활성화 후 실제 구간 기록·장비 검증이 남아 있습니다. [최초 검토](docs/cfg_compatibility_review.md)와 [후속 수정 결과](docs/canoe_fix_plan.md)를 구분합니다.
+CAN과 Diag는 각각 하나의 .cfg와 그 안의 BLF 기록 블록 하나를 사용합니다. AutoLog가 첫 연결에서 필요한 CANoe 독립 COM 모드를 자동 준비하며, 원본 can.ini는 같은 폴더에 백업합니다. 이미 기본 COM 모드로 실행된 CANoe가 있으면 최초 한 번 작업을 저장하고 모든 CANoe 창을 닫은 뒤 연결 확인을 다시 누르세요. 이후 두 구성은 자동으로 각각 열립니다. 설정은 해당 CANoe 설치 전체에 유지되며 다른 COM 도구·ActiveX/.NET 패널도 영향을 받을 수 있습니다. 대표 구성과 실제 버튼 경로의 두 프로세스·정확한 cfg 연결을 CANoe 19.3.118에서 확인했습니다. 현재 PC는 **View Only**이므로 라이선스 활성화 후 실제 구간 기록·장비 검증이 남아 있습니다.
 
 ## 폴더와 Git 관리 범위
 

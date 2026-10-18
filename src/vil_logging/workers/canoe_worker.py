@@ -52,11 +52,16 @@ def canoe_worker_main(role, pipe):
                 else:
                     raise ValueError("Unsupported CANoe command")
                 pipe.send(CommandResult(command, True, state, evidence, os.getpid(), details=details))
-            except Exception:
+            except Exception as error:
                 details = capture.stats()
-                if any(item.get("event") in {"canoe.instance_reused", "canoe.independent_setup_required"}
-                       and item.get("monotonic", 0) >= trace_started for item in details.get("diagnostics", [])):
-                    details["connection_issue"] = "independent_setup_required"
+                issue = getattr(error, "connection_issue", "")
+                if issue:
+                    details["connection_issue"] = issue
+                    details["settings_path"] = getattr(error, "settings_path", "")
+                    details["running_canoe_pids"] = getattr(error, "process_ids", [])
+                elif any(item.get("event") == "canoe.instance_reused"
+                         and item.get("monotonic", 0) >= trace_started for item in details.get("diagnostics", [])):
+                    details["connection_issue"] = "restart_required"
                 pipe.send(CommandResult(command, False, "unknown", traceback.format_exc(), os.getpid(),
                                         details=details))
     except (EOFError, OSError, BrokenPipeError):

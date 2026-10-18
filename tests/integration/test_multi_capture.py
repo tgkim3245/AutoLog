@@ -179,11 +179,11 @@ def test_connection_report_separates_license_failure_from_managed_filename_optio
         assert "기존 로깅 버튼" in report["next_action_ko"]
 
 
-def test_disabled_independent_mode_offers_setup_without_showing_traceback(real):
+def test_running_shared_mode_requests_only_one_time_close_without_a_mode_choice(real):
     runtime, tools = real
     tools.fail = (Role.DIAG, "connect")
-    tools.failure_details = {"connection_issue": "independent_setup_required",
-                             "diagnostics": [{"event": "canoe.independent_setup_required"}]}
+    tools.failure_details = {"connection_issue": "restart_required",
+                             "diagnostics": [{"event": "canoe.activation_failed"}]}
     runtime._submit(runtime._prepare_canoe, Role.DIAG).result(5)
     reports = []
     while not runtime.messages.empty():
@@ -191,7 +191,8 @@ def test_disabled_independent_mode_offers_setup_without_showing_traceback(real):
         if kind == "preparation":
             reports.append(value)
     report = reports[-1]
-    assert report["status"] == "attention" and report["action"] == "canoe_setup"
+    assert report["status"] == "attention" and "action" not in report
+    assert "자동 적용" in report["detail"]
     assert "Traceback" not in report["detail"]
     assert report["diagnostic_detail"] == "injected proof"
     assert tools.calls == [((Role.DIAG,), "connect")]
