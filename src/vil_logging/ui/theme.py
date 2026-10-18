@@ -51,7 +51,12 @@ QLabel[tone="attention"] { color: #986314; background: #FFF5E2; }
 QLabel[tone="error"] { color: #B63B4A; background: #FFF0F1; }
 QFrame[panel="true"] { background: #FFFFFF; border: 1px solid #DDE4EF; border-radius: 12px; }
 QFrame[role="card"] { background: #FFFFFF; border: 1px solid #DDE4EF; border-left: 3px solid #CCD6E6; border-radius: 9px; }
+QFrame[role="card"][target="can"] { border-left-color: #4263EB; }
+QFrame[role="card"][target="diag"] { border-left-color: #845EF7; }
 QFrame[role="card"][selected="true"] { border-color: #CDD6FF; border-left-color: #4263EB; background: #FCFDFF; }
+QFrame[role="divider"] { color: #E8EDF5; background: #E8EDF5; border: none; max-height: 1px; }
+QLabel[variant="number"] { color: #FFFFFF; background: #4263EB; border-radius: 10px; padding: 5px 7px; font-size: 10px; font-weight: 700; }
+QFrame[target="diag"] QLabel[variant="number"] { background: #845EF7; }
 QFrame[role="notice"] { background: #EDF1FF; border: 1px solid #D9E1FF; border-radius: 10px; }
 QFrame[role="notice"][tone="ready"] { background: #EAF7F1; border-color: #D3EBE0; }
 QFrame[role="notice"][tone="attention"] { background: #FFF5E2; border-color: #F1E3C5; }

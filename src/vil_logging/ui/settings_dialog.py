@@ -54,8 +54,22 @@ TEXT = {
                   "Install Wireshark and find again, or choose tshark.exe."),
     "network_help": ("장비가 연결된 네트워크 이름을 선택하세요. 선택한 장치는 다음 실행에도 기억합니다.",
                      "Choose the network connected to your device. Your choice is remembered for the next launch."),
-    "can_help": (".cfg를 선택하고 연결 확인을 누르면 전용 CANoe 창을 엽니다. 그 창에서 측정을 시작하세요. 구간 기록은 AutoLog로 제어합니다.",
-                 "Choose .cfg and check connection to open a dedicated CANoe window. Start measurement there; control segment recording from AutoLog."),
+    "can_help": ("CAN과 Diag는 한 세트지만 파일과 BLF 기록 블록은 각각 지정합니다. 두 연결을 확인하고 측정은 CANoe에서 시작하세요.",
+                 "CAN and Diag form one set with separate cfg and BLF choices. Check both connections, then start measurement in CANoe."),
+    "canoe_set_title": ("CAN + Diag 로깅 세트", "CAN + Diag logging set"),
+    "can_heading": ("CAN", "CAN"), "can_subtitle": ("차량 CAN 메시지 · BLF 기록", "Vehicle CAN messages · BLF logging"),
+    "diag_heading": ("Diag", "Diag"), "diag_subtitle": ("진단 메시지 · BLF 기록", "Diagnostic messages · BLF logging"),
+    "can_cfg_label": ("CAN 구성 파일 (.cfg)", "CAN configuration (.cfg)"),
+    "diag_cfg_label": ("Diag 구성 파일 (.cfg)", "Diag configuration (.cfg)"),
+    "can_block_label": ("CAN 기록 블록 (.blf)", "CAN logging block (.blf)"),
+    "diag_block_label": ("Diag 기록 블록 (.blf)", "Diag logging block (.blf)"),
+    "can_connection": ("CAN 연결 상태", "CAN connection"),
+    "diag_connection": ("Diag 연결 상태", "Diag connection"),
+    "ethernet_connection": ("Ethernet 연결 상태", "Ethernet connection"),
+    "check_can": ("CAN 연결 확인", "Check CAN"),
+    "check_diag": ("Diag 연결 확인", "Check Diag"),
+    "checking_can": ("CAN 확인 중…", "Checking CAN…"),
+    "checking_diag": ("Diag 확인 중…", "Checking Diag…"),
     "naming_help": ("파일명과 다음 번호를 바꾼 뒤 적용하세요. 번호 앞의 _는 자동으로 넣습니다. 경로 선택은 바로 저장됩니다.",
                     "Apply changes to the filename prefix and next number. An underscore is added before the index. Path choices save immediately."),
     "saved": ("선택을 저장했습니다.", "Choices saved."),
@@ -114,10 +128,13 @@ class SettingsDialog(QDialog):
         self.fields: dict[str, QLineEdit] = {}
         self.block_inputs = {}
         self.block_labels = {}
+        self.preparation_headings: dict[Role, QLabel] = {}
         self.labels: dict[str, QLabel] = {}
         self.browse_buttons: list[QPushButton] = []
         self.prepare_buttons: dict[Role, QPushButton] = {}
         self.target_labels: dict[Role, QLabel] = {}
+        self.target_headings: dict[Role, QLabel] = {}
+        self.target_subtitles: dict[Role, QLabel] = {}
         self.result_details: dict[Role, QLabel] = {}
         self.next_actions: dict[Role, QLabel] = {}
         self._preparation_cards: dict[Role, QFrame] = {}
@@ -160,25 +177,26 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(storage, "")
         canoe, layout = self._page()
         self.can_hint = self._helper()
-        layout.addWidget(self.can_hint)
+        self.can_hint.setObjectName("canoeSetHint")
+        set_header = QFrame()
+        set_header.setProperty("role", "notice")
+        set_header.setObjectName("canoeSetHeader")
+        header_layout = QHBoxLayout(set_header)
+        header_layout.setContentsMargins(14, 10, 14, 10)
+        header_copy = QVBoxLayout()
+        header_copy.setSpacing(3)
+        self.canoe_set_title = QLabel()
+        self.canoe_set_title.setProperty("variant", "section")
+        header_copy.addWidget(self.canoe_set_title)
+        header_copy.addWidget(self.can_hint)
+        header_layout.addLayout(header_copy, 1)
         self.canoe_setup_button = QPushButton()
         self.canoe_setup_button.setObjectName("canoeSetupButton")
         self.canoe_setup_button.clicked.connect(self._open_canoe_setup)
-        layout.addWidget(self.canoe_setup_button, 0, Qt.AlignmentFlag.AlignLeft)
-        for role, key in ((Role.CAN, "can_cfg"), (Role.DIAG, "diag_cfg")):
-            form = QFormLayout()
-            self._field(form, key, role.label + " .cfg", "cfg")
-            block_key = ("can" if role == Role.CAN else "diag") + "_logging_block"
-            combo = ThemedComboBox()
-            combo.setObjectName(block_key + "ComboBox")
-            self.block_inputs[block_key] = combo
-            combo.addItem("", "")
-            combo.currentIndexChanged.connect(lambda _index, k=block_key: self._block_changed(k))
-            self.block_labels[block_key] = QLabel()
-            form.addRow(self.block_labels[block_key], combo)
-            self.fields[key].textChanged.connect(lambda _value, k=block_key: self._reset_blocks(k))
-            layout.addLayout(form)
-            layout.addWidget(self._preparation_box(role))
+        header_layout.addWidget(self.canoe_setup_button, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(set_header)
+        for role, key, number in ((Role.CAN, "can_cfg", "01"), (Role.DIAG, "diag_cfg", "02")):
+            layout.addWidget(self._canoe_target_card(role, key, number))
         layout.addStretch()
         self.tabs.addTab(canoe, "")
         ethernet, layout = self._page()
@@ -292,6 +310,7 @@ class SettingsDialog(QDialog):
         field = QLineEdit()
         field.setObjectName(key + "Input")
         field.textChanged.connect(lambda _text, k=key: self._mark_dirty(k))
+        field.textChanged.connect(field.setToolTip)
         if key in PREFERENCES:
             field.editingFinished.connect(lambda k=key: self._save_preferences((k,)))
         self.fields[key] = field
@@ -313,6 +332,64 @@ class SettingsDialog(QDialog):
         holder.setLayout(row)
         form.addRow(label, holder)
 
+    def _canoe_target_card(self, role, cfg_key, number):
+        """Keep each CAN/Diag cfg, BLF block and connection result together."""
+        target = "can" if role == Role.CAN else "diag"
+        block_key = target + "_logging_block"
+        frame = QFrame()
+        frame.setProperty("role", "card")
+        frame.setProperty("target", target)
+        frame.setObjectName(f"preparation{role.value}Card")
+        frame.setProperty("configCard", True)
+        card = QVBoxLayout(frame)
+        card.setContentsMargins(12, 10, 12, 10)
+        card.setSpacing(7)
+        self._preparation_cards[role] = frame
+
+        heading = QHBoxLayout()
+        heading.setSpacing(10)
+        number_label = QLabel(number)
+        number_label.setObjectName(f"canoe{role.label}Number")
+        number_label.setProperty("variant", "number")
+        heading.addWidget(number_label, 0, Qt.AlignmentFlag.AlignTop)
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
+        title = QLabel()
+        title.setProperty("variant", "section")
+        self.target_headings[role] = title
+        title_row.addWidget(title)
+        title_row.addStretch()
+        subtitle = self._helper()
+        self.target_subtitles[role] = subtitle
+        title_row.addWidget(subtitle, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        heading.addLayout(title_row, 1)
+        card.addLayout(heading)
+
+        form = QFormLayout()
+        form.setContentsMargins(0, 2, 0, 0)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(8)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        self._field(form, cfg_key, cfg_key, "cfg")
+        combo = ThemedComboBox()
+        combo.setObjectName(block_key + "ComboBox")
+        combo.setMinimumContentsLength(22)
+        self.block_inputs[block_key] = combo
+        combo.addItem("", "")
+        combo.currentIndexChanged.connect(lambda _index, k=block_key: self._block_changed(k))
+        self.block_labels[block_key] = QLabel()
+        form.addRow(self.block_labels[block_key], combo)
+        self.fields[cfg_key].textChanged.connect(lambda _value, k=block_key: self._reset_blocks(k))
+        card.addLayout(form)
+
+        separator = QFrame()
+        separator.setObjectName(f"canoe{role.label}Divider")
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setProperty("role", "divider")
+        card.addWidget(separator)
+        self._add_preparation_content(role, card)
+        return frame
+
     def _preparation_box(self, role):
         frame = QFrame()
         frame.setProperty("panel", True)
@@ -321,10 +398,16 @@ class SettingsDialog(QDialog):
         self._preparation_cards[role] = frame
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(14, 12, 14, 12)
+        self._add_preparation_content(role, layout)
+        return frame
+
+    def _add_preparation_content(self, role, layout):
         row = QHBoxLayout()
-        title = QLabel(role.label)
-        title.setProperty("variant", "section")
-        row.addWidget(title)
+        section_title = QLabel()
+        section_title.setProperty("variant", "muted")
+        section_title.setObjectName(f"preparation{role.value}Heading")
+        self.preparation_headings[role] = section_title
+        row.addWidget(section_title)
         row.addStretch()
         button = QPushButton()
         button.setObjectName(f"prepare{role.label}Button")
@@ -350,7 +433,6 @@ class SettingsDialog(QDialog):
             setup.hide()
             self.setup_actions[role] = setup
             layout.addWidget(setup, 0, Qt.AlignmentFlag.AlignLeft)
-        return frame
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -656,6 +738,9 @@ class SettingsDialog(QDialog):
         status = report.get("status", "neutral")
         title = self._t(status) if status in {"checking", "ready", "attention", "error"} else self._t("unprepared")
         message = report.get("message_" + self._language, "")
+        if role in self.preparation_headings:
+            heading_key = "can_connection" if role == Role.CAN else "diag_connection" if role == Role.DIAG else "ethernet_connection"
+            self.preparation_headings[role].setText(self._t(heading_key))
         label = self.target_labels[role]
         label.setText(title + (" · " + message if message else ""))
         label.setProperty("tone", status)
@@ -671,7 +756,13 @@ class SettingsDialog(QDialog):
                              "network_next" if role == Role.ETHERNET else "cfg_next")
         self.next_actions[role].setText(action)
         self.next_actions[role].setVisible(bool(action))
-        self.prepare_buttons[role].setText(self._t("checking" if role in self._preparing else "check"))
+        if role == Role.CAN:
+            button_key = "checking_can" if role in self._preparing else "check_can"
+        elif role == Role.DIAG:
+            button_key = "checking_diag" if role in self._preparing else "check_diag"
+        else:
+            button_key = "checking" if role in self._preparing else "check"
+        self.prepare_buttons[role].setText(self._t(button_key))
         self.prepare_buttons[role].setEnabled(not self._busy and role not in self._preparing)
         if role in self.setup_actions:
             setup = self.setup_actions[role]
@@ -701,6 +792,13 @@ class SettingsDialog(QDialog):
             self.tabs.setTabText(index, self._t(key))
         for label in self.labels.values():
             label.setText(tr(label.property("translationKey"), self._language))
+        self.canoe_set_title.setText(self._t("canoe_set_title"))
+        self.target_headings[Role.CAN].setText(self._t("can_heading"))
+        self.target_headings[Role.DIAG].setText(self._t("diag_heading"))
+        self.target_subtitles[Role.CAN].setText(self._t("can_subtitle"))
+        self.target_subtitles[Role.DIAG].setText(self._t("diag_subtitle"))
+        self.labels["can_cfg"].setText(self._t("can_cfg_label"))
+        self.labels["diag_cfg"].setText(self._t("diag_cfg_label"))
         for button in self.browse_buttons:
             button.setText(self._t("select") if button.property("picker") == "tool" else tr("browse", self._language))
         for label, key in ((self.naming_hint, "naming_help"), (self.can_hint, "can_help"),
@@ -719,7 +817,7 @@ class SettingsDialog(QDialog):
         self.format_input.setToolTip(self._t("format_help"))
         self.find_button.setText(self._t("find"))
         for key, label in self.block_labels.items():
-            label.setText("기록 블록" if self._language == "ko" else "Logging Block")
+            label.setText(self._t("can_block_label" if key.startswith("can_") else "diag_block_label"))
             self.block_inputs[key].setItemText(0, "연결 후 블록 선택" if self._language == "ko" else "Choose block after connection")
         self.install_button.setText("Wireshark " + ("설치·복구" if self._language == "ko" else "install / repair"))
         self.npcap_button.setText(self._t("npcap"))
