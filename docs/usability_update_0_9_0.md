@@ -38,3 +38,12 @@ dumpcap이 선택한 NIC에서 원본 pcap/pcapng를 직접 기록한다. 별도
 ## 의존성
 
 Vector XL의 구조체·읽기 조회 바인딩에 python-can 4.6.1과 wrapt 1.17.3을 추가했다. CAN Bus 인스턴스나 송수신 API는 사용하지 않는다. LGPL 고지·원본 링크와 교체 가능한 Python 소스 형태를 배포에 포함한다. Vector 드라이버 DLL과 Wireshark는 배포에 포함하지 않는다.
+
+## 최종 배포 확인
+
+- 변경 없는 소스 커밋 `9d67075809f32b7740e6394d8c174c75e1f309c2`에서 `build.cmd --no-pause`로 `AutoLog-0.9.0_20261019_174756`을 만들었다. 결과는 로컬 `Downloads/AutoLog_Builds/AutoLog-0.9.0_20261019_174756/`에 있다.
+- ZIP은 52,928,788바이트이며 SHA256은 `873be7538ed4f72598c89e42da8b90589f3457b60a1c8fae12a1ab1032b23626`, EXE SHA256은 `836d9c0a814e19d1ee5296b73800a34e002b458ec1c6492cd524320105fe18de`다. ZIP CRC·압축 해제 EXE 해시·제품명/버전과 COM mutex 의존 파일을 확인했다.
+- 개발 Python 환경 변수/PATH를 제외한 압축 해제 EXE에서 중국어 프로필·모의 구간 기록/정지·정상 종료·실제 NIC 조회를 통과했다. EXE 옆 개발자로그의 이 실행 89개 레코드에 ERROR/CRITICAL이 없었다. 근거는 배포 결과의 `verification/result.json`이다.
+- 같은 EXE에서 실제 TShark 경로를 명시해 localhost pcap/pcapng 각각 0패킷·5패킷·재시작 6회, capinfos 전체 읽기·요약 수 일치와 비IP ARP 확인을 통과했다. `verification/frozen-ethernet/result.json`에 보관했다. 새 의존성의 교체 가능한 소스와 라이선스 포함도 확인했다.
+- 새 채널 기준을 저장한 v2 프로필을 실제 0.8.6 EXE가 읽어 모의 기록·정상 종료한 뒤 0.9.0 소스에서 채널 기준 보존을 확인했다. 설정 JSON 호환성 시험이며 실제 CANoe/장치 시험이 아니다. 로컬 `improvements-0.9.0/compat-0.8.6/result.json`을 따른다.
+- 빌드 PC에 로컬 XL 드라이버 DLL이 없어 분석 단계에서 `vxlapi64` 미발견 메시지가 있었다. 이 DLL은 앱에 넣지 않는다. 실제 시험 PC의 Vector 드라이버와 VN 조회는 현장 실증 항목으로 유지한다. 이번 EXE 시험을 새 PC·차량 성능·라이선스 CAN 기록 성공으로 확대 해석하지 않는다.
