@@ -30,4 +30,10 @@ Write 창은 **과거 기록**이다. 안내에도 이전 시도일 수 있음�
 
 - Windows 글꼴을 로드한 Qt offscreen에서 한/영/중 측정 안내·옵션 오류 기록을 렌더링해 확인했다. 690×712 논리 크기에서 안내가 줄바꿈되고 가로 스크롤이 생기지 않는다. 긴 CAN/Diag 카드는 기존 세로 스크롤로 접근한다. 로컬 근거는 `Downloads/AutoLog_Builds/canoe-fixes-0.9.1/ui/`의 PNG·JSON이다.
 
-빌드·압축 해제 실행 결과는 확인 후 아래에 추가한다.
+## 배포 확인
+
+- 변경 없는 소스 커밋 `5a2c3fe2848cebef56080b253b7771858fcb3d13`에서 `build.cmd --no-pause`로 `AutoLog-0.9.1_20261019_210152`을 만들었다. 위치는 로컬 `Downloads/AutoLog_Builds/AutoLog-0.9.1_20261019_210152/`다.
+- 배포 ZIP은 **52,936,412바이트**, SHA256 `08ef5e96438de05d5939d7460511981ab705d854ec906d2283dcd9b112552cb4`다. EXE SHA256은 `653b51319f8e13d4fe98b09e480693551ba78375e63e5fa78adfe458af8a44cb`다. ZIP 전체 CRC·압축 해제 EXE 해시와 제품명/제품·파일 버전 0.9.1을 확인했다.
+- 개발 Python 변수/경로를 제거한 환경에서 압축 해제 EXE의 중국어 설정 복원·모의 기록/정지·정상 종료·실제 네트워크 목록 조회를 통과했다. 이 실행의 EXE 옆 개발자로그 85개 레코드에 ERROR/CRITICAL은 없었다. 근거는 배포 결과 `verification/result.json`이다.
+- EXE 아카이브에 CANoe 어댑터·수정한 하드웨어/측정/준비 진단·worker 모듈이 포함됐고 COM mutex 의존 파일도 포함됐다. 빌드 PC에는 Vector XL DLL이 없어 기존과 같이 분석 단계에 미발견 메시지가 있었으며 실제 VN 조회를 대신 통과 처리하지 않는다.
+- 이번 배포에서 실제 CANoe 측정·장비 로깅은 수행하지 않았다. 앞선 0.9.0의 localhost 성능 수치를 새 버전의 차량/CAN 성공 근거로 승계하지 않는다.
