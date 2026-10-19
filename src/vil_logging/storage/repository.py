@@ -58,6 +58,10 @@ def _json(value: Any) -> str:
 
 def _settings_document(settings: AppSettings) -> dict[str, Any]:
     document = asdict(settings)
+    # Keep the v2 settings document readable by older releases. New hardware
+    # references live in an extension table that those releases can ignore.
+    for role in ("can", "diag"):
+        document.pop(role + "_hardware_baseline", None)
     document["next_index"] = str(settings.next_index)
     return document
 
@@ -75,6 +79,8 @@ class Repository:
             self._connection.execute("PRAGMA journal_mode=WAL")
             self._connection.execute("PRAGMA synchronous=FULL")
             self._initialize()
+            self._connection.execute("CREATE TABLE IF NOT EXISTS hardware_references "
+                                     "(role TEXT PRIMARY KEY, cfg TEXT NOT NULL, document TEXT NOT NULL)")
         except BaseException:
             self._connection.close()
             raise
@@ -154,6 +160,11 @@ class Repository:
         if row is None:
             return None
         document = json.loads(row["document"])
+        for role in ("can", "diag"):
+            reference = self._connection.execute("SELECT cfg,document FROM hardware_references WHERE role=?",
+                                                 (role,)).fetchone()
+            key = role + "_hardware_baseline"
+            document[key] = reference["document"] if reference and reference["cfg"] == document.get(role + "_cfg", "") else ""
         document["ethernet_buffer_mib"] = "64"  # Fixed application buffer; ignore legacy UI tuning.
         document.update(next_index=int(row["next_index"]), version=row["version"])
         return AppSettings(**document)
@@ -161,6 +172,10 @@ class Repository:
     @staticmethod
     def _write_settings(connection: sqlite3.Connection, settings: AppSettings) -> None:
         settings = replace(settings, ethernet_buffer_mib="64")
+        for role in ("can", "diag"):
+            connection.execute("INSERT INTO hardware_references VALUES(?,?,?) ON CONFLICT(role) "
+                               "DO UPDATE SET cfg=excluded.cfg,document=excluded.document",
+                               (role, getattr(settings, role + "_cfg"), getattr(settings, role + "_hardware_baseline")))
         connection.execute(
             "INSERT INTO settings(id,next_index,version,document) VALUES(1,?,?,?) "
             "ON CONFLICT(id) DO UPDATE SET next_index=excluded.next_index, "
@@ -215,7 +230,8 @@ class Repository:
         Capture preparation still performs full filesystem/tool validation.
         """
         allowed = {"can_cfg", "diag_cfg", "tshark_path", "output_dir", "nic_id",
-                   "language", "ethernet_format", "ethernet_buffer_mib", "can_logging_block", "diag_logging_block", "monitor_rules_json"}
+                   "language", "ethernet_format", "ethernet_buffer_mib", "can_logging_block", "diag_logging_block", "monitor_rules_json",
+                   "can_hardware_baseline", "diag_hardware_baseline"}
         if not isinstance(patch, dict) or set(patch) - allowed:
             raise RepositoryError("Unsupported connection preference fields")
         if any(not isinstance(value, str) or any(ord(char) < 32 for char in value)
@@ -234,6 +250,10 @@ class Repository:
         for key in ("can_logging_block", "diag_logging_block"):
             if key in patch and patch[key] and (not patch[key].isdecimal() or not 1 <= int(patch[key]) <= 128):
                 raise RepositoryError("Logging Block must be a listed 1-based index")
+        for key in ("can_hardware_baseline", "diag_hardware_baseline"):
+            if key in patch:
+                from vil_logging.diagnostics.canoe_hardware import parse_baseline
+                parse_baseline(patch[key])
         with self._transaction("save_preferences") as connection:
             current = self._read_settings()
             if current is None:
@@ -245,6 +265,8 @@ class Repository:
                 cfg_key, block_key = prefix + "_cfg", prefix + "_logging_block"
                 if cfg_key in patch and patch[cfg_key] != getattr(current, cfg_key) and block_key not in patch:
                     patch[block_key] = ""
+                if cfg_key in patch and patch[cfg_key] != getattr(current, cfg_key):
+                    patch[prefix + "_hardware_baseline"] = ""
             if all(getattr(current, key) == value for key, value in patch.items()):
                 return current
             updated = replace(current, **patch, version=current.version + 1)

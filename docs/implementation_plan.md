@@ -1,9 +1,9 @@
 # 프로그램 구현 작업 계획
 
 작성일: 2026-10-17 (Asia/Seoul)
-현황 갱신: 2026-10-19, 소스 버전 0.8.6. [전체 검토·수정 결과](project_audit_0_8_6.md)와 [미적용 개선 제안](improvement_backlog.md)을 함께 확인한다. 현재 작업별 진행은 **5절**, 다음 작업 순서는 **10절**을 기준으로 본다. 작업 ID와 최종 완료 기준은 기존 계획을 유지한다. [0.5.1 수정](canoe_fix_plan.md)에서 CANoe 제어·출력 복구, [0.6.0](development_stage_6.md)에서 수동 복구, [0.7.0](development_stage_7.md)에서 Ethernet 감시, [0.8.0](development_stage_8.md)에서 품질·부하 검사를 구현했다. [0.8.4](canoe_independent_connection.md)에서 cfg별 독립 연결을 필수 자동 처리로 고정하고 실제 두 worker 동시 요청과 UI 버튼 연속 클릭을 검증했다. [0.8.5](ui_update_0_8_5.md)에서 화면 간소화·실시간 NIC 수신 그래프·중국어·캡처 폴더 열기·진단 ZIP 검증을 추가하고 버퍼를 64 MiB 고정으로 바꿨다. 실제 CAN/Diag 구간 기록은 라이선스 준비 후 검증한다.
+현황 갱신: 2026-10-19, 소스 버전 0.9.0. [최신 사용성·채널·캡처 변경](usability_update_0_9_0.md)과 [CANoe 환경별 검증표](canoe_support_matrix.md)를 확인한다. [전체 검토·수정 결과](project_audit_0_8_6.md)와 [개선 반영 상태](improvement_backlog.md)을 함께 확인한다. 현재 작업별 진행은 **5절**, 다음 작업 순서는 **10절**을 기준으로 본다. 작업 ID와 최종 완료 기준은 기존 계획을 유지한다. [0.5.1 수정](canoe_fix_plan.md)에서 CANoe 제어·출력 복구, [0.6.0](development_stage_6.md)에서 수동 복구, [0.7.0](development_stage_7.md)에서 Ethernet 감시, [0.8.0](development_stage_8.md)에서 품질·부하 검사를 구현했다. [0.8.4](canoe_independent_connection.md)에서 cfg별 독립 연결을 필수 자동 처리로 고정하고 실제 두 worker 동시 요청과 UI 버튼 연속 클릭을 검증했다. [0.8.5](ui_update_0_8_5.md)에서 화면 간소화·실시간 NIC 수신 그래프·중국어·캡처 폴더 열기·진단 ZIP 검증을 추가하고 버퍼를 64 MiB 고정으로 바꿨다. 실제 CAN/Diag 구간 기록은 라이선스 준비 후 검증한다.
 
-현재 구현: Qt UI·설정/번호/이력, TShark Ethernet 취득·최근 패킷·명시적 규칙 감시, 완료 파일 관리·미완료 수동 복구, 상시 진단·버그리포트와 버전별 자동 빌드. CAN/Diag COM 제어는 시험용이며 대표 .cfg 측정·기록, CAN/Diag 수신 이벤트·하드웨어 채널 관측, 실제 차량·고부하·새 PC 검증이 남아 있다. 최신 검증 근거는 [전체 검토](project_audit_0_8_6.md)를 따른다.
+현재 구현: Qt UI·설정/번호/이력, dumpcap 원본 취득과 독립 TShark 해석·감시·품질, 완료 파일 관리·복구, 상시 진단·버그리포트, 버전별 빌드, CAN 준비 상태·로컬 채널 기준 비교, 화면 크기 대응·활동 필터·이력 압축 정리. CAN/Diag 실제 라이선스 BLF·수신 감시, 실제 VN/차량 고부하·장시간·새 PC 검증은 남아 있다. 최신 범위는 [0.9.0 결과](usability_update_0_9_0.md)를 따른다.
 기준: [요구사항](requirements.md), [제어 정책](control_policy.md), [설계](architecture.md), [검증 계획](validation_plan.md).
 
 ## 1. 파악한 프로그램과 현재 상태

@@ -1,11 +1,13 @@
 # 개발 빌드의 외부 구성요소
 
-이 앱은 Python, Qt/PySide6·Shiboken, pywin32, SQLite와 PyInstaller 실행 지원 코드를 사용한다. 실제 버전은 배포 폴더의 `requirements.lock`과 빌드 정보에서 확인한다.
+이 앱은 Python, Qt/PySide6·Shiboken, pywin32, python-can·wrapt, SQLite와 PyInstaller 실행 지원 코드를 사용한다. 실제 버전은 배포 폴더의 `requirements.lock`과 빌드 정보에서 확인한다.
 
 - Python: https://docs.python.org/3/license.html
 - Qt for Python / PySide6 / Shiboken: https://doc.qt.io/qtforpython-6/licenses.html
 - Qt: https://doc.qt.io/qt-6/licensing.html
 - pywin32: https://github.com/mhammond/pywin32
+- python-can 4.6.1 (LGPL-3.0-only): https://github.com/hardbyte/python-can/tree/4.6.1 — 원본 소스·변경 내역은 해당 공개 저장소와 PyPI 소스 배포에서 제공한다. 라이브러리는 수정하지 않았으며 배포의 `_internal/can/`에 Python 소스로 두어 호환 버전으로 교체할 수 있다. 해당 라이브러리와의 사용을 위한 수정·디버깅을 제한하지 않는다.
+- wrapt 1.17.3 (BSD): https://github.com/GrahamDumpleton/wrapt/tree/1.17.3
 - SQLite: https://www.sqlite.org/copyright.html
 - PyInstaller: https://pyinstaller.org/en/stable/license.html
 

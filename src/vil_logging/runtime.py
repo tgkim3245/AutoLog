@@ -174,10 +174,22 @@ class Runtime:
         self._recovery = RecoveryService(self._repo)
         file_recovery = self._file_service.recover()
         recovered = self._repo.recover_incomplete()
+        from vil_logging.storage.retention import maintain
+        retention_notice = None
+        try:
+            retention = maintain(self._repo)
+            log.info("history.retention", extra={"result": retention})
+            if retention["status"] == "archived":
+                retention_notice = {"code": "HISTORY_ARCHIVED", **retention}
+        except Exception as error:
+            log.exception("history.retention_failed")
+            retention_notice = {"code": "HISTORY_ARCHIVE_FAILED", "level": "WARNING", "original": str(error)}
         self._publish("settings", self._settings)
         # Historical rows must not consume nearly the whole control-message
         # queue before the first GUI tick (500 history rows versus 512 slots).
         self._publish("events", self._repo.recent_events())
+        if retention_notice:
+            self._event(**retention_notice)
         for snapshot in self._snapshots.values():
             self._publish("target", snapshot)
         self._ready = True
@@ -355,7 +367,7 @@ class Runtime:
             if any(key in changed for key in ("tshark_path", "nic_id")):
                 self._begin_discovery()
             for role, prefix in ((Role.CAN, "can"), (Role.DIAG, "diag")):
-                if any(key in changed for key in (prefix + "_cfg", prefix + "_logging_block")):
+                if any(key in changed for key in (prefix + "_cfg", prefix + "_logging_block", prefix + "_hardware_baseline")):
                     self._target(role, connection=ConnectionState.UNKNOWN, evidence="CANoe settings changed")
                     self._publish("preparation", self._preparation_report(
                         role, "attention", "설정이 변경됐습니다. 연결 확인을 다시 눌러주세요.",
@@ -436,8 +448,9 @@ class Runtime:
                 key = ("can" if role == Role.CAN else "diag") + "_logging_block"
                 self._settings = self._repo.save_preferences({key: block})
                 self._publish("settings", self._settings)
-            ready = bool(block and details.get("measurement_running") and not details.get("trigger_active")
-                         and not details.get("view_only"))
+            from vil_logging.diagnostics.canoe_readiness import readiness_stage, stage_text
+            stage = readiness_stage(details)
+            ready = stage == "segment_ready"
             ko = ("측정 실행과 기록 블록을 확인했습니다. logging으로 구간 기록을 시작하세요." if ready else
                   "기록 블록을 선택하고, AutoLog가 연 CANoe 창에서 측정을 시작한 뒤 다시 확인하세요.")
             en = ("Measurement and logging block found. Start segment recording with logging." if ready else
@@ -459,7 +472,14 @@ class Runtime:
             report = self._preparation_report(role, "ready" if ready else "attention", ko, en, detail)
             report.update(blocks=details.get("blocks", []), selected_block=block,
                           connected_cfg=details.get("cfg", ""), canoe_pid=details.get("canoe_pid", 0),
-                          detail_ko=detail_ko, detail_en=detail_en)
+                          detail_ko=detail_ko, detail_en=detail_en, readiness_stage=stage,
+                          hardware=details.get("hardware", {}))
+            if stage in {"hardware_mismatch", "hardware_unavailable"}:
+                report.update(message_ko="저장한 장치·포트 기준을 확인하지 못했습니다. 아래 채널 정보를 확인하세요.",
+                              message_en="The saved device/port reference was not verified. Review the channel information below.",
+                              message_zh="无法验证已保存的设备和端口基准。请检查下方通道信息。")
+            else:
+                report["message_zh"] = stage_text(stage, "zh")
             if ready:
                 report.update(next_action_ko="logging으로 구간 기록을 제어하세요. 기록 중에는 CANoe의 기존 로깅 버튼과 "
                               "파일 설정을 함께 조작하지 마세요.",
@@ -558,9 +578,9 @@ class Runtime:
             return report("attention", "네트워크는 확인했지만 캡처 드라이버에서 조회하지 못했습니다. Npcap 설치를 확인하세요.",
                           "The network is visible to Windows but not the capture driver. Check Npcap installation.",
                           connections.get("interface_query_error", "")), connections
-        if not Path(tool["path"]).with_name("capinfos.exe").is_file():
-            return report("attention", "파일 검사 도구 capinfos.exe가 없습니다. Wireshark 설치를 확인하세요.",
-                          "The capinfos.exe inspection tool is missing. Check your Wireshark installation."), connections
+        if not all(Path(tool["path"]).with_name(name).is_file() for name in ("capinfos.exe", "dumpcap.exe")):
+            return report("attention", "capinfos.exe 또는 dumpcap.exe가 없습니다. Wireshark 설치를 확인하세요.",
+                          "The capinfos.exe or dumpcap.exe tool is missing. Check your Wireshark installation."), connections
         result = report("ready", f"{selected['name']} 캡처 준비를 확인했습니다. 패킷 기록은 시작하지 않았습니다.",
                       f"{selected['name']} is available for capture. Recording has not started.", tool["path"]), connections
         result[0].update(next_action_ko="메인에서 Zipy를 선택하고 logging을 누르면 선택한 네트워크 기록을 시작합니다.",
@@ -934,7 +954,8 @@ class Runtime:
                     "file_format": self._settings.ethernet_format, "buffer_mib": "64"}
         key = "can" if role == Role.CAN else "diag"
         return {"cfg_path": getattr(self._settings, key + "_cfg"),
-                "logging_block": getattr(self._settings, key + "_logging_block")}
+                "logging_block": getattr(self._settings, key + "_logging_block"),
+                "hardware_baseline": getattr(self._settings, key + "_hardware_baseline")}
 
     def _request_real(self, roles, action, session_id, parameters=None, **kwargs):
         parameters = parameters or {}

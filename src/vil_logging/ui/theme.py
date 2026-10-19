@@ -130,6 +130,10 @@ QMenu::item:selected { background: #EDF1FF; }
 
 def apply_theme(widget):
     widget.setStyleSheet(STYLE)
+    from PySide6.QtWidgets import QDialog
+    if isinstance(widget, QDialog):
+        from .window_fit import ScreenFit
+        widget._screen_fit = ScreenFit(widget)
 
 
 def refresh_style(widget):

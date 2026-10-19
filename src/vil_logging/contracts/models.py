@@ -71,6 +71,8 @@ class AppSettings:
     diag_cfg: str = ""
     can_logging_block: str = ""
     diag_logging_block: str = ""
+    can_hardware_baseline: str = ""
+    diag_hardware_baseline: str = ""
     nic_id: str = ""
     tshark_path: str = ""
     language: str = "ko"

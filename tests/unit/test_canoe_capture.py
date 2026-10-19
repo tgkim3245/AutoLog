@@ -92,6 +92,18 @@ def test_three_segments_keep_measurement_and_original_configuration(fixture):
     assert Path(params["cfg_path"]).read_bytes() == b"original configuration, never saved by AutoLog"
 
 
+@pytest.mark.parametrize("status", ["mismatch", "unavailable"])
+def test_saved_hardware_reference_blocks_start_when_unverified(fixture, monkeypatch, status):
+    capture, app, params, _ = fixture
+    monkeypatch.setattr("vil_logging.diagnostics.canoe_hardware.inspect_hardware",
+                        lambda *_args: {"status": status})
+    capture.connect(params)
+    app.Measurement.Running = True
+    with pytest.raises(RuntimeError, match="hardware"):
+        capture.prepare({**params, "hardware_baseline": "saved-reference"})
+    assert not app.blocks[0].Trigger.starts
+
+
 def test_existing_configuration_is_never_replaced(fixture):
     capture, app, params, _ = fixture
     app.Configuration.FullName = "C:/unrelated.cfg"

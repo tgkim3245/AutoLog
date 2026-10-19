@@ -1,6 +1,12 @@
 """Simplified Chinese UI catalog. Diagnostic originals and device names stay intact."""
 
 TEXT = {
+    "disconnected_short": "未连接", "measurement_waiting_short": "等待测量",
+    "license_required_short": "需要许可证", "block_required_short": "选择记录块",
+    "block_recording_short": "记录块繁忙", "segment_ready_short": "记录准备",
+    "hardware_mismatch_short": "通道不匹配", "hardware_unavailable_short": "检查通道",
+    "copy": "复制",
+    "events_all": "全部", "events_warning": "警告·错误", "events_error": "错误", "event_copy": "复制详情",
     "title": "日志采集", "subtitle": "CAN · Diag · Zipy 控制", "settings": "设置",
     "packets": "数据包", "environment": "环境检查", "exit": "退出程序", "show": "打开窗口",
     "next_files": "下次采集文件名", "current_files": "正在记录", "previous_files": "上次记录文件",
@@ -125,6 +131,8 @@ SETTINGS = {
 }
 
 EVENTS = {
+    "HISTORY_ARCHIVED": "较早历史已压缩归档，采集文件保留。",
+    "HISTORY_ARCHIVE_FAILED": "历史导出失败，原始历史已保留。",
     "DISK_SPACE_LOW": "可用空间 ≤1 GiB · 请检查保存位置", "DISK_SPACE_RESTORED": "可用空间已恢复",
     "CAPTURE_DROP_REPORTED": "结束文件报告原始丢包 · 请检查记录质量",
     "CAPTURE_SUMMARY_MISMATCH": "文件与解析包数不同 · 请检查记录质量",

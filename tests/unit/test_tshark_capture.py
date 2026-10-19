@@ -101,6 +101,7 @@ def test_full_ui_queue_and_bad_metadata_do_not_stop_stdout_consumption():
     capture = TSharkCapture(queue.Queue(maxsize=1))
     capture.session_id = "owned-session"
     capture.process = SimpleNamespace(stdout=io.BytesIO(row + b"invalid\n" + row * 2))
+    capture._observer = SimpleNamespace(process=capture.process)
     capture._consume_stdout()
     assert capture._parsed == 3 and capture._dropped == 2 and capture._parse_errors == 1
     assert capture.packets.qsize() == 1

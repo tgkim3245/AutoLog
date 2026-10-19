@@ -1,5 +1,6 @@
 """Remembered connection choices and visible connection preparation feedback."""
 
+import json
 import logging
 from collections import deque
 from dataclasses import replace
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from vil_logging import __version__
 from vil_logging.contracts.models import AppSettings, Role, TargetSnapshot
+from vil_logging.diagnostics.canoe_readiness import stage_text
 from vil_logging.storage.naming import NamingError, parse_index
 
 from . import zh_cn
@@ -133,11 +135,14 @@ class SettingsDialog(QDialog):
         self.target_headings: dict[Role, QLabel] = {}
         self.target_subtitles: dict[Role, QLabel] = {}
         self.connection_summaries: dict[Role, QLabel] = {}
+        self.hardware_labels = {}
+        self.hardware_reference_buttons = {}
+        self.hardware_clear_buttons = {}
         self.result_details: dict[Role, QLabel] = {}
         self.next_actions: dict[Role, QLabel] = {}
         self._preparation_cards: dict[Role, QFrame] = {}
         self.setObjectName("settingsDialog")
-        self.setMinimumSize(640, 590)
+        self.setMinimumSize(420, 360)
         self.resize(700, 730)
         apply_theme(self)
         outer = QVBoxLayout(self)
@@ -244,6 +249,8 @@ class SettingsDialog(QDialog):
         outer.addLayout(actions)
         self.tabs.currentChanged.connect(self._sync_network_sampling)
         self.set_settings(self._settings)
+        for form in self.findChildren(QFormLayout):
+            form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
 
     def _t(self, key: str) -> str:
         if self._language == "zh":
@@ -396,6 +403,19 @@ class SettingsDialog(QDialog):
         layout.addWidget(status)
         self.result_details[role] = self._helper()
         layout.addWidget(self.result_details[role])
+        if role != Role.ETHERNET:
+            self.hardware_labels[role] = self._helper()
+            self.hardware_labels[role].setObjectName(role.value + "HardwareStatus")
+            layout.addWidget(self.hardware_labels[role])
+            actions = QHBoxLayout()
+            for storage, clear in ((self.hardware_reference_buttons, False), (self.hardware_clear_buttons, True)):
+                button = QPushButton()
+                button.setProperty("compact", True)
+                button.clicked.connect(lambda _checked=False, r=role, c=clear: self._remember_hardware(r, c))
+                storage[role] = button
+                actions.addWidget(button)
+            actions.addStretch()
+            layout.addLayout(actions)
         self.next_actions[role] = self._helper()
         self.next_actions[role].setObjectName(f"preparation{role.value}NextAction")
         layout.addWidget(self.next_actions[role])
@@ -689,6 +709,7 @@ class SettingsDialog(QDialog):
         report = self._reports.get(role, {})
         status = report.get("status", "neutral")
         title = self._t(status) if status in {"checking", "ready", "attention", "error"} else self._t("unprepared")
+        title = stage_text(report.get("readiness_stage"), self._language) or title
         message = report_text(report, "message", self._language)
         if role in self.preparation_headings:
             heading_key = "can_connection" if role == Role.CAN else "diag_connection" if role == Role.DIAG else "ethernet_connection"
@@ -724,6 +745,46 @@ class SettingsDialog(QDialog):
             summary.setText(f"{caption} · {Path(cfg).name}" + (f" · CANoe PID {pid}" if pid else ""))
             summary.setToolTip(cfg)
             summary.setVisible(bool(cfg))
+            self._render_hardware(role, report)
+
+    def _render_hardware(self, role, report):
+        hardware = report.get("hardware", {})
+        statuses = {
+            "match": ("채널 기준 일치", "Channel reference matches", "通道与基准一致"),
+            "mismatch": ("채널 기준 불일치 · 장치/포트를 확인하세요", "Channel reference mismatch · Check device/port", "通道与基准不匹配 · 请检查设备/端口"),
+            "unreferenced": ("채널 조회됨 · 기준 미설정", "Channels found · No reference saved", "已查询通道 · 尚无基准"),
+            "unavailable": ("하드웨어 확인 불가", "Hardware could not be verified", "无法验证硬件"),
+        }
+        index = {"ko": 0, "en": 1, "zh": 2}[self._language]
+        lines = [statuses.get(hardware.get("status"), statuses["unavailable"])[index]]
+        for channel in hardware.get("channels", []):
+            lines.append(f"CAN {channel['logical']} → {channel['name']} · SN {channel['serial']} · Port {channel['port']}")
+        lines.append(("채널 매핑 확인이며 차량 데이터 수신 확인은 아닙니다.",
+                      "Mapping check only; vehicle data reception is not verified.",
+                      "仅验证通道映射，不代表已收到车辆数据。")[index])
+        label = self.hardware_labels[role]
+        label.setText("\n".join(lines))
+        label.setToolTip(hardware.get("detail", ""))
+        label.setVisible(bool(hardware))
+        remember = self.hardware_reference_buttons[role]
+        remember.setText(("채널 기준 저장", "Save reference", "保存基准")[index])
+        remember.setToolTip(("시험에 사용할 장치·시리얼·포트가 맞는지 확인한 뒤 저장하세요.",
+                             "Confirm this device, serial number and port before saving the reference.",
+                             "请确认设备、序列号和端口后再保存基准。")[index])
+        remember.setVisible(bool(hardware))
+        remember.setEnabled(not self._busy and bool(hardware.get("baseline")) and role not in self._preparing)
+        clear = self.hardware_clear_buttons[role]
+        clear.setText(("기준 해제", "Clear", "清除")[index])
+        clear.setVisible(bool(getattr(self._settings, role.value + "_hardware_baseline")))
+        clear.setEnabled(not self._busy and role not in self._preparing)
+
+    def _remember_hardware(self, role, clear=False):
+        if self._busy or role in self._preparing:
+            return
+        baseline = self._reports.get(role, {}).get("hardware", {}).get("baseline")
+        if clear or baseline:
+            patch = {role.value + "_hardware_baseline": "" if clear else json.dumps(baseline, ensure_ascii=False)}
+            self.preferences_changed.emit(patch)
 
     def set_target(self, target):
         self.targets[target.role] = target

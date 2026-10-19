@@ -142,6 +142,7 @@ def test_receive_loop_delay_and_display_drops_are_independent_of_file_stats():
     row = f"{now - .05}\t\t\t127.0.0.1\t\t127.0.0.1\t\tUDP\t50\n".encode()
     capture = TSharkCapture(queue.Queue(maxsize=1))
     capture.process = SimpleNamespace(stdout=io.BytesIO(row * 3))
+    capture._observer = SimpleNamespace(process=capture.process)
     capture._consume_stdout()
     assert capture._parsed == 3 and capture._dropped == 2
     assert capture._last_delay >= 50 and capture._max_delay >= capture._last_delay

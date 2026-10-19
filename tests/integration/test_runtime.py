@@ -70,6 +70,29 @@ def test_real_mode_cannot_claim_or_start_unvalidated_capture(runtime_factory):
     assert not list(runtime.data_dir.rglob("*.blf"))
 
 
+def test_startup_retention_notice_is_delivered_once_after_history(tmp_path):
+    from vil_logging.contracts.models import AppEvent
+    repo = Repository(tmp_path / "state.sqlite3")
+    repo.load_settings()
+    for _ in range(600):
+        repo.append_event(AppEvent("OLD", timestamp="2020-01-01T00:00:00.000+00:00"))
+    repo.close()
+    runtime = Runtime(tmp_path, demo=True)
+    try:
+        runtime.initialize().result(8)
+        events = []
+        for kind, value in list(runtime.messages.queue):
+            if kind == "events":
+                events.extend(value)
+            elif kind == "event":
+                events.append(value)
+        assert sum(event.code == "HISTORY_ARCHIVED" for event in events) == 1
+        assert [event.code for event in events][500] == "HISTORY_ARCHIVED"
+        assert runtime._notification_loss == 0
+    finally:
+        runtime.close_for_test()
+
+
 def test_failed_ethernet_preparation_without_any_recorder_can_exit(runtime_factory):
     runtime = runtime_factory(demo=False)
     runtime.save_preferences({"tshark_path": "C:/AutoLog-missing-tool/tshark.exe"}).result(5)

@@ -1,4 +1,4 @@
-"""One owned TShark capture, continuously drained metadata, explicit normal stop."""
+"""Dumpcap owns raw recording; TShark decodes a growing file independently."""
 
 import csv
 import io
@@ -11,6 +11,7 @@ from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
 
+from vil_logging.adapters.capture_observer import CaptureObserver
 from vil_logging.adapters.external import external_environment, launch_capture, request_normal_stop
 from vil_logging.contracts.models import PacketSummary
 from vil_logging.diagnostics.capture_quality import CaptureMetrics, validate_buffer
@@ -73,6 +74,7 @@ class TSharkCapture:
     def __init__(self, packets):
         self.packets = packets
         self.process: subprocess.Popen | None = None
+        self._observer = None
         self.session_id = ""
         self.binding: dict = {}
         self.path: Path | None = None
@@ -112,13 +114,18 @@ class TSharkCapture:
             raise ValueError("Unsupported capture format")
         buffer_mib = validate_buffer(params.get("buffer_mib", "64"))
         capinfos = Path(tool["path"]).with_name("capinfos.exe")
+        dumpcap = Path(tool["path"]).with_name("dumpcap.exe")
+        dumpcap_version = _version_response(dumpcap)
+        if dumpcap_version["status"] != "present" or "Dumpcap" not in dumpcap_version.get("stdout", ""):
+            raise ValueError("dumpcap.exe is required for independent raw capture. Check your Wireshark installation.")
         version = _version_response(capinfos)
         if version["status"] != "present" or "Capinfos" not in version.get("stdout", ""):
             raise ValueError("파일 검사 도구 capinfos.exe가 필요합니다. Wireshark 설치를 확인하세요.")
         self.binding = {"tshark_path": tool["path"], "nic_id": selected["id"],
                         "nic_name": selected["name"], "file_format": file_format,
                         "requested_buffer_mib": buffer_mib,
-                        "capinfos_path": str(capinfos), "tool_version": tool["version"]}
+                        "capinfos_path": str(capinfos), "dumpcap_path": str(dumpcap),
+                        "capture_engine": "dumpcap", "decoder": "tshark_growing_file", "tool_version": tool["version"]}
         return self.binding.copy()
 
     def start(self, session_id: str, params: dict, timeout: float = 15) -> dict:
@@ -134,6 +141,9 @@ class TSharkCapture:
             for stream in (self.process.stdout, self.process.stderr):
                 if stream and not stream.closed:
                     stream.close()
+        if self._observer:
+            self._observer.process.stdout.close()
+            self._observer = None
         path = Path(params["temp_path"])
         if path.exists() or path.is_symlink() or not path.parent.is_dir():
             raise ValueError("The private capture path is not empty or its folder is unavailable")
@@ -155,12 +165,13 @@ class TSharkCapture:
             self._monitor = MonitorEngine(session_id=session_id)
             self._monitor_error = str(error)
         self._stop_requested = self._started = False
-        arguments = [self.binding["tshark_path"], "-n", "-l", "-P", "-i", self.binding["nic_id"],
+        arguments = [self.binding["dumpcap_path"], "-q", "-i", self.binding["nic_id"],
                      "-B", str(self.binding.get("requested_buffer_mib", 64)),
-                     "-w", str(path), "-F", self.binding["file_format"], "-T", "fields",
+                     "-w", str(path), "-F", self.binding["file_format"]]
+        decoder = [self.binding["tshark_path"], "-n", "-l", "-r", "-", "-T", "fields",
                      "-E", "separator=/t", "-E", "occurrence=f", "-E", "escape=y"]
         for field in FIELDS:
-            arguments.extend(("-e", field))
+            decoder.extend(("-e", field))
         # Used only by explicit localhost verification; normal capture has no
         # display or capture filter and saves all traffic on the selected NIC.
         if params.get("verification_filter"):
@@ -168,6 +179,10 @@ class TSharkCapture:
                 raise ValueError("Verification filters are restricted to the loopback interface")
             arguments.extend(("-f", params["verification_filter"]))
         self.process = launch_capture(arguments)
+        try:
+            self._observer = CaptureObserver(decoder, path, self.process)
+        except OSError as error:
+            self._read_errors.append("Decoder unavailable: " + str(error))
         self._threads = [threading.Thread(target=self._consume_stdout, daemon=True, name="capture-fields"),
                          threading.Thread(target=self._consume_stderr, daemon=True, name="capture-errors")]
         for thread in self._threads:
@@ -176,7 +191,7 @@ class TSharkCapture:
         header_since = None
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                raise RuntimeError("TShark exited during start: " + self.evidence())
+                raise RuntimeError("Dumpcap exited during start: " + self.evidence())
             ready = self._notice.is_set() and capture_header_ready(path, self.binding["file_format"])
             header_since = (header_since or time.monotonic()) if ready else None
             if header_since and time.monotonic() - header_since >= .15:
@@ -185,12 +200,15 @@ class TSharkCapture:
                     self._monitor_call("activate")
                 return self.stats()
             time.sleep(.02)
-        raise TimeoutError("TShark capture readiness was not confirmed: " + self.evidence())
+        raise TimeoutError("Dumpcap capture readiness was not confirmed: " + self.evidence())
 
     def _consume_stdout(self):
         try:
+            if not self._observer:
+                return
+            stream = self._observer.process.stdout
             discard = False
-            while chunk := self.process.stdout.readline(16_384):
+            while chunk := stream.readline(16_384):
                 complete = chunk.endswith(b"\n")
                 if discard or not complete:
                     if not discard:
@@ -257,7 +275,8 @@ class TSharkCapture:
             stats = {"parsed_packets": self._parsed, "summary_drops": self._dropped,
                      "parse_errors": self._parse_errors, "reader_errors": list(self._read_errors),
                      "last_packet_utc": self._last_packet, "started": self._started,
-                     "monitor": self._monitor_call("snapshot", reader_ok=not self._stdout_eof and not self._read_errors)}
+                     "monitor": self._monitor_call("snapshot", reader_ok=not self._stdout_eof and not self._read_errors
+                                                   and not (self._observer and self._observer.errors))}
             last_delay, max_delay = self._last_delay, self._max_delay
         # Filesystem I/O stays outside the receive lock: slow storage must not
         # stop stdout draining just to update a status panel.
@@ -270,6 +289,12 @@ class TSharkCapture:
                      exit_code=self.process.poll() if self.process else None,
                      temp_path=str(self.path) if self.path else "", session_id=self.session_id,
                      binding=self.binding.copy(), stderr=self.evidence())
+        if self._observer:
+            stats["decoder"] = {"pid": self._observer.process.pid,
+                                "exit_code": self._observer.process.poll(),
+                                "bytes_fed": self._observer.bytes_fed,
+                                "errors": list(self._observer.errors)}
+            stats["reader_errors"].extend(self._observer.errors)
         return stats
 
     def query(self) -> tuple[str, dict]:
@@ -288,12 +313,16 @@ class TSharkCapture:
         if self.process:
             request_normal_stop(self.process)
             self.process.wait(timeout=timeout)
+            if self._observer:
+                self._observer.finish()
             for thread in self._threads:
                 thread.join(timeout=2)
             if any(thread.is_alive() for thread in self._threads):
                 raise TimeoutError("Capture output pipes did not reach EOF")
             self.process.stdout.close()
             self.process.stderr.close()
+            if self._observer:
+                self._observer.process.stdout.close()
         with self._stats_lock:
             self._monitor_call("stop")
         self._metrics.finish()

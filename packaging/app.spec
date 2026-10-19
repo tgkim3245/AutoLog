@@ -12,7 +12,7 @@ license_data = [(str(path), 'licenses') for path in (project_root / 'licenses').
 python_license = Path(sys.base_prefix) / 'LICENSE.txt'
 if python_license.exists():
     license_data.append((str(python_license), 'licenses/Python'))
-for package_name in ('PySide6', 'PySide6_Essentials', 'shiboken6', 'pywin32', 'pyinstaller'):
+for package_name in ('PySide6', 'PySide6_Essentials', 'shiboken6', 'pywin32', 'pyinstaller', 'python-can', 'wrapt'):
     package = distribution(package_name)
     for relative_file in package.files or ():
         filename = str(relative_file).replace('\\', '/')
@@ -30,6 +30,7 @@ a = Analysis(
     excludes=['PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets', 'PySide6.QtPdf',
               'PySide6.QtQml', 'PySide6.QtQuick', 'PySide6.Qt3DCore'],
     noarchive=False,
+    module_collection_mode={'can': 'py'},  # Keep the LGPL library replaceable in the distribution.
 )
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=app_name, debug=False,

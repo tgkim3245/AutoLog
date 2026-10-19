@@ -273,6 +273,9 @@ class CanoeCapture:
                    "automatic_splitting": [name for name in FILE_OPTIONS
                        if self.block is not None and bool(getattr(self.block.FileNameOptions, name))]}
         self._trace("canoe.connected", block=index, measurement_running=details["measurement_running"])
+        from vil_logging.diagnostics.canoe_hardware import inspect_hardware
+        details["hardware"] = inspect_hardware(self.app, self.cfg, params.get("hardware_baseline", ""))
+        self._trace("canoe.hardware_checked", hardware=details["hardware"])
         return details
 
     def prepare(self, params):
@@ -288,6 +291,10 @@ class CanoeCapture:
         self._validate()
         if details["view_only"]:
             raise RuntimeError("CANoe is in View Only mode. Activate a measurement license on the test PC first.")
+        if details["hardware"]["status"] == "mismatch":
+            raise RuntimeError("CAN hardware mapping differs from the saved reference. Check the device and port in Settings.")
+        if params.get("hardware_baseline") and details["hardware"]["status"] == "unavailable":
+            raise RuntimeError("The saved CAN hardware reference cannot be verified. Check the device connection in Settings.")
         if not self.app.Measurement.Running:
             raise RuntimeError("Start measurement in the AutoLog-created CANoe window, then check again. AutoLog does not start measurement.")
         if self.block.Trigger.Active:

@@ -207,6 +207,7 @@ def test_display_queue_overflow_and_closed_packet_window_do_not_drop_monitor_inp
     capture._monitor = monitor
     line = b"1700000000\t\t\t192.0.2.1\t\t192.0.2.100\t\tUDP\t42\n"
     capture.process = SimpleNamespace(stdout=io.BytesIO(line * 100))
+    capture._observer = SimpleNamespace(process=capture.process)
     capture._consume_stdout()
     assert capture._parsed == 100 and capture._dropped == 99
     assert row(monitor)["matched_packets"] == 100
@@ -218,6 +219,7 @@ def test_monitor_exception_never_interrupts_stdout_drain(monkeypatch):
     capture.session_id = "session"
     line = b"1700000000\t\t\t192.0.2.1\t\t192.0.2.100\t\tUDP\t42\n"
     capture.process = SimpleNamespace(stdout=io.BytesIO(line * 100), pid=123, poll=lambda: None)
+    capture._observer = SimpleNamespace(process=capture.process, errors=[], bytes_fed=0)
 
     def broken(*args):
         raise RuntimeError("injected monitor fault")

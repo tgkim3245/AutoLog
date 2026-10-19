@@ -1,5 +1,6 @@
 """Compact control panel with request-only signals to application services."""
 
+import json
 import logging
 from collections import deque
 from dataclasses import replace
@@ -9,7 +10,9 @@ from pathlib import Path
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -19,6 +22,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QPushButton,
+    QScrollArea,
     QStyle,
     QSystemTrayIcon,
     QToolButton,
@@ -36,6 +40,7 @@ from vil_logging.contracts.models import (
     SessionPhase,
     TargetSnapshot,
 )
+from vil_logging.diagnostics.canoe_readiness import stage_text
 from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.naming import capture_prefix
 
@@ -48,6 +53,7 @@ from .quality_dialog import QualityDialog
 from .recovery_dialog import RecoveryDialog
 from .settings_dialog import SettingsDialog
 from .theme import COLOR, STYLE, ThemedCheckBox, apply_theme, refresh_style
+from .window_fit import ScreenFit
 
 logger = logging.getLogger(__name__)
 
@@ -139,14 +145,22 @@ class MainWindow(QMainWindow):
         self._last_file_result = None
         self._recovery_report = {}
         self._preparation_report: dict = {}
+        self._preparation_reports: dict = {}
         self._discovery_report: dict = {}
         self.setObjectName("mainWindow")
-        self.setFixedWidth(480)
+        self.resize(480, 760)
+        self.setMinimumWidth(360)
         apply_theme(self)
         self.setStyleSheet(STYLE + MAIN_STYLE)
         self.setWindowIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
         root = QWidget()
-        self.setCentralWidget(root)
+        self.main_scroll = QScrollArea()
+        self.main_scroll.setObjectName("mainScrollArea")
+        self.main_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.main_scroll.setWidgetResizable(True)
+        self.main_scroll.setWidget(root)
+        self.setCentralWidget(self.main_scroll)
+        self._screen_fit = ScreenFit(self)
         outer = QVBoxLayout(root)
         outer.setContentsMargins(18, 15, 18, 14)
         outer.setSpacing(9)
@@ -293,13 +307,25 @@ class MainWindow(QMainWindow):
         file_layout.addLayout(rename_row)
         self.file_feedback = _label(variant="helper")
         self.file_feedback.setWordWrap(True)
-        self.file_feedback.setFixedHeight(32)
+        self.file_feedback.setMinimumHeight(32)
         file_layout.addWidget(self.file_feedback)
         outer.addWidget(file_frame)
         event_row = QHBoxLayout()
         self.event_heading = _label(variant="section")
         self.event_count = _label(variant="helper")
         event_row.addWidget(self.event_heading, 1)
+        self.event_filter = QComboBox()
+        self.event_filter.setObjectName("eventFilter")
+        for key in ("all", "warning", "error"):
+            self.event_filter.addItem("", key)
+        self.event_filter.currentIndexChanged.connect(self._render_events)
+        event_row.addWidget(self.event_filter)
+        self.event_copy = QPushButton()
+        self.event_copy.setObjectName("copyEventButton")
+        self.event_copy.setProperty("compact", True)
+        self.event_copy.setEnabled(False)
+        self.event_copy.clicked.connect(self._copy_event)
+        event_row.addWidget(self.event_copy)
         event_row.addWidget(self.event_count)
         outer.addLayout(event_row)
         self.event_list = QListWidget()
@@ -307,6 +333,8 @@ class MainWindow(QMainWindow):
         self.event_list.setWordWrap(True)
         self.event_list.setFixedHeight(108)
         self.event_list.setAccessibleName("Notifications and capture events")
+        self.event_list.itemSelectionChanged.connect(
+            lambda: self.event_copy.setEnabled(bool(self.event_list.selectedItems())))
         self.event_empty = _label(variant="helper")
         self.event_empty.setParent(self.event_list.viewport())
         self.event_empty.setGeometry(8, 31, 410, 24)
@@ -420,6 +448,10 @@ class MainWindow(QMainWindow):
         if self._last_file_result:
             self.set_file_result(self._last_file_result)
         self.event_heading.setText(tr("events", language))
+        for index, key in enumerate(("all", "warning", "error")):
+            self.event_filter.setItemText(index, tr("events_" + key, language))
+        self.event_copy.setText(tr("copy", language))
+        self.event_copy.setToolTip(tr("event_copy", language))
         self.event_empty.setText(tr("events_empty", language))
         self.target_heading.setText(tr("capture_targets", language))
         self.bug_report_button.setText(tr("bug_report", language))
@@ -479,9 +511,11 @@ class MainWindow(QMainWindow):
     def set_preparation_report(self, report: dict):
         """Display the most recent preparation action in the current display language."""
         self._preparation_report = dict(report)
+        self._preparation_reports[Role(report["role"])] = dict(report)
         if hasattr(self.settings_dialog, "set_preparation_report"):
             self.settings_dialog.set_preparation_report(report)
         self._render_readiness()
+        self.set_target(self._targets[Role(report["role"])])
 
     def _render_readiness(self):
         count = len(self.selected_roles())
@@ -552,6 +586,13 @@ class MainWindow(QMainWindow):
         state = self.target_states[target.role]
         state_key = "phase_short_" + value if value in ("starting", "recording", "stopping") else value
         state.setText(tr(state_key, self._language))
+        if self.width() < 420 and value == "disconnected":
+            state.setText(tr("disconnected_short", self._language))
+        if not active and target.connection.value != "connecting":
+            stage = self._preparation_reports.get(target.role, {}).get("readiness_stage")
+            if stage:
+                state.setText(tr(stage + "_short", self._language) if self.width() < 420 else
+                              stage_text(stage, self._language).split(" · ")[-1])
         state.setToolTip(target.evidence)
         tone = (
             "error" if value in ("error", "unknown")
@@ -685,13 +726,14 @@ class MainWindow(QMainWindow):
         self.file_manager.set_result(result)
 
     def add_event(self, event: AppEvent):
+        if len(self._events) == 500 and self.event_list.count():
+            if self.event_list.item(0).data(Qt.ItemDataRole.UserRole) == self._events[0]:
+                self.event_list.takeItem(0)
         self._events.append(event)
-        self._append_event_item(event)
-        while self.event_list.count() > 500:
-            self.event_list.takeItem(0)
+        if self._event_visible(event):
+            self._append_event_item(event)
         self.event_list.scrollToBottom()
-        self.event_count.setText(tr("event_count", self._language).format(count=len(self._events)))
-        self.event_empty.setVisible(not self._events)
+        self._event_counter()
         if event.code == "SETTINGS_ERROR":
             self.settings_dialog.set_error(render_event(event, self._language))
             self.monitor_dialog.set_error(render_event(event, self._language, include_details=False))
@@ -700,6 +742,7 @@ class MainWindow(QMainWindow):
 
     def _append_event_item(self, event: AppEvent):
         item = QListWidgetItem(render_event(event, self._language, include_details=False))
+        item.setData(Qt.ItemDataRole.UserRole, event)
         item.setToolTip(f"{event.timestamp}\n{event.code}\n{render_event(event, self._language)}")
         color = {
             "ERROR": COLOR["error"], "CRITICAL": COLOR["error"], "WARNING": COLOR["attention"]
@@ -710,11 +753,31 @@ class MainWindow(QMainWindow):
     def _render_events(self):
         self.event_list.clear()
         for event in self._events:
-            self._append_event_item(event)
+            if self._event_visible(event):
+                self._append_event_item(event)
         if self.event_list.count():
             self.event_list.scrollToBottom()
-        self.event_count.setText(tr("event_count", self._language).format(count=len(self._events)))
-        self.event_empty.setVisible(not self._events)
+        self._event_counter()
+
+    def _event_visible(self, event):
+        mode = self.event_filter.currentData()
+        return mode == "all" or event.level.upper() in (
+            {"WARNING", "ERROR", "CRITICAL"} if mode == "warning" else {"ERROR", "CRITICAL"})
+
+    def _event_counter(self):
+        self.event_count.setText(f"{self.event_list.count()} / {len(self._events)} / 500"
+                                if self.event_filter.currentData() != "all" else
+                                tr("event_count", self._language).format(count=len(self._events)))
+        self.event_empty.setVisible(not self.event_list.count())
+
+    def _copy_event(self):
+        items = self.event_list.selectedItems()
+        if items:
+            event = items[0].data(Qt.ItemDataRole.UserRole)
+            QApplication.clipboard().setText(
+                f"{event.timestamp}\n{event.level} {event.target} {event.code}\n"
+                f"{render_event(event, self._language)}\n{event.original}\n"
+                + json.dumps(event.params, ensure_ascii=False, indent=2, default=str))
 
     def set_debug_status(self, path: str = "", error: str = ""):
         self._debug_path = path
@@ -746,3 +809,14 @@ class MainWindow(QMainWindow):
         logger.debug("Main window close requested; requesting orderly application exit; phase=%s",
                      self._phase.value)
         self.exit_requested.emit()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "eyebrow"):
+            self.eyebrow.setText(f"AUTOLOG · {__version__}" if self.width() < 450 else
+                                  f"AUTOLOG / LOGGING CONTROL · {__version__}")
+        for label in getattr(self, "target_formats", {}).values():
+            label.setVisible(self.width() >= 420)
+        if hasattr(self, "settings_dialog"):
+            for target in list(self._targets.values()):
+                self.set_target(target)

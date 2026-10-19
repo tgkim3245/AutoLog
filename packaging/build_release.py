@@ -81,7 +81,7 @@ def check_environment() -> dict[str, str]:
     if sys.version_info[:2] != (3, 14):
         raise RuntimeError("This project requires Python 3.14.")
     packages = {}
-    for name in ("PyInstaller", "PySide6", "pywin32"):
+    for name in ("PyInstaller", "PySide6", "pywin32", "python-can", "wrapt"):
         try:
             packages[name] = version(name)
         except PackageNotFoundError as error:

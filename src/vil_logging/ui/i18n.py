@@ -21,6 +21,19 @@ def report_text(report: dict, key: str, language: str, default="") -> str:
     return report.get(key + "_" + language, default)
 
 TEXT = {
+    "disconnected_short": ("미연결", "Offline"),
+    "measurement_waiting_short": ("측정 대기", "Start meas."),
+    "license_required_short": ("라이선스 필요", "License"),
+    "block_required_short": ("블록 선택", "Select block"),
+    "block_recording_short": ("기존 기록 중", "Block busy"),
+    "segment_ready_short": ("기록 준비", "Ready"),
+    "hardware_mismatch_short": ("채널 불일치", "HW differs"),
+    "hardware_unavailable_short": ("채널 확인", "Check HW"),
+    "copy": ("복사", "Copy"),
+    "events_all": ("전체", "All"),
+    "events_warning": ("경고·오류", "Warnings+"),
+    "events_error": ("오류", "Errors"),
+    "event_copy": ("상세 복사", "Copy details"),
     "quality": ("기록 품질", "Quality"),
     "title": ("로그 캡처", "Log capture"),
     "subtitle": ("CAN · Diag · Zipy 통합 제어", "CAN · Diag · Zipy controls"),
@@ -267,6 +280,8 @@ TEXT.update({
 })
 
 EVENTS = {
+    "HISTORY_ARCHIVED": ("오래된 이력을 압축 보관했습니다. 캡처 파일은 유지됩니다.", "Older history archived. Capture files are retained."),
+    "HISTORY_ARCHIVE_FAILED": ("이력 내보내기에 실패해 원래 이력을 유지했습니다.", "History export failed; original history was retained."),
     "DISK_SPACE_LOW": ("저장 공간 1 GiB 이하 · 저장 위치 확인 필요", "Free disk space ≤1 GiB · check output location"),
     "DISK_SPACE_RESTORED": ("저장 공간 여유 회복", "Free disk space recovered"),
     "CAPTURE_DROP_REPORTED": ("종료 파일에서 원본 패킷 누락 통계 확인 · 기록 품질 확인", "Closed file reports packet drops · review capture quality"),
