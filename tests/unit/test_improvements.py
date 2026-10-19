@@ -17,7 +17,8 @@ from vil_logging.ui.window_fit import fit_window
 
 def hardware_app():
     return SimpleNamespace(ChannelMappingName="CANoe", Configuration=SimpleNamespace(
-        GeneralSetup=SimpleNamespace(Channels=lambda bus: 2), DistributedMode=False))
+        GeneralSetup=SimpleNamespace(Channels=lambda bus: 2),
+        DistributedMode=SimpleNamespace(RTServer="", Connected=0)))
 
 
 @pytest.fixture
@@ -66,7 +67,7 @@ def test_hardware_unknown_is_never_verified(mode, tmp_path):
     if mode == "missing_api":
         app = SimpleNamespace()
     elif mode == "remote":
-        app.Configuration.DistributedMode = True
+        app.Configuration.DistributedMode = SimpleNamespace(RTServer="test-target", Connected=1)
     elif mode == "virtual":
         def query(*args):
             rows = channels(*args)
@@ -77,6 +78,27 @@ def test_hardware_unknown_is_never_verified(mode, tmp_path):
             raise OSError("driver missing")
     report = inspect_hardware(app, tmp_path / "can.cfg", query=query)
     assert report["status"] == "unavailable" and "baseline" not in report
+
+
+@pytest.mark.parametrize("server,connected", [("", 1), ("test-target", 0), ("test-target", 1)])
+def test_remote_target_never_queries_local_driver(tmp_path, server, connected):
+    app = hardware_app()
+    app.Configuration.DistributedMode = SimpleNamespace(RTServer=server, Connected=connected)
+    def forbidden(*args):
+        pytest.fail("Remote target must not use the local XL mapping")
+    report = inspect_hardware(app, tmp_path / "can.cfg", query=forbidden)
+    assert report["status"] == "unavailable" and "baseline" not in report
+    assert report["distributed_mode"] == {"server": server, "connected": connected}
+
+
+@pytest.mark.parametrize("mode", [True, None, SimpleNamespace(RTServer=None, Connected=0),
+                                   SimpleNamespace(RTServer="", Connected="unknown")])
+def test_unreadable_distributed_state_cannot_claim_local_mapping(tmp_path, mode):
+    app = hardware_app()
+    app.Configuration.DistributedMode = mode
+    def forbidden(*args):
+        pytest.fail("Unknown target must not use the local XL mapping")
+    assert inspect_hardware(app, tmp_path / "can.cfg", query=forbidden)["status"] == "unavailable"
 
 
 def test_cfg_change_clears_hardware_reference(tmp_path):

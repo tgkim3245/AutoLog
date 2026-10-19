@@ -9,6 +9,7 @@ from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 
+from vil_logging.diagnostics.canoe_measurement import measurement_diagnostics
 from vil_logging.diagnostics.canoe_setup import CanoeActivationError
 from vil_logging.storage.blf import inspect_blf
 from vil_logging.storage.file_access import ExclusiveFile, observe
@@ -55,7 +56,7 @@ def _identity(obj):
     if hasattr(obj, "_oleobj_"):
         import pythoncom
         return obj._oleobj_.QueryInterface(pythoncom.IID_IUnknown)
-    return obj  # Test doubles, with the same identity checks as the real objects.
+    return obj  # Test doubles expose stable identity just like an unchanged COM model.
 
 
 class CanoeCapture:
@@ -73,6 +74,7 @@ class CanoeCapture:
         self.journal = deque(maxlen=40)
         self.emit_trace = None
         self._output_snapshot = None
+        self._selection = None
         self.output_restore_error = ""
 
     def _trace(self, event, **fields):
@@ -93,9 +95,65 @@ class CanoeCapture:
         if self.app is None or not _same_path(self.app.Configuration.FullName, self.cfg):
             raise RuntimeError("CANoe configuration changed or window closed. Reconnect while measurement is stopped.")
         if self.block is not None:
-            current = self.app.Configuration.OnlineSetup.LoggingCollection.Item(self.index)
-            if _identity(current) != _identity(self.block):
-                raise RuntimeError("Logging block changed. Reconnect and select the intended block again.")
+            collection = self.app.Configuration.OnlineSetup.LoggingCollection
+            count = int(collection.Count)
+            expected = self._selection
+            if expected is None or count != len(expected["blocks"]):
+                self._trace("canoe.block_validation_failed", reason="block_count_changed", count=count,
+                            block=self.index, expected=expected)
+                raise RuntimeError("Logging block layout changed. Reconnect and select the intended block again.")
+            current = collection.Item(self.index)
+            name = str(current.Name)
+            if name != expected["blocks"][self.index - 1]["name"]:
+                self._trace("canoe.block_validation_failed", reason="block_layout_changed", count=count,
+                            block=self.index, observed_name=name, expected=expected)
+                raise RuntimeError("Logging block layout changed. Reconnect and select the intended block again.")
+            try:
+                same_identity = _identity(current) == _identity(self.block)
+            except Exception as error:
+                same_identity = False
+                self._trace("canoe.block_identity_unavailable", error=str(error))
+            idle = self._output_snapshot is None and (not self.attempted or self.stop_confirmed)
+            if not same_identity:
+                observed = []
+                for i in range(1, count + 1):
+                    item = collection.Item(i)
+                    observed.append({"name": str(item.Name), "path": str(item.FullName)})
+                options = {key: bool(getattr(current.FileNameOptions, key)) for key in FILE_OPTIONS}
+                selected = expected["blocks"][self.index - 1]
+                unique = observed.count(selected) == 1
+                # Starting measurement or applying channel mapping can rebuild
+                # idle COM objects. Rebind only the exact, unambiguous selection.
+                # Never adopt a replacement during output ownership/recording.
+                if not idle or observed != expected["blocks"] or options != expected["options"] or not unique:
+                    self._trace("canoe.block_validation_failed", reason="identity_or_selection_changed",
+                                idle=idle, expected=expected, observed=observed, options=options,
+                                measurement_running=bool(self.app.Measurement.Running))
+                    raise RuntimeError("Logging block changed. Reconnect and select the intended block again.")
+                self.block = current
+                self._trace("canoe.idle_block_reacquired", block=self.index, name=name,
+                            measurement_running=bool(self.app.Measurement.Running))
+
+    def record_failure(self, action, error):
+        """Best-effort read-only failure evidence; never mask the command error."""
+        observed = {}
+        try:
+            observed["cfg"] = str(self.app.Configuration.FullName)
+            observed["measurement_running"] = bool(self.app.Measurement.Running)
+            observed["measurement_diagnostics"] = measurement_diagnostics(self.app, observed["measurement_running"])
+        except Exception as diagnostic_error:
+            observed["observation_error"] = str(diagnostic_error)
+        try:
+            collection = self.app.Configuration.OnlineSetup.LoggingCollection
+            observed["block_count"] = int(collection.Count)
+            if 0 < self.index <= observed["block_count"]:
+                block = collection.Item(self.index)
+                observed["block"] = {"name": str(block.Name), "path": str(block.FullName),
+                                     "trigger_active": bool(block.Trigger.Active)}
+        except Exception as diagnostic_error:
+            observed["block_observation_error"] = str(diagnostic_error)
+        self._trace("canoe.command_failed", action=action, error=str(error), block=self.index,
+                    canoe_pid=self.canoe_pid, observed=observed)
 
     def _require_single_file(self):
         options = self.block.FileNameOptions
@@ -263,6 +321,9 @@ class CanoeCapture:
             index = 0
         self.index = index
         self.block = collection.Item(index) if index else None
+        self._selection = {"blocks": [{"name": item["name"], "path": item["path"]} for item in blocks],
+                           "options": {key: bool(getattr(self.block.FileNameOptions, key)) for key in FILE_OPTIONS}
+                           } if self.block is not None else None
         self.session_id, self.path = "", None
         self.attempted = self.stop_confirmed = False
         details = {**self.stats(), "blocks": blocks, "selected_block": str(index) if index else "",
@@ -272,7 +333,10 @@ class CanoeCapture:
                    "trigger_active": bool(self.block.Trigger.Active) if self.block is not None else None,
                    "automatic_splitting": [name for name in FILE_OPTIONS
                        if self.block is not None and bool(getattr(self.block.FileNameOptions, name))]}
+        details["measurement_diagnostics"] = measurement_diagnostics(self.app, details["measurement_running"])
         self._trace("canoe.connected", block=index, measurement_running=details["measurement_running"])
+        if not details["measurement_running"]:
+            self._trace("canoe.measurement_waiting", measurement_diagnostics=details["measurement_diagnostics"])
         from vil_logging.diagnostics.canoe_hardware import inspect_hardware
         details["hardware"] = inspect_hardware(self.app, self.cfg, params.get("hardware_baseline", ""))
         self._trace("canoe.hardware_checked", hardware=details["hardware"])
@@ -280,7 +344,8 @@ class CanoeCapture:
 
     def prepare(self, params):
         # A logging click is not consent to replace the previously selected
-        # block. Validate the old COM identity before connect refreshes it.
+        # block. Validate the selection before connect refreshes it, allowing
+        # a verified idle model rebuild after the user's CANoe preparation.
         # Explicit connection checks can deliberately adopt a new selection.
         if self.app is not None:
             self._validate()
@@ -296,7 +361,14 @@ class CanoeCapture:
         if params.get("hardware_baseline") and details["hardware"]["status"] == "unavailable":
             raise RuntimeError("The saved CAN hardware reference cannot be verified. Check the device connection in Settings.")
         if not self.app.Measurement.Running:
-            raise RuntimeError("Start measurement in the AutoLog-created CANoe window, then check again. AutoLog does not start measurement.")
+            diagnostics = details["measurement_diagnostics"]
+            self._trace("canoe.preparation_blocked", reason="measurement_not_running",
+                        measurement_diagnostics=diagnostics)
+            missing = ", ".join(diagnostics["missing_options"])
+            history = f" CANoe Write history reports missing options: {missing} (may be an earlier attempt)." if missing else ""
+            raise RuntimeError("Start measurement (F9) in the AutoLog-created CANoe window after checking channel mapping "
+                               "and all bus-option licenses required by this cfg. If F9 fails, review CANoe's Write window. "
+                               "Confirm CAN reception in Trace, then check the connection again." + history)
         if self.block.Trigger.Active:
             raise RuntimeError("The selected Logging Block is already recording. Stop it manually before AutoLog starts a new segment.")
         self._trace("canoe.prepared", block=self.index)

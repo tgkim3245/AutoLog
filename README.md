@@ -2,7 +2,7 @@
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 공통 logging 버튼으로 기록을 제어합니다.
 
-현재 소스 버전은 **0.9.0**입니다. [사용성·채널 확인·캡처 분리 변경](docs/usability_update_0_9_0.md), [개선 항목별 상태](docs/improvement_backlog.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md)를 확인하세요. CAN과 Diag의 **연결 확인**은 각 .cfg를 별도 CANoe 창에 연결하고 구성 열기·측정 대기·구간 기록 준비를 구분합니다. 로컬 Vector 장치의 채널을 조회할 수 있으면 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교합니다. 조회 불가와 실제 수신 성공은 구분합니다. 이전 [전체 검토](docs/project_audit_0_8_6.md), [자동 독립 연결](docs/canoe_independent_connection.md), [개발 안내](CONTRIBUTING.md)도 참고하세요.
+현재 소스 버전은 **0.9.1**입니다. [CANoe 현장 오류 수정](docs/canoe_fixes_0_9_1.md), 이전 [사용성·채널 확인·캡처 분리 변경](docs/usability_update_0_9_0.md), [개선 항목별 상태](docs/improvement_backlog.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md)를 확인하세요. CAN과 Diag의 **연결 확인**은 각 .cfg를 별도 CANoe 창에 연결하고 구성 열기·측정 대기·구간 기록 준비를 구분합니다. 로컬 Vector 장치의 채널을 조회할 수 있으면 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교합니다. 조회 불가와 실제 수신 성공은 구분합니다. 이전 [전체 검토](docs/project_audit_0_8_6.md), [자동 독립 연결](docs/canoe_independent_connection.md), [개발 안내](CONTRIBUTING.md)도 참고하세요.
 
 **기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
 
@@ -14,7 +14,9 @@ dumpcap이 원본 파일을 직접 기록하고 TShark는 저장 중인 파일�
 
 비정상 종료 후에는 메인의 **미완료 확인 N건** 또는 **파일 관리 → 미완료 기록 복구**에서 파일을 검토합니다. 외부 기록 종료를 직접 확인한 뒤 **검사 후 보관**하거나 **파일 유지하고 미완료 정리**할 수 있습니다. 파일과 소비한 번호를 유지하며 복구 세션은 실패 이력으로 남깁니다.
 
-CAN과 Diag는 각각 하나의 .cfg와 그 안의 BLF 기록 블록 하나를 사용합니다. AutoLog가 첫 연결에서 필요한 CANoe 독립 COM 모드를 자동 준비하며, 원본 can.ini는 같은 폴더에 백업합니다. 이미 기본 COM 모드로 실행된 CANoe가 있으면 최초 한 번 작업을 저장하고 모든 CANoe 창을 닫은 뒤 연결 확인을 다시 누르세요. 이후 두 구성은 자동으로 각각 열립니다. 설정은 해당 CANoe 설치 전체에 유지되며 다른 COM 도구·ActiveX/.NET 패널도 영향을 받을 수 있습니다. 대표 구성과 실제 버튼 경로의 두 프로세스·정확한 cfg 연결을 CANoe 19.3.118에서 확인했습니다. 마지막 실제 연결 시험은 **View Only** 상태였으며, 라이선스 활성화 후 실제 구간 기록·장비 검증이 남아 있습니다.
+CAN과 Diag는 각각 하나의 .cfg와 그 안의 BLF 기록 블록 하나를 사용합니다. AutoLog가 첫 연결에서 필요한 CANoe 독립 COM 모드를 자동 준비하며, 원본 can.ini는 같은 폴더에 백업합니다. 이미 기본 COM 모드로 실행된 CANoe가 있으면 최초 한 번 작업을 저장하고 모든 CANoe 창을 닫은 뒤 연결 확인을 다시 누르세요. 이후 두 구성은 자동으로 각각 열립니다. 설정은 해당 CANoe 설치 전체에 유지되며 다른 COM 도구·ActiveX/.NET 패널도 영향을 받을 수 있습니다. 대표 구성과 실제 버튼 경로의 두 프로세스·정확한 cfg 연결을 CANoe 19.3.118에서 확인했습니다. 0.9.0 현장 시도에서도 서로 다른 PID의 연결을 확인했으나 실제 기록 준비에서 차단됐습니다. 사용자가 CANoe에서 확인한 `Ethernet (missing)`은 선택한 cfg가 요구하는 버스 옵션 문제이며 채널 매핑과 별도로 확인해야 합니다. 실제 BLF 구간 기록 성공은 아직 검증하지 못했습니다.
+
+AutoLog로 cfg를 연 뒤 해당 CANoe 창에서 채널 매핑과 cfg에 필요한 모든 버스 옵션의 라이선스를 확인하고 **F9 측정 실행 → Trace 수신 확인 → AutoLog 연결 확인** 순서로 준비하세요. 측정 실패 시 CANoe Write 창의 오류를 확인합니다. BLF 블록만 선택하거나 AutoLog의 Zipy를 해제해도 cfg의 Ethernet 요구 사항이 없어지지는 않습니다. 원본 cfg와 라이선스 설정은 AutoLog가 변경하지 않습니다.
 
 ## 폴더와 Git 관리 범위
 

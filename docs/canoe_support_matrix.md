@@ -7,6 +7,8 @@ AutoLog 버전별 실제 근거를 관리한다. 이전 버전에서 구성 연�
 | 0.8.4 | 19.3.118 | View Only | 확인하지 않음 | CAN · CAN_Logging / Diag · Logging | 두 PID·cfg 대조 통과 | 미실행 | [독립 연결 시험](canoe_independent_connection.md) |
 | 0.8.6 | 설치 타입 정보만 조회 | 새로 확인하지 않음 | 확인하지 않음 | 이전 대표 cfg의 구현 경로 검토 | 이전 근거만 있음 | 미실행 | [전체 검토](project_audit_0_8_6.md) |
 | 0.9.0 | CANoe 19 COM 타입 정보 기준 | 현장 시험 대기 | 로컬 XL 매핑 조회·시리얼/포트 기준 비교 구현, 실제 VN 실증 대기 | CAN·Diag 각각 BLF 블록 하나 | 실제 장비 재시험 대기 | 미실행 | [시험 절차](licensed_canoe_validation.md) |
+| 0.9.0 현장 시도 | 19.3.118 /pro CAN.LIN | CAN available / Ethernet missing (사용자 제공 Write 오류) | VN 상세 미확인, 기존 분산 판정 오류로 채널 조회 불가 | CAN · CAN_Logging / Diag · Logging | 서로 다른 PID로 cfg 연결 | 준비 실패 · start 명령 미전송 | [두 리포트 분석](canoe_fixes_0_9_1.md) |
+| 0.9.1 | 설치된 CANoe 19 타입 정보·COM 대역 | 실제 측정 미실행 | 로컬/원격 판정 수정, 실제 VN 재시험 대기 | 블록 갱신·교체 구분 대역 검사 | 이전 현장 연결 근거만 있음 | 미실행 | [수정·검증 범위](canoe_fixes_0_9_1.md) |
 
 ## 새 시험 결과 추가 규칙
 

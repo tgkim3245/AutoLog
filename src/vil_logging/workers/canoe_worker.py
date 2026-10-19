@@ -53,6 +53,7 @@ def canoe_worker_main(role, pipe):
                     raise ValueError("Unsupported CANoe command")
                 pipe.send(CommandResult(command, True, state, evidence, os.getpid(), details=details))
             except Exception as error:
+                capture.record_failure(command.action, error)
                 details = capture.stats()
                 issue = getattr(error, "connection_issue", "")
                 if issue:

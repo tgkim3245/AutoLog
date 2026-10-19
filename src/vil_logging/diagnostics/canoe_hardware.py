@@ -71,8 +71,15 @@ def inspect_hardware(app, cfg, baseline="", *, query=_xl_mapping):
             raise ValueError("CAN channel count or application mapping name is unavailable")
         report["application"] = application
         # Remote/VTP mappings cannot be inferred from this PC's local XL driver.
-        if bool(app.Configuration.DistributedMode):
-            raise ValueError("Distributed CANoe hardware must be checked on its target device")
+        mode = app.Configuration.DistributedMode
+        # CANoe returns IDistributedMode, not a Boolean. The COM object itself
+        # is truthy even for a local configuration (RTServer="", Connected=0).
+        server, connected = mode.RTServer, mode.Connected
+        if not isinstance(server, str) or not isinstance(connected, int):
+            raise ValueError("CANoe distributed-mode state could not be determined")
+        report["distributed_mode"] = {"server": server.strip(), "connected": connected}
+        if server.strip() or connected:
+            raise ValueError("Remote CANoe target is configured or connected; check hardware on that target")
         channels = query(application, count)
         report["channels"] = channels
         if len(channels) != count or any(not c["physical"] or c["config_error"] for c in channels):

@@ -448,38 +448,30 @@ class Runtime:
                 key = ("can" if role == Role.CAN else "diag") + "_logging_block"
                 self._settings = self._repo.save_preferences({key: block})
                 self._publish("settings", self._settings)
-            from vil_logging.diagnostics.canoe_readiness import readiness_stage, stage_text
+            from vil_logging.diagnostics.canoe_readiness import (
+                option_history_text,
+                readiness_stage,
+                stage_guidance,
+            )
             stage = readiness_stage(details)
             ready = stage == "segment_ready"
-            ko = ("측정 실행과 기록 블록을 확인했습니다. logging으로 구간 기록을 시작하세요." if ready else
-                  "기록 블록을 선택하고, AutoLog가 연 CANoe 창에서 측정을 시작한 뒤 다시 확인하세요.")
-            en = ("Measurement and logging block found. Start segment recording with logging." if ready else
-                  "Select a logging block and start measurement in the CANoe window opened by AutoLog, then check again.")
-            if details.get("view_only"):
-                ko = "CANoe가 View Only 상태라 측정할 수 없습니다. 시험 PC에서 CANoe 라이선스를 활성화한 뒤 다시 확인하세요."
-                en = "CANoe is in View Only mode. Activate a measurement license on the test PC, then check again."
-            elif details.get("selection_error"):
-                ko = "기억한 기록 블록을 사용할 수 없습니다. 위 목록에서 BLF 블록을 다시 선택하세요."
-                en = details["selection_error"]
-            elif details.get("trigger_active"):
-                ko = "선택한 Logging Block이 이미 기록 중입니다. CANoe에서 해당 블록의 기록을 끝낸 뒤 다시 확인하세요."
-                en = "The selected Logging Block is already recording. Stop that block in CANoe, then check again."
+            ko, en = (stage_guidance(stage, language) for language in ("ko", "en"))
             detail_ko = ("기록 중에는 CANoe의 기존 로깅 버튼·파일 설정을 함께 조작하지 마세요. "
                          "AutoLog는 선택 블록의 경로·자동 번호 옵션을 구간 동안 적용하고 정지 후 복구합니다.") if block else ""
             detail_en = ("Avoid concurrent CANoe logging controls or filename edits. AutoLog temporarily manages "
                          "this block's path and filename options, then restores them after stop.") if block else ""
+            detail_zh = ("记录期间请勿同时操作 CANoe 的记录控制或修改文件名。AutoLog 会临时管理此块的路径和文件名选项，停止后恢复。") if block else ""
+            diagnostics = details.get("measurement_diagnostics", {})
+            detail_ko = "\n".join(filter(None, (option_history_text(diagnostics, "ko"), detail_ko)))
+            detail_en = "\n".join(filter(None, (option_history_text(diagnostics, "en"), detail_en)))
+            detail_zh = "\n".join(filter(None, (option_history_text(diagnostics, "zh"), detail_zh)))
             detail = detail_ko if self._settings.language == "ko" else detail_en
             report = self._preparation_report(role, "ready" if ready else "attention", ko, en, detail)
             report.update(blocks=details.get("blocks", []), selected_block=block,
                           connected_cfg=details.get("cfg", ""), canoe_pid=details.get("canoe_pid", 0),
-                          detail_ko=detail_ko, detail_en=detail_en, readiness_stage=stage,
-                          hardware=details.get("hardware", {}))
-            if stage in {"hardware_mismatch", "hardware_unavailable"}:
-                report.update(message_ko="저장한 장치·포트 기준을 확인하지 못했습니다. 아래 채널 정보를 확인하세요.",
-                              message_en="The saved device/port reference was not verified. Review the channel information below.",
-                              message_zh="无法验证已保存的设备和端口基准。请检查下方通道信息。")
-            else:
-                report["message_zh"] = stage_text(stage, "zh")
+                          detail_ko=detail_ko, detail_en=detail_en, detail_zh=detail_zh, readiness_stage=stage,
+                          hardware=details.get("hardware", {}), measurement_diagnostics=diagnostics,
+                          message_zh=stage_guidance(stage, "zh"))
             if ready:
                 report.update(next_action_ko="logging으로 구간 기록을 제어하세요. 기록 중에는 CANoe의 기존 로깅 버튼과 "
                               "파일 설정을 함께 조작하지 마세요.",

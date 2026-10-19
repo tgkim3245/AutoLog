@@ -331,3 +331,24 @@ def test_missing_npcap_is_reported_before_asking_for_a_network(runtime_factory, 
     event = wait_for_message(runtime, "event", lambda value: value.code == "TARGET_ATTENTION")
     assert event.level == "INFO"
     assert runtime._connections["interfaces"][0]["name"] == "Ethernet"
+
+
+def test_canoe_measurement_waiting_reports_license_workflow_and_history_in_three_languages(runtime_factory, monkeypatch):
+    from types import SimpleNamespace
+
+    runtime = runtime_factory(demo=False)
+    details = {"selected_block": "1", "measurement_running": False, "trigger_active": False,
+               "hardware": {"status": "unavailable", "reference_required": False},
+               "measurement_diagnostics": {"missing_options": ["Ethernet"], "current_license_verified": False}}
+    result = SimpleNamespace(success=True, details=details)
+    monkeypatch.setattr(runtime, "_request_real", lambda *_args, **_kwargs: {Role.CAN: result})
+    runtime._submit(runtime._prepare_canoe, Role.CAN).result(timeout=3)
+    report = wait_for_message(runtime, "preparation")
+    assert report["status"] == "attention" and report["readiness_stage"] == "measurement_waiting"
+    for language in ("ko", "en", "zh"):
+        assert "F9" in report[f"message_{language}"]
+        assert "Trace" in report[f"message_{language}"]
+        assert "Ethernet" in report[f"detail_{language}"]
+    assert runtime._settings.can_logging_block == "1"
+    assert read_next(runtime) == 1
+    assert runtime._plan is None

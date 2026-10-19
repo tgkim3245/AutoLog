@@ -190,6 +190,109 @@ def test_no_measurement_or_existing_recording_blocks_preparation(fixture):
     assert capture.prepare(params)["automatic_splitting"] == ["IncrementAfterGrowth"]
 
 
+def test_idle_model_rebuild_after_manual_measurement_reacquires_exact_block(fixture):
+    capture, app, params, root = fixture
+    capture.connect(params)
+    old = app.blocks[0]
+    old.FileNameOptions.IncrementAfterGrowth = True
+    capture.connect(params)  # Explicitly confirm this output option before F9.
+    replacement = Block(old.FullName)
+    replacement.FileNameOptions.IncrementAfterGrowth = True
+    app.blocks[0] = replacement  # A new COM model, with the same logical selection.
+    app.Measurement.Running = True
+    capture.prepare(params)
+    path = root / "rebound.blf"
+    capture.configure("rebound", {"temp_path": str(path)})
+    capture.start("rebound", {"temp_path": str(path)})
+    capture.stop("rebound")
+    assert capture.block is replacement
+    assert replacement.Trigger.starts == replacement.Trigger.stops == 1
+    assert old.Trigger.starts == old.Trigger.stops == 0
+    assert replacement.FullName == old.FullName
+    assert replacement.FileNameOptions.IncrementAfterGrowth
+    assert any(row["event"] == "canoe.idle_block_reacquired" for row in capture.journal)
+
+
+def test_disconnected_idle_com_handle_can_be_reacquired(fixture, monkeypatch):
+    capture, app, params, _ = fixture
+    capture.connect(params)
+    old = app.blocks[0]
+    app.blocks[0] = Block(old.FullName)
+    app.Measurement.Running = True
+    def identity(block):
+        if block is old:
+            raise RuntimeError("COM object disconnected during model rebuild")
+        return block
+    monkeypatch.setattr("vil_logging.adapters.canoe._identity", identity)
+    capture.prepare(params)
+    assert capture.block is app.blocks[0]
+    assert any(row["event"] == "canoe.block_identity_unavailable" for row in capture.journal)
+
+
+@pytest.mark.parametrize("change", ["name", "path", "options", "count", "order", "ambiguous"])
+def test_idle_rebuild_never_adopts_changed_or_ambiguous_selection(fixture, change):
+    capture, app, params, _ = fixture
+    if change in {"order", "ambiguous"}:
+        app.blocks.append(Block("second.blf" if change == "order" else app.blocks[0].FullName))
+        app.Configuration.OnlineSetup.LoggingCollection.Count = 2
+        params = {**params, "logging_block": "1"}
+    capture.connect(params)
+    old = app.blocks[0]
+    app.blocks[0] = Block(old.FullName)
+    if change == "name":
+        app.blocks[0].Name = "Different logging block"
+    elif change == "path":
+        app.blocks[0].FullName = "different.blf"
+    elif change == "options":
+        app.blocks[0].FileNameOptions.IncrementAfterTrigger = True
+    elif change == "count":
+        app.blocks.append(Block("second.blf"))
+        app.Configuration.OnlineSetup.LoggingCollection.Count = 2
+    elif change == "order":
+        app.blocks.reverse()
+    app.Measurement.Running = True
+    with pytest.raises(RuntimeError, match="changed"):
+        capture.prepare(params)
+    assert capture.block is old
+    assert all(not block.Trigger.starts for block in app.blocks)
+    assert any(row["event"] == "canoe.block_validation_failed" for row in capture.journal)
+
+
+@pytest.mark.parametrize("active", [False, True])
+def test_owned_output_never_rebinds_a_structurally_identical_replacement(fixture, active):
+    capture, app, path = prepared(fixture)
+    old = app.blocks[0]
+    if active:
+        capture.start("s1", {"temp_path": str(path)})
+    app.blocks[0] = Block(old.FullName)
+    app.blocks[0].Trigger.Active = old.Trigger.Active
+    with pytest.raises(RuntimeError, match="changed"):
+        if active:
+            capture.stop("s1")
+        else:
+            capture.start("s1", {"temp_path": str(path)})
+    assert capture.block is old
+    assert not app.blocks[0].Trigger.starts and not app.blocks[0].Trigger.stops
+    assert capture.stats()["output_restore_pending"]
+
+
+def test_failed_preparation_records_measurement_and_option_history(fixture):
+    capture, app, params, _ = fixture
+    app.UI = SimpleNamespace(Write=SimpleNamespace(Text=(
+        "[E]\t[System]\tRequired bus system options:\n"
+        "[E]\t[System]\tCAN (available)\n[E]\t[System]\tEthernet (missing)\n"
+        "[E]\t[System]\tMeasurement was halted.")))
+    with pytest.raises(RuntimeError, match="Ethernet") as failed:
+        capture.prepare(params)
+    capture.record_failure("prepare", failed.value)
+    failure = capture.journal[-1]
+    assert failure["action"] == "prepare"
+    assert not failure["observed"]["measurement_running"]
+    assert failure["observed"]["measurement_diagnostics"]["missing_options"] == ["Ethernet"]
+    assert "earlier attempt" in str(failed.value)
+    assert not app.blocks[0].Trigger.starts
+
+
 def test_foreign_session_stop_and_inspect_are_rejected(fixture):
     capture, app, path = prepared(fixture)
     capture.start("s1", {"temp_path": str(path)})
