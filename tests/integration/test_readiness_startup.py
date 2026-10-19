@@ -61,9 +61,13 @@ def verify():
         assert main_window.settings_dialog.tabs.currentIndex() == 2
         assert view.cards["npcap"][3].isHidden()
         missing = False  # Dependencies installed externally; recheck without an in-app installer.
-        view.refresh_button.click()
         stage = 1
-    elif stage == 1 and view._connections["tshark"]["status"] == "ready" and view._environment[
+    elif stage == 1 and view.refresh_button.isEnabled():
+        # The logging click and Settings show above already requested asynchronous
+        # checks. A click on their disabled refresh button would be discarded.
+        view.refresh_button.click()
+        stage = 2
+    elif stage == 2 and view._connections["tshark"]["status"] == "ready" and view._environment[
             "capinfos"]["version_check"]["status"] == "present":
         assert view.cards["canoe"][1].text() == "확인됨"
         main_window.exit_requested.emit()

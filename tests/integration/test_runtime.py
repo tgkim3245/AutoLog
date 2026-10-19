@@ -10,6 +10,8 @@ from vil_logging.contracts.commands import FakeBehavior
 from vil_logging.contracts.models import Role, SessionPhase
 from vil_logging.diagnostics.debug_log import DebugLogService
 from vil_logging.runtime import Runtime
+from vil_logging.storage.naming import build_plan
+from vil_logging.storage.repository import Repository
 
 
 @pytest.fixture
@@ -31,6 +33,34 @@ def read_next(runtime):
     return runtime._submit(lambda: runtime._repo.load_settings().next_index).result(timeout=5)
 
 
+def test_full_recent_history_cannot_drop_startup_recovery_or_exit(tmp_path):
+    from vil_logging.contracts.models import AppEvent
+    repo = Repository(tmp_path / "state.sqlite3")
+    output = tmp_path / "captures"
+    output.mkdir()
+    settings = repo.load_settings(str(output))
+    plan = build_plan(settings, (Role.CAN,))
+    repo.reserve(plan)
+    repo.update_session(plan.session_id, SessionPhase.INCOMPLETE,
+                        capture_quality={"state": "unknown"})
+    # An interrupted file operation adds another startup notification.
+    repo.begin_file_operation("interrupted", "delete", {"items": []})
+    for number in range(500):
+        repo.append_event(AppEvent("OPERATION_ERROR", original=f"history-{number}"))
+    repo.close()
+    runtime = Runtime(tmp_path)
+    try:
+        runtime.initialize().result(5)
+        # Startup is complete before the GUI begins draining messages.
+        assert runtime._notification_loss == 0
+        messages = list(runtime.messages.queue)
+        assert {"settings", "phase", "recovery", "capture_quality"} <= {kind for kind, _ in messages}
+        history = [value for kind, value in messages if kind == "events"]
+        assert len(history) == 1 and len(history[0]) == 500
+    finally:
+        runtime.close_for_test()
+
+
 def test_real_mode_cannot_claim_or_start_unvalidated_capture(runtime_factory):
     runtime = runtime_factory(demo=False)
     runtime.toggle((Role.CAN, Role.ETHERNET)).result(timeout=5)
@@ -38,6 +68,15 @@ def test_real_mode_cannot_claim_or_start_unvalidated_capture(runtime_factory):
     assert read_next(runtime) == 1
     assert runtime._plan is None
     assert not list(runtime.data_dir.rglob("*.blf"))
+
+
+def test_failed_ethernet_preparation_without_any_recorder_can_exit(runtime_factory):
+    runtime = runtime_factory(demo=False)
+    runtime.save_preferences({"tshark_path": "C:/AutoLog-missing-tool/tshark.exe"}).result(5)
+    runtime.toggle((Role.ETHERNET,)).result(10)
+    assert runtime.phase == SessionPhase.FAILED
+    assert runtime._plan is None and read_next(runtime) == 1
+    assert runtime.request_exit().result(5) is True
 
 
 def test_empty_selection_does_not_consume_number(runtime_factory):

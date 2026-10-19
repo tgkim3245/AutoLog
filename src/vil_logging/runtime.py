@@ -29,6 +29,7 @@ from vil_logging.contracts.models import (
 from vil_logging.diagnostics.capture_quality import LOW_SPACE_BYTES, SPACE_RECOVERY_BYTES
 from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
+from vil_logging.storage.file_access import matches, observe
 from vil_logging.storage.file_service import FileResultStorageError, FileService
 from vil_logging.storage.naming import build_plan, find_collisions, validate_settings
 from vil_logging.storage.recovery import RecoveryService
@@ -67,6 +68,7 @@ class Runtime:
         self._disk_warning = False
         self._plan: CapturePlan | None = None
         self._issued_roles: tuple[Role, ...] = ()
+        self._published_files: dict[Role, dict] = {}
         self._snapshots = {role: TargetSnapshot(role) for role in Role}
         self._failure_latched = False
         self._target_failures: dict[Role, str] = {}
@@ -173,8 +175,9 @@ class Runtime:
         file_recovery = self._file_service.recover()
         recovered = self._repo.recover_incomplete()
         self._publish("settings", self._settings)
-        for event in self._repo.recent_events():
-            self._publish("event", event)
+        # Historical rows must not consume nearly the whole control-message
+        # queue before the first GUI tick (500 history rows versus 512 slots).
+        self._publish("events", self._repo.recent_events())
         for snapshot in self._snapshots.values():
             self._publish("target", snapshot)
         self._ready = True
@@ -660,6 +663,7 @@ class Runtime:
     def _start(self, roles: tuple[Role, ...]) -> None:
         self._plan = None
         self._issued_roles = ()
+        self._published_files = {}
         self._failure_latched = False
         self._target_failures = {}
         self._monitor_reports = {}
@@ -1077,7 +1081,8 @@ class Runtime:
         confirmed = all(result.success and result.state == "stopped" for result in results.values())
         phase = (SessionPhase.FAILED if self._failure_latched else SessionPhase.COMPLETED
                  ) if confirmed else SessionPhase.INCOMPLETE
-        actual_paths, inspections = [], {}
+        actual_paths = []
+        inspections = {role.value: inspection for role, inspection in self._published_files.items()}
         try:
             for file in plan.files:
                 role, actual_path = file.role, file.temp_path
@@ -1093,7 +1098,22 @@ class Runtime:
                     report = {"status": "unknown", "reasons": ["recorder_unavailable"], "rules": []}
                     self._monitor_reports[role.value] = report
                     self._target(role, observation=ObservationState.UNKNOWN, observation_details=report)
-                if not stopped:
+                if role in self._published_files:
+                    # A previous stop attempt may have archived this target while
+                    # another target remained unresolved. Its working file is gone
+                    # by design: keep the committed result and original inspection.
+                    actual_path = file.final_path
+                    expected = {key: self._published_files[role][key]
+                                for key in ("inode", "bytes", "mtime_ns")}
+                    try:
+                        if not matches(observe(actual_path), expected):
+                            raise ValueError("Published capture changed while retrying stop")
+                    except (OSError, ValueError) as error:
+                        if phase != SessionPhase.INCOMPLETE:
+                            phase = SessionPhase.FAILED
+                        self._event("FILE_ERROR", level="ERROR", target=role.label,
+                                    original=str(error), path=str(actual_path))
+                elif not stopped:
                     self._repo.update_capture_file(plan.session_id, role, "unknown", actual_path=str(actual_path))
                 elif not file.temp_path.exists():
                     if phase != SessionPhase.INCOMPLETE:
@@ -1128,6 +1148,7 @@ class Runtime:
                         else:
                             self._repo.update_capture_file(plan.session_id, role, "published",
                                                            actual_path=str(actual_path), inspection=inspection)
+                            self._published_files[role] = inspection
                             self._event("FILE_PUBLISHED" if role == Role.ETHERNET else "BLF_PUBLISHED",
                                         target=role.label, path=str(actual_path), bytes=inspection["bytes"],
                                         packets=inspection.get("packet_count", 0),

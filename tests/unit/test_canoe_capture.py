@@ -146,6 +146,25 @@ def test_external_changes_prevent_start(fixture, fault):
     assert block.Trigger.starts == 0
 
 
+@pytest.mark.parametrize("change", ["block", "configuration"])
+def test_preparation_cannot_silently_adopt_an_external_replacement(fixture, change):
+    capture, app, params, root = fixture
+    capture.connect(params)
+    app.Measurement.Running = True
+    if change == "block":
+        app.blocks[0] = Block("replacement.blf")
+    else:
+        app.Configuration.FullName = str(root / "another.cfg")
+    with pytest.raises(RuntimeError, match="changed"):
+        capture.prepare(params)
+    assert len(app.open_calls) == 1
+    assert app.blocks[0].Trigger.starts == 0
+    if change == "block":
+        capture.connect(params)  # Explicit connection confirmation adopts the changed block.
+        capture.prepare(params)
+        assert capture.block is app.blocks[0]
+
+
 def test_no_measurement_or_existing_recording_blocks_preparation(fixture):
     capture, app, params, _ = fixture
     with pytest.raises(RuntimeError, match="Start measurement"):

@@ -31,6 +31,16 @@ py -3.14 -m venv .venv
 
 `tests/hardware/` 검사는 차량 장비가 연결된 시험 PC에서 선택하여 수행합니다. 기본 검사에서는 실제 CANoe 설정 파일과 차량 네트워크를 열지 않습니다.
 
+## 명시적 localhost 검증
+
+실제 TShark를 사용하지만 물리 NIC와 CANoe는 열지 않습니다. 사용할 설치 경로를 명시해야 하며 일반 앱에서 기억한 프로필을 변경하지 않습니다. `--data-dir`는 아직 없는 새 폴더를 지정합니다.
+
+```powershell
+.\.venv\Scripts\python.exe -m vil_logging --verify-ethernet --tshark "C:\Program Files\Wireshark\tshark.exe" --data-dir "$env:TEMP\AutoLog-ethernet-new"
+```
+
+`--verify-monitoring`, `--verify-recovery`, `--verify-load`도 `--tshark`가 필요합니다. `--verify-file-management`는 외부 도구 없이 생성된 파일만 사용합니다. 차량 시험은 [라이선스 CANoe 검증](docs/licensed_canoe_validation.md)을 따릅니다.
+
 ## 빌드
 
 개발 환경을 준비한 뒤 루트의 **`build.cmd`를 더블클릭**하면 Windows 배포 폴더와 ZIP을 자동으로 만듭니다. 현재 작업 디렉터리와 관계없이 프로젝트 경로를 찾고, `run.cmd`처럼 프로젝트 가상환경 또는 기존 AppData 개발 환경을 사용합니다.

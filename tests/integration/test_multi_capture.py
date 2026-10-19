@@ -120,6 +120,52 @@ def test_unconfirmed_can_stop_preserves_its_file_but_archives_other_closed_targe
         assert file.temp_path.is_file() if file.role == Role.CAN else file.final_path.is_file()
 
 
+@pytest.mark.parametrize("retry", ["recovery", "exit"])
+def test_retry_stop_keeps_already_published_files_and_inspections(real, retry):
+    runtime, tools = real
+    roles = (Role.CAN, Role.DIAG, Role.ETHERNET)
+    runtime.toggle(roles).result(5)
+    tools.fail = (Role.CAN, "stop")
+    runtime.toggle(roles).result(5)
+    assert runtime.phase == SessionPhase.INCOMPLETE
+    before = {file.final_path: file.final_path.read_bytes() for file in runtime._plan.files
+              if file.role != Role.CAN}
+    tools.fail = None
+    if retry == "recovery":
+        assert runtime.recover({"action": "retry_stop"}).result(5)["success"]
+    else:
+        assert runtime.request_exit().result(5)
+    assert runtime.phase == SessionPhase.COMPLETED
+    assert all(path.read_bytes() == content for path, content in before.items())
+    assert tools.calls.count(((Role.DIAG,), "inspect")) == 1
+    assert tools.calls.count(((Role.ETHERNET,), "inspect")) == 1
+    from vil_logging.storage.repository import Repository
+    repo = Repository(runtime.data_dir / "state.sqlite3")
+    try:
+        session = repo.captures()[0]
+        assert {file["state"] for file in session["files"]} == {"published"}
+        assert set(session["details"]["inspections"]) == {role.value for role in roles}
+        assert repo.load_settings().next_index == 2
+    finally:
+        repo.close()
+
+
+def test_retry_stop_does_not_certify_an_externally_changed_published_file(real):
+    runtime, tools = real
+    roles = (Role.CAN, Role.ETHERNET)
+    runtime.toggle(roles).result(5)
+    tools.fail = (Role.CAN, "stop")
+    runtime.toggle(roles).result(5)
+    published = next(file for file in runtime._plan.files if file.role == Role.ETHERNET).final_path
+    published.write_bytes(b"externally modified")
+    tools.fail = None
+    runtime.recover({"action": "retry_stop"}).result(5)
+    assert runtime.phase == SessionPhase.FAILED
+    assert published.read_bytes() == b"externally modified"
+    history = runtime._submit(runtime._file_service.history).result(5)
+    assert next(file for file in history[0]["files"] if file["role"] == "ethernet")["status"] == "changed"
+
+
 def test_same_configuration_for_can_and_diag_is_rejected_before_tool_commands(real):
     runtime, tools = real
     runtime.save_preferences({"diag_cfg": "C:/can.cfg"}).result(timeout=5)

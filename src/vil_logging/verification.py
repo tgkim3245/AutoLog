@@ -89,7 +89,7 @@ def verify_file_management(data_dir: Path) -> dict:
     return report
 
 
-def verify_recovery(data_dir: Path) -> dict:
+def verify_recovery(data_dir: Path, *, tshark_path: str = "") -> dict:
     """Exercise the packaged recovery path without opening a CANoe window or NIC."""
     root = Path(data_dir)
     if root.exists():
@@ -103,7 +103,7 @@ def verify_recovery(data_dir: Path) -> dict:
     report = {"passed": False, "app_data": str(root), "physical_nic_opened": False,
               "canoe_opened": False, "scope": "Generated offline capture recovery only", "cases": []}
     try:
-        tool = _find_tshark("")
+        tool = _find_tshark(tshark_path)
         if tool["status"] != "ready":
             raise RuntimeError(tool["message_en"])
         fixtures = {
@@ -159,7 +159,7 @@ def verify_recovery(data_dir: Path) -> dict:
     return report
 
 
-def verify_monitoring(data_dir: Path) -> dict:
+def verify_monitoring(data_dir: Path, *, tshark_path: str = "") -> dict:
     root = Path(data_dir)
     if root.exists():
         raise ValueError("Verification requires a new folder; existing profiles are preserved")
@@ -171,7 +171,7 @@ def verify_monitoring(data_dir: Path) -> dict:
     report = {"passed": False, "app_data": str(root), "physical_nic_opened": False,
               "scope": "Generated localhost packets; synthetic test criteria only", "cases": []}
     try:
-        tool = _find_tshark("")
+        tool = _find_tshark(tshark_path)
         if tool["status"] != "ready":
             raise RuntimeError(tool["message_en"])
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
@@ -256,7 +256,7 @@ def verify_monitoring(data_dir: Path) -> dict:
     return report
 
 
-def verify_ethernet(data_dir: Path) -> dict:
+def verify_ethernet(data_dir: Path, *, tshark_path: str = "") -> dict:
     root = Path(data_dir)
     if root.exists():
         raise ValueError("Verification requires a new folder; existing profiles are preserved")
@@ -268,7 +268,7 @@ def verify_ethernet(data_dir: Path) -> dict:
     report = {"passed": False, "app_data": str(root), "scope": "Generated localhost UDP and offline ARP fixture only",
               "physical_nic_opened": False, "cases": []}
     try:
-        tool = _find_tshark("")
+        tool = _find_tshark(tshark_path)
         if tool["status"] != "ready":
             raise RuntimeError(tool["message_en"])
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:

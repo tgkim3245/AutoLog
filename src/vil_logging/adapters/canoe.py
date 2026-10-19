@@ -276,6 +276,11 @@ class CanoeCapture:
         return details
 
     def prepare(self, params):
+        # A logging click is not consent to replace the previously selected
+        # block. Validate the old COM identity before connect refreshes it.
+        # Explicit connection checks can deliberately adopt a new selection.
+        if self.app is not None:
+            self._validate()
         details = self.connect(params)
         if self.block is None:
             raise RuntimeError(details["selection_error"] or

@@ -57,11 +57,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-monitoring", action="store_true",
                         help="Verify monitoring with generated localhost packets only")
     parser.add_argument("--verify-load", action="store_true", help="Numbered localhost load test; never opens a physical NIC")
+    parser.add_argument("--tshark", default="", help="Explicit tshark.exe path for --verify-* commands")
     parser.add_argument("--load-duration", type=int, default=10, help="Load duration in seconds (default 10)")
     parser.add_argument("--load-pps", type=int, default=1000, help="Generated packets per second (default 1000)")
     parser.add_argument("--load-payload", type=int, default=512, help="UDP payload bytes (default 512)")
     parser.add_argument("--version", action="version", version=__version__)
     args = parser.parse_args(argv)
+    if any((args.verify_load, args.verify_monitoring, args.verify_recovery, args.verify_ethernet)) and not args.tshark:
+        parser.error("Capture verification requires --tshark <full path to tshark.exe>")
     if args.verify_load:
         if any((args.demo, args.smoke_test, args.diagnose, args.verify_monitoring, args.verify_ethernet,
                 args.verify_file_management, args.verify_recovery, args.smoke_debug_log, args.smoke_discovery)):
@@ -72,7 +75,8 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as error:
             parser.error(str(error))
         folder = args.data_dir or default_data_dir() / "development" / "load-verification" / uuid4().hex
-        report = verify_load(folder, duration=args.load_duration, pps=args.load_pps, payload_size=args.load_payload)
+        report = verify_load(folder, duration=args.load_duration, pps=args.load_pps,
+                             payload_size=args.load_payload, tshark_path=args.tshark)
         print(json.dumps({key: value for key, value in report.items() if key != "samples"}, ensure_ascii=False))
         return 0 if report["passed"] else 2
     if args.verify_monitoring:
@@ -80,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--verify-monitoring requires a separate verification run")
         from vil_logging.verification import verify_monitoring
         folder = args.data_dir or default_data_dir() / "development" / "monitor-verification" / uuid4().hex
-        report = verify_monitoring(folder)
+        report = verify_monitoring(folder, tshark_path=args.tshark)
         print(json.dumps(report, ensure_ascii=False))
         return 0 if report["passed"] else 2
     if args.verify_recovery:
@@ -88,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--verify-recovery requires a separate verification run")
         from vil_logging.verification import verify_recovery
         folder = args.data_dir or default_data_dir() / "development" / "recovery-verification" / uuid4().hex
-        report = verify_recovery(folder)
+        report = verify_recovery(folder, tshark_path=args.tshark)
         print(json.dumps(report, ensure_ascii=False))
         return 0 if report["passed"] else 2
     if args.verify_file_management:
@@ -104,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--verify-ethernet cannot be combined with simulation flags")
         from vil_logging.verification import verify_ethernet
         folder = args.data_dir or default_data_dir() / "development" / "ethernet-verification" / uuid4().hex
-        report = verify_ethernet(folder)
+        report = verify_ethernet(folder, tshark_path=args.tshark)
         print(json.dumps(report, ensure_ascii=False))
         return 0 if report["passed"] else 2
     if args.smoke_debug_log and not args.smoke_test:
@@ -327,6 +331,9 @@ def main(argv: list[str] | None = None) -> int:
                 window.set_target(value)
             elif kind == "event":
                 window.add_event(value)
+            elif kind == "events":
+                for event in value:
+                    window.add_event(event)
             elif kind == "files":
                 window.set_files(*value)
             elif kind == "capture_history":

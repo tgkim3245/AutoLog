@@ -71,7 +71,7 @@ def inspect_sequences(path, token, expected, payload_size):
             "passed": unique == expected and not (duplicate or invalid or foreign or out_of_range)}
 
 
-def verify_load(data_dir, *, duration=10, pps=1000, payload_size=512):
+def verify_load(data_dir, *, duration=10, pps=1000, payload_size=512, tshark_path=""):
     validate_load(duration, pps, payload_size)
     root = Path(data_dir)
     if root.exists():
@@ -89,7 +89,7 @@ def verify_load(data_dir, *, duration=10, pps=1000, payload_size=512):
     try:
         if shutil.disk_usage(root).free < expected * (payload_size + 128) * 1.2 + 1024 ** 3:
             raise ValueError("Insufficient free disk space for requested load fixture plus 1 GiB reserve")
-        tool = _find_tshark("")
+        tool = _find_tshark(tshark_path)
         if tool["status"] != "ready":
             raise RuntimeError(tool["message_en"])
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:

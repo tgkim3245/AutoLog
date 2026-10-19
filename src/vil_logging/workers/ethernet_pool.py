@@ -25,7 +25,7 @@ class CaptureWorkerPool(FakeWorkerPool):
         if os.name == "nt" and action in {"stop", "query"}:
             import win32job
             for role, result in list(results.items()):
-                if not result.success or result.state != "stopped" or role not in self._jobs:
+                if not result.success or result.state not in {"idle", "ready", "stopped"} or role not in self._jobs:
                     continue
                 deadline = time.monotonic() + 2
                 while True:
@@ -96,9 +96,19 @@ class CaptureWorkerPool(FakeWorkerPool):
         if self._closed:
             return
         if not abnormal and self._processes:
-            for result in self.request(tuple(self._processes), "query", "shutdown-check", timeout=2).values():
-                if not result.success or result.state not in {"stopped", "ready"}:
+            observed = self.request(tuple(self._processes), "query", "shutdown-check", timeout=2)
+            for result in observed.values():
+                if not result.success or result.state not in {"idle", "stopped", "ready"}:
                     raise RuntimeError("Real capture shutdown is unconfirmed; keep the application open")
+            # Do this before any shutdown command. Otherwise a rejected restoration
+            # reply can be discarded when the idle worker is torn down, losing the
+            # only snapshot of the user's original CANoe output settings.
+            for role, result in observed.items():
+                if role != Role.ETHERNET and result.details.get("output_restore_pending"):
+                    restored = self.request((role,), "restore", result.details["session_id"], timeout=15)[role]
+                    if not restored.success or restored.details.get("output_restore_pending"):
+                        raise RuntimeError("CANoe output restoration is unconfirmed; keep the application open: "
+                                           + restored.evidence)
         self._closed = True
         for role, pipe in self._pipes.items():
             try:

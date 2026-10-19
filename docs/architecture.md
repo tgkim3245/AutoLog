@@ -1,10 +1,8 @@
 # 통합 제어 설계
 
-최신 현황: [0.4.5](hotfix_0_4_5.md)에서 AutoLog 브랜딩을 적용하고 Auto_Log/VILLogging 사용자 프로필을 새 데이터 경로로 이관한다. 개발자 진단은 상시 순환 저장하며 버그리포트 ZIP으로 내보낸다. 로그 원문에서 패킷·프레임 내용은 마스킹한다.
+최신 현황(2026-10-19, 0.8.6): Qt 앱, 대상별 worker, SQLite 설정/번호/이력, 실제 TShark 취득·요약·감시·품질, 파일 관리·수동 복구, CAN/Diag COM 실행부와 독립 창 연결이 구현되어 있다. 개발자로그는 EXE 옆에서 순환 저장하고 버그리포트 ZIP으로 내보낸다. 세부 결과는 [전체 검토](project_audit_0_8_6.md)를 따른다.
 
-상태: 기본 앱·모의 실행·설정/번호 저장·환경 진단·개발자 로그 기반 구현. 실제 CANoe/Ethernet 도구는 미연동이며 실제 시험·팀 배포는 미실행.
-최신 현황(2026-10-18): [0.3.0](development_stage_3.md)에서 실제 Ethernet worker·TShark·패킷·검사/보관을 연결했고 localhost 실증을 통과했다. CANoe·차량 NIC·현장·부하 검증은 남아 있다. 아래 설계 전체의 완료를 뜻하지 않는다.
-현재 요구사항: 55개, 검증 시나리오 66개. 상세 동작은 [제어 정책](control_policy.md), 검증은 [검증 계획](validation_plan.md), 최신 코드·실행·검사 상태는 [1단계 개발 결과](development_stage_1.md)를 따른다.
+현재 요구사항: 55개, 검증 시나리오 66개. 아래 설계 전체의 완료를 뜻하지 않는다. 라이선스가 필요한 CAN/Diag 구간 BLF·수신/채널 감시, 차량 고부하·장시간·새 PC 시험은 남아 있다. 상세 동작은 [제어 정책](control_policy.md), 검증은 [검증 계획](validation_plan.md), 진행은 [구현 계획](implementation_plan.md)을 따른다.
 
 ## 1. 구성과 책임
 
@@ -30,7 +28,7 @@ COM 호출·외부 출력 소비·파일 검사를 UI 스레드에서 기다리�
 
 같은 슬롯의 같은 구성은 중복 실행하지 않는다. 다른 구성으로 바꾸려면 해당 측정·기록이 정지돼 있어야 한다. 미저장 변경은 CANoe의 사용자 확인 절차를 따른다. 사용자가 외부에서 프로젝트를 교체하면 기존 참조를 무효화한다.
 
-Logging/Trigger COM 제어를 우선 실증한다. CAPL은 기존 연결 또는 수신 관측 보완에 필요한 경우 검토하며 추가 허용 여부를 가정하지 않는다. 복수 COM 참조의 독립성, 측정 유지 중 파일명 적용·구간 완결은 실제 CANoe 19 검증 전까지 미검증이다.
+Logging/Trigger COM 제어를 구현했다. CANoe 19.3.118에서 다른 PID·정확한 cfg의 독립 연결은 확인했다. 측정 유지 중 파일명/옵션 적용·구간 완결·복구는 라이선스 활성 상태에서 실증해야 한다. CAPL 수정·추가는 수행하지 않았으며 원본 cfg를 자동 저장하지 않는다. SingleCOMClient=1은 원본 can.ini 백업 후 자동 준비하고 공유 창으로 대체 연결하지 않는다.
 
 근거: [CANoe 19 COM](https://help.vector.com/CANoeDEFamily/19/en/Help/Content/Topics/COMInterface/COMInterface.htm), [Logging](https://help.vector.com/CANoeDEFamily/19/en/Help/Content/Topics/COMInterface/Objects/COMObjectLogging.htm), [Trigger](https://help.vector.com/CANoeDEFamily/19/en/Help/Content/Topics/COMInterface/Objects/COMObjectTrigger.htm).
 
@@ -112,7 +110,7 @@ pcap/pcapng 실제 출력 형식을 지정하고 결과를 확인한다. 표시/
 
 개발자로그는 상시 켜고 `vil_logging.*` 진단을 JSONL로 저장한다. 배포판에서는 EXE와 같은 배포 폴더의 `developer_logs`에 두며 5MB 파일과 최대 4개 백업으로 회전한다. 유한 큐로 기록을 전달하고 종료 시 큐를 비운 뒤 flush/close한다. 메인의 버그리포트 버튼은 해당 로그를 ZIP으로 내보낸다.
 
-명령 요청/응답·세션/대상/명령 ID·상태 전이·경과시간·오류 원문/traceback·앱/도구 버전과 진단 확인 범위를 남긴다. 파일/큐 오류는 별도로 보고하고 기록 제어 경로로 전파해 실제 취득을 중단하지 않는다. 화면은 경로와 폴더 열기를 제공하고 사용자가 파일을 직접 전달한다. 자동 업로드와 캡처 payload 저장은 하지 않는다. 현재 검증 범위는 모의 명령·로컬 저장이며 실제 도구별 진단은 연동 시 추가 검증한다.
+명령 요청/응답·세션/대상/명령 ID·상태 전이·경과시간·오류 원문/traceback·앱/도구 버전과 진단 확인 범위를 남긴다. 파일/큐 오류는 별도로 보고하고 기록 제어 경로로 전파해 실제 취득을 중단하지 않는다. 화면은 경로와 폴더 열기를 제공하고 사용자가 파일을 직접 전달한다. 자동 업로드와 캡처 payload 저장은 하지 않는다. 실제 Ethernet·독립 CANoe 연결 진단도 확인했다. 라이선스 CAN 구간 기록의 진단은 현장 시험으로 추가 확인한다.
 
 메인 창 X와 명시적 종료는 기록 정리와 파일 확인을 마친 뒤 종료한다. 종료 확인 실패 시 미완료 상태를 알리고 창을 유지한다. CANoe 측정·창을 자동 종료하지 않는다.
 

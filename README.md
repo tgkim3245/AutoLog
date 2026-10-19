@@ -2,7 +2,7 @@
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 공통 logging 버튼으로 기록을 제어합니다.
 
-현재 소스 버전은 **0.8.5**입니다. [화면 간소화·네트워크 그래프·중국어·버그리포트 검증](docs/ui_update_0_8_5.md)을 반영했습니다. CAN과 Diag의 **연결 확인**을 누르면 각 .cfg가 별도 CANoe 창에 연결됩니다. 연결 방식 선택창은 없으며 각 카드에 연결된 .cfg와 CANoe PID를 표시합니다. [자동 독립 연결 수정](docs/canoe_independent_connection.md), [기록 품질·부하 검사](docs/development_stage_8.md), [Ethernet 통신 감시](docs/development_stage_7.md), [미완료 기록 복구](docs/development_stage_6.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
+현재 소스 버전은 **0.8.6**입니다. [전체 검토·버그 수정 결과](docs/project_audit_0_8_6.md)와 [미적용 개선 제안](docs/improvement_backlog.md)을 확인하세요. [화면 간소화·네트워크 그래프·중국어·버그리포트 검증](docs/ui_update_0_8_5.md)을 반영했습니다. CAN과 Diag의 **연결 확인**을 누르면 각 .cfg가 별도 CANoe 창에 연결됩니다. 연결 방식 선택창은 없으며 각 카드에 연결된 .cfg와 CANoe PID를 표시합니다. [자동 독립 연결 수정](docs/canoe_independent_connection.md), [기록 품질·부하 검사](docs/development_stage_8.md), [Ethernet 통신 감시](docs/development_stage_7.md), [미완료 기록 복구](docs/development_stage_6.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
 **기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
 

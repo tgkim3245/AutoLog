@@ -5,7 +5,7 @@
 
 ## 1. 현재 제공 상태
 
-현재 소스 버전은 0.8.5이며 [화면·언어·네트워크 그래프 변경](../docs/ui_update_0_8_5.md), [CANoe 자동 독립 연결](../docs/canoe_independent_connection.md), [기록 품질·부하 검사](../docs/development_stage_8.md), [통신 감시 안내](../docs/development_stage_7.md), [미완료 복구 안내](../docs/development_stage_6.md)를 참고한다. 기존 HTML 시안과 실제 앱 화면은 구분한다. Zipy 실제 기록·정지·패킷 보기·파일 검사와 보관, Ethernet 감시·품질, 파일 관리·수동 복구, 설정/번호 보존·환경 확인·상시 개발자로그·버그리포트를 제공한다. 배포 EXE 검증 여부는 해당 릴리스 문서를 따른다.
+현재 소스 버전은 0.8.6이며 [전체 검토·수정 결과](../docs/project_audit_0_8_6.md), [화면·언어·네트워크 그래프 변경](../docs/ui_update_0_8_5.md), [CANoe 자동 독립 연결](../docs/canoe_independent_connection.md), [기록 품질·부하 검사](../docs/development_stage_8.md), [통신 감시 안내](../docs/development_stage_7.md), [미완료 복구 안내](../docs/development_stage_6.md)를 참고한다. 기존 HTML 시안과 실제 앱 화면은 구분한다. Zipy 실제 기록·정지·패킷 보기·파일 검사와 보관, Ethernet 감시·품질, 파일 관리·수동 복구, 설정/번호 보존·환경 확인·상시 개발자로그·버그리포트를 제공한다. 배포 EXE 검증 여부는 해당 릴리스 문서를 따른다.
 
 **CAN·Diag 동시 연결:** 독립 연결이 꺼져 있으면 두 번째 구성을 별도 창으로 열 수 없다. 연결 카드의 **독립 연결 설정…**에서 안내를 확인하고, CANoe 작업 저장·모든 CANoe 창 닫기 → 상태 다시 확인 → 다중 연결 적용 → 닫기를 수행한다. 저장된 CAN·Diag의 연결을 다시 확인한다. 설정 변경은 설치본 전체에 적용되며 원본 백업을 남긴다.
 
