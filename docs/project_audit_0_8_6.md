@@ -74,3 +74,13 @@
 - 수동 복구: 생성한 오프라인 BLF/pcap/pcapng의 재시작·검사·보관 3종 통과. 실제 CANoe 생성 BLF 아님.
 - 10초·1,000 pps·512바이트 시험: 10,000개 송신/저장/순번·내용 대조, 누락·중복·내용 오류 0. 화면 큐에서 9,000개가 빠진 것은 소비하지 않은 시험 화면 큐의 결과이며 원본 캡처 손실과 구분한다.
 - 로컬 근거: `Downloads/AutoLog_Builds/audit-0.8.6-20261019_051923/`의 각 `result.json`, 로그와 생성된 캡처. 물리 NIC·CANoe 측정을 열지 않았다. 원본 캡처·개발자로그는 Git에 포함하지 않는다.
+
+## 배포 파일 검증
+
+- 소스 커밋 `78eb204817631f2535fbb2d7d24b5c3b9a8aae0a`의 변경 없는 상태에서 `build.cmd --no-pause`로 빌드했다. 결과 폴더는 `Downloads/AutoLog_Builds/AutoLog-0.8.6_20261019_110519/`이다.
+- ZIP `AutoLog-0.8.6_20261019_110519.zip`은 52,279,868바이트다. ZIP CRC·압축 해제 EXE 해시·Windows 제품명/버전 `AutoLog / 0.8.6`과 COM 잠금 의존 파일 포함을 확인했다.
+- ZIP SHA256: `d6f3f81ca3b691c04ec1c4732b58109f5bf4b39ed8921381dbd2f26d6503586c`.
+- EXE SHA256: `4894989bf72bf954bc78b4ed187f7e3e6044c9f5a0351dd993d405038487780d`.
+- 개발 Python 환경 변수와 PATH를 제외한 압축 해제 EXE에서 중국어 프로필 복원·모의 기록/정지·정상 종료·실제 NIC 목록 조회를 통과했다. EXE 옆 개발자로그의 해당 실행 83개 레코드에 ERROR/CRITICAL이 없었다. 근거는 배포 결과 폴더의 `verification/result.json`이다.
+- 같은 압축 해제 EXE에서 명시적 `--tshark` 경로로 실제 localhost pcap/pcapng 각각 0패킷·5패킷·재시작을 실행했다. 6회 모두 파일 보관·전체 읽기 검사와 화면 요약 수 일치, 오프라인 ARP 확인을 통과했다. 근거는 `verification/frozen-ethernet/result.json`이다.
+- 이번 EXE 시험은 같은 개발 PC에서 수행했다. 별도 PC 배포·물리 NIC 부하·라이선스 CANoe 실제 측정 성공으로 확대 해석하지 않는다.
