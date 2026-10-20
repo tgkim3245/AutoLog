@@ -243,6 +243,29 @@ def test_restart_requires_manual_review_before_new_capture_then_allows_orderly_e
         runtime.close_for_test()
 
 
+def test_old_incomplete_record_does_not_trap_exit_and_remains_recoverable(tmp_path):
+    output = tmp_path / "captures"
+    output.mkdir()
+    repo = Repository(tmp_path / "state.sqlite3")
+    plan = seed(repo, output)
+    before = plan.files[0].temp_path.read_bytes()
+    repo.close()
+    for _ in range(2):
+        runtime = Runtime(tmp_path)
+        try:
+            runtime.initialize().result(5)
+            assert runtime.phase == SessionPhase.INCOMPLETE and runtime._plan is None
+            assert runtime.toggle((Role.CAN,)) is None
+            report = runtime._submit(runtime._refresh_recovery).result(5)
+            assert report["sessions"][0]["session_id"] == plan.session_id
+            assert runtime._settings.next_index == 2
+            assert runtime.request_exit().result(5) is True
+            assert runtime._closed
+            assert plan.files[0].temp_path.read_bytes() == before
+        finally:
+            runtime.close_for_test()
+
+
 def test_pcap_recovery_uses_full_read_and_rejects_format_mismatch(recovery, monkeypatch):
     from vil_logging.storage import recovery as module
     repo, service, _ = recovery

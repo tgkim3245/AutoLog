@@ -1,6 +1,8 @@
 """Simplified Chinese UI catalog. Diagnostic originals and device names stay intact."""
 
 TEXT = {
+    "exit_deferred_title": "暂缓退出",
+    "exit_deferred_help": "未能完成当前记录的停止或文件/输出设置清理。\n请查看最近活动中的错误，然后再次按 X 重试退出。\n如果持续失败，请发送错误报告。未完成的文件将被保留。",
     "disconnected_short": "未连接", "measurement_waiting_short": "等待测量",
     "license_required_short": "需要许可证", "block_required_short": "选择记录块",
     "block_recording_short": "记录块繁忙", "segment_ready_short": "记录准备",

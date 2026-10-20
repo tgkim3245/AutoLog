@@ -602,10 +602,12 @@ def test_normal_file_close_survives_restore_failure_and_keeps_evidence(fixture, 
     capture, app, path = prepared(fixture)
     capture.start("s1", {"temp_path": str(path)})
     real_validate = capture._validate
+    injected = []
 
     def fail_restore_only():
         real_validate()
-        if capture.stop_confirmed:
+        if capture.trigger_stopped and not injected:
+            injected.append(True)
             raise RuntimeError("injected restore failure")
 
     monkeypatch.setattr(capture, "_validate", fail_restore_only)
@@ -616,6 +618,94 @@ def test_normal_file_close_survives_restore_failure_and_keeps_evidence(fixture, 
     monkeypatch.setattr(capture, "_validate", real_validate)
     capture.restore_output("s1")
     assert app.blocks[0].FullName == "original_0.blf"
+
+
+class RetainedWriterBlock(Block):
+    """A stopped trigger retains its writer until the idle filename changes."""
+
+    def __init__(self, name):
+        self.writer = None
+        super().__init__(name)
+        start = self.Trigger.Start
+
+        def begin():
+            start()
+            self.writer = Path(self.FullName).open("r+b")
+
+        def pause():
+            self.Trigger.stops += 1
+            self.Trigger.Active = False
+            self.writer.seek(0)
+            self.writer.write(empty_blf())
+            self.writer.flush()
+
+        self.Trigger.Start, self.Trigger.Stop = begin, pause
+
+    @property
+    def FullName(self):
+        return self._full_name
+
+    @FullName.setter
+    def FullName(self, value):
+        if self.writer is not None and value != self._full_name:
+            self.writer.close()
+            self.writer = None
+        self._full_name = value
+
+
+def test_stop_releases_idle_output_before_waiting_for_closed_file_and_can_repeat(fixture, monkeypatch):
+    capture, app, params, root = fixture
+    app.blocks[0] = block = RetainedWriterBlock(str(root / "manual.blf"))
+    block.FileNameOptions.IncrementAfterTrigger = True
+    app.fresh_proxies = True
+    capture.connect(params)
+    app.Measurement.Running = True
+    clock = SimpleNamespace(now=0.)
+    monkeypatch.setattr("vil_logging.adapters.canoe.time", SimpleNamespace(
+        monotonic=lambda: clock.now, sleep=lambda delay: setattr(clock, "now", clock.now + delay)))
+    try:
+        for number in range(3):
+            capture.prepare(params)
+            path, session = root / f"held_{number}.blf", f"held-{number}"
+            capture.configure(session, {"temp_path": str(path)})
+            capture.start(session, {"temp_path": str(path)})
+            result = capture.stop(session)
+            assert result["stop_confirmed"] and not result["output_restore_pending"]
+            assert capture.inspect_file(session)["actual_format"] == "blf"
+            assert block.writer is None and block.FullName == str(root / "manual.blf")
+            assert block.FileNameOptions.IncrementAfterTrigger and app.Measurement.Running
+        assert block.Trigger.starts == block.Trigger.stops == 3
+        assert clock.now < 1  # No 28-second wait for a handle released by the filename change.
+    finally:
+        if block.writer is not None:
+            block.writer.close()
+
+
+@pytest.mark.parametrize("restart_manual", [False, True])
+def test_external_file_lock_remains_unconfirmed_and_retry_never_stops_manual_recording(fixture, monkeypatch, restart_manual):
+    capture, app, path = prepared(fixture)
+    capture.start("s1", {"temp_path": str(path)})
+    clock = SimpleNamespace(now=0.)
+    monkeypatch.setattr("vil_logging.adapters.canoe.time", SimpleNamespace(
+        monotonic=lambda: clock.now, sleep=lambda delay: setattr(clock, "now", clock.now + delay)))
+    with path.open("rb"):
+        with pytest.raises(TimeoutError, match="exclusive file close"):
+            capture.stop("s1")
+    assert capture.trigger_stopped and not capture.stop_confirmed
+    assert not capture.stats()["output_restore_pending"]
+    assert app.blocks[0].FullName == "original_0.blf"
+    with pytest.raises(RuntimeError, match="previous recording"):
+        capture.configure("s2", {"temp_path": str(path.with_name("new.blf"))})
+    assert app.blocks[0].Trigger.stops == 1
+    if restart_manual:
+        app.blocks[0].Trigger.Active = True
+        with pytest.raises(RuntimeError, match="restarted"):
+            capture.stop("s1")
+        assert app.blocks[0].Trigger.stops == 1 and app.blocks[0].Trigger.Active
+        app.blocks[0].Trigger.Active = False
+    capture.stop("s1")
+    assert capture.stop_confirmed and app.blocks[0].Trigger.stops == 1
+    assert capture.inspect_file("s1")["actual_format"] == "blf"
 
 
 def test_idle_cfg_switch_reuses_owned_window_and_preserves_unsaved_edits(fixture):

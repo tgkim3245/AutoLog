@@ -217,7 +217,7 @@ class SettingsDialog(QDialog):
         self.nic_input.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.nic_input.currentIndexChanged.connect(self._nic_changed)
         self.nic_input.popup_opened.connect(self._request_discovery)
-        self.nic_input.popup_closed.connect(lambda: self._render_networks(self._current("nic_id")))
+        self.nic_input.popup_closed.connect(self._refresh_networks_after_popup, Qt.ConnectionType.QueuedConnection)
         form.addRow(self.network_label, self.nic_input)
         self.format_label = QLabel()
         self.format_input = ThemedComboBox()
@@ -644,6 +644,12 @@ class SettingsDialog(QDialog):
                 self.nic_input.setItemData(index, selected, Qt.ItemDataRole.ToolTipRole)
             self.nic_input.setCurrentIndex(max(index, 0))
         self.nic_input.refresh_activity()
+
+    def _refresh_networks_after_popup(self):
+        # QComboBox closes the popup before committing its clicked QModelIndex.
+        # Rebuilding rows inside hidePopup invalidates that index. A queued slot
+        # runs after Qt commits the selection and its preference-save signal.
+        self._render_networks(self._current("nic_id"))
 
     def _render_discovery(self):
         tool = self._discovery.get("tshark", {})

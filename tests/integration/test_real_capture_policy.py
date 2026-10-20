@@ -179,6 +179,26 @@ def test_cancellation_after_reservation_sends_no_start_and_keeps_reserved_index(
     assert "start" not in pool.calls
 
 
+def test_unexpected_stop_exception_releases_exit_latch_and_allows_retry(real, monkeypatch):
+    runtime, pool = real
+    runtime.toggle((Role.ETHERNET,)).result(5)
+    original = pool.request
+
+    def fail_stop(roles, action, session_id, **kwargs):
+        if action == "stop":
+            raise OSError("injected stop transport error")
+        return original(roles, action, session_id, **kwargs)
+
+    monkeypatch.setattr(pool, "request", fail_stop)
+    assert runtime.request_exit().result(5) is False
+    assert not runtime._exit_pending and not runtime._closed
+    assert runtime.phase == SessionPhase.INCOMPLETE
+    assert ("exit_ready", False) in list(runtime.messages.queue)
+    monkeypatch.setattr(pool, "request", original)
+    assert runtime.request_exit().result(5) is True
+    assert runtime._plan.files[0].final_path.is_file()
+
+
 def test_pool_shutdown_failure_reports_exit_not_ready_instead_of_hanging_ui(real, monkeypatch):
     runtime, pool = real
 

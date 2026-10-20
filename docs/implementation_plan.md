@@ -1,5 +1,7 @@
 # 프로그램 구현 작업 계획
 
+2026-10-20 최신 수정: 소스 0.9.4에서 CAN 종료 지연·연속 기록과 NIC 클릭 선택을 수정했다. 0.9.3 현장에서는 CAN+Zipy 시작에 성공했지만 CAN 파일 닫힘 확인에 실패했다. [수정 및 현장 재시험 범위](capture_fixes_0_9_4.md)를 따른다. 실제 BLF 완결·반복 기록 실증은 계속 남아 있다. 아래 0.9.3까지의 구현 이력과 작업 ID는 유지한다.
+
 작성일: 2026-10-17 (Asia/Seoul)
 현황 갱신: 2026-10-20, 소스 버전 0.9.3. [수동 시험 후 파일명 변경 수정](canoe_fixes_0_9_3.md), 이전 [기록 시작 오류 수정](canoe_fixes_0_9_2.md), [준비 오류 수정](canoe_fixes_0_9_1.md), [사용성·채널·캡처 변경](usability_update_0_9_0.md)과 [CANoe 환경별 검증표](canoe_support_matrix.md)를 확인한다. [전체 검토·수정 결과](project_audit_0_8_6.md)와 [개선 반영 상태](improvement_backlog.md)을 함께 확인한다. 현재 작업별 진행은 **5절**, 다음 작업 순서는 **10절**을 기준으로 본다. 작업 ID와 최종 완료 기준은 기존 계획을 유지한다. [0.5.1 수정](canoe_fix_plan.md)에서 CANoe 제어·출력 복구, [0.6.0](development_stage_6.md)에서 수동 복구, [0.7.0](development_stage_7.md)에서 Ethernet 감시, [0.8.0](development_stage_8.md)에서 품질·부하 검사를 구현했다. [0.8.4](canoe_independent_connection.md)에서 cfg별 독립 연결을 필수 자동 처리로 고정하고 실제 두 worker 동시 요청과 UI 버튼 연속 클릭을 검증했다. [0.8.5](ui_update_0_8_5.md)에서 화면 간소화·실시간 NIC 수신 그래프·중국어·캡처 폴더 열기·진단 ZIP 검증을 추가하고 버퍼를 64 MiB 고정으로 바꿨다. 실제 CAN/Diag 구간 기록은 현장 재시험으로 검증한다.
 

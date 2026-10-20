@@ -226,6 +226,7 @@ def main(argv: list[str] | None = None) -> int:
         nonlocal exiting
         if not exiting:
             exiting = True
+            debug.log("app.exit_requested", phase=runtime.phase.value)
             window.set_phase(SessionPhase.STOPPING)
             runtime.request_exit()
 
@@ -384,6 +385,8 @@ def main(argv: list[str] | None = None) -> int:
                     exiting = False
                     window.restore_window()
                     window.set_phase(runtime.phase)
+                    QMessageBox.warning(window, tr("exit_deferred_title", window._language),
+                                        tr("exit_deferred_help", window._language))
         for packet in runtime.drain_packets():
             window.add_packet(packet)
         window.check_monitor_freshness()

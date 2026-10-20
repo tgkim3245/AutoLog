@@ -61,6 +61,7 @@ class CanoeCapture:
         self.session_id = ""
         self.path = None
         self.attempted = False
+        self.trigger_stopped = False
         self.stop_confirmed = False
         self.version = ""
         self.canoe_pid = 0
@@ -80,6 +81,7 @@ class CanoeCapture:
         return {"cfg": self.cfg, "logging_block": self.index, "session_id": self.session_id,
                 "canoe_version": self.version, "canoe_pid": self.canoe_pid,
                 "path": str(self.path or ""), "start_attempted": self.attempted,
+                "trigger_stopped": self.trigger_stopped,
                 "stop_confirmed": self.stop_confirmed,
                 "output_restore_pending": self._output_snapshot is not None,
                 "output_restore_error": self.output_restore_error,
@@ -186,7 +188,7 @@ class CanoeCapture:
         if session_id != self.session_id:
             raise RuntimeError("Output restoration belongs to a different recording session.")
         try:
-            if self.attempted and not self.stop_confirmed:
+            if self.attempted and not (self.trigger_stopped or self.stop_confirmed):
                 raise RuntimeError("Normal segment stop must be confirmed before restoring output settings.")
             self._validate()
             if self.block.Trigger.Active:
@@ -342,7 +344,7 @@ class CanoeCapture:
         self._selection = {"blocks": [{"name": item["name"], "path": item["path"]} for item in blocks]
                            } if self.block is not None else None
         self.session_id, self.path = "", None
-        self.attempted = self.stop_confirmed = False
+        self.attempted = self.trigger_stopped = self.stop_confirmed = False
         details = {**self.stats(), "blocks": blocks, "selected_block": str(index) if index else "",
                    "measurement_running": bool(self.app.Measurement.Running),
                    "view_only": "view only" in self.version.casefold(),
@@ -393,6 +395,8 @@ class CanoeCapture:
         return {**details, **self.stats()}
 
     def configure(self, session_id, params):
+        if self.attempted and not self.stop_confirmed:
+            raise RuntimeError("Resolve the previous recording before configuring another segment.")
         if self._output_snapshot is not None:
             raise RuntimeError("Restore the previous output settings before configuring another segment.")
         self._validate(allow_idle_output_refresh=True)
@@ -402,7 +406,7 @@ class CanoeCapture:
         if path.suffix.lower() != ".blf" or path.exists() or not path.parent.is_dir():
             raise ValueError("A new BLF working path is required; existing files are preserved.")
         self.session_id, self.path = session_id, path
-        self.attempted = self.stop_confirmed = False
+        self.attempted = self.trigger_stopped = self.stop_confirmed = False
         options = self.block.FileNameOptions
         self._output_snapshot = {"full_name": str(self.block.FullName),
                                  "options": {name: bool(getattr(options, name)) for name in FILE_OPTIONS}}
@@ -436,7 +440,7 @@ class CanoeCapture:
         if not _same_path(self.block.FullName, self.path):
             raise RuntimeError("Output filename changed after preparation; start is blocked.")
         self.attempted = True  # Record intent before a COM call can time out or raise.
-        self.stop_confirmed = False
+        self.trigger_stopped = self.stop_confirmed = False
         self._trace("canoe.trigger_start_requested")
         self.block.Trigger.Start()
         deadline = time.monotonic() + 8
@@ -475,29 +479,56 @@ class CanoeCapture:
             raise RuntimeError("Stop belongs to a different CANoe recording session.")
         if self.stop_confirmed:
             return self.stats()
+        started = time.monotonic()
         self._validate()
-        if not _same_path(self.block.FullName, self.path):
+        if not self.trigger_stopped and not _same_path(self.block.FullName, self.path):
             raise RuntimeError("Logging output changed externally; refusing to stop another segment.")
-        self._trace("canoe.trigger_stop_requested")
-        if self.block.Trigger.Active:
-            self.block.Trigger.Stop()
+        if self.trigger_stopped:
+            if self.block.Trigger.Active:
+                raise RuntimeError("Logging restarted after this segment stopped; refusing to stop another recording.")
+        else:
+            self._trace("canoe.trigger_stop_requested")
+            if self.block.Trigger.Active:
+                self.block.Trigger.Stop()
         deadline = time.monotonic() + 28
         last_error = ""
+        restore_attempted = False
+        wait_reported = False
         while time.monotonic() < deadline:
             self._validate()
-            if not self.block.Trigger.Active:
+            active = bool(self.block.Trigger.Active)
+            if self.trigger_stopped and active:
+                raise RuntimeError("Logging restarted after this segment stopped; output settings were preserved.")
+            if not active:
+                if not self.trigger_stopped:
+                    self.trigger_stopped = True
+                    self._trace("canoe.trigger_stopped", elapsed_ms=round((time.monotonic() - started) * 1000))
+                if self._output_snapshot is not None and not restore_attempted:
+                    restore_attempted = True
+                    # Trigger.Stop can pause logging while CANoe retains the
+                    # current file. Release our idle filename before waiting for
+                    # exclusive access; otherwise closure and restoration wait
+                    # on each other. The session remains unresolved until the
+                    # original working file is actually exclusively accessible.
+                    try:
+                        self.restore_output(session_id)
+                    except Exception:
+                        pass  # Preserve the snapshot/error; closure can still be proven independently.
+                if self.block.Trigger.Active:
+                    raise RuntimeError("Logging restarted during output restoration; refusing to certify closure.")
                 try:
                     with ExclusiveFile(self.path, observe(self.path)):
                         pass
                 except (OSError, ValueError) as error:
                     last_error = str(error)
+                    if not wait_reported:
+                        wait_reported = True
+                        self._trace("canoe.file_close_waiting", error=last_error,
+                                    output_restore_pending=self._output_snapshot is not None)
                 else:
                     self.stop_confirmed = True
-                    self._trace("canoe.segment_closed", measurement_running=bool(self.app.Measurement.Running))
-                    try:
-                        self.restore_output(session_id)
-                    except Exception:
-                        pass  # File close remains proven; report restoration separately.
+                    self._trace("canoe.segment_closed", measurement_running=bool(self.app.Measurement.Running),
+                                elapsed_ms=round((time.monotonic() - started) * 1000))
                     return self.stats()
             time.sleep(.05)
         raise TimeoutError("CANoe normal stop / exclusive file close is unconfirmed: " + last_error)

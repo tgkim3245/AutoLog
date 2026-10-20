@@ -1,3 +1,7 @@
+import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QSignalSpy
+
 from vil_logging.diagnostics.network_activity import ActivityHistory, ReceiveCounter
 from vil_logging.ui.network_combo import ACTIVITY_ROLE
 from vil_logging.ui.settings_dialog import SettingsDialog
@@ -52,5 +56,31 @@ def test_inventory_updates_wait_until_picker_closes(qtbot):
     assert dialog.nic_input.currentData() == "old"
     assert dialog.nic_input.findData("new") < 0
     dialog.nic_input.hidePopup()
-    assert dialog.nic_input.findData("new") >= 0
+    qtbot.waitUntil(lambda: dialog.nic_input.findData("new") >= 0)
     assert dialog.nic_input.currentData() == "old"
+
+
+@pytest.mark.parametrize("input_method", ["mouse", "keyboard"])
+def test_selection_survives_popup_close_and_inventory_refresh(qtbot, input_method):
+    dialog = SettingsDialog()
+    qtbot.addWidget(dialog)
+    report = {"interfaces": [{"id": "wifi", "name": "Wi-Fi"}, {"id": "vehicle", "name": "Ethernet"}]}
+    dialog.set_connection_discovery(report)
+    dialog.open_section("ethernet")
+    nic = dialog.nic_input
+    nic.set_sampling(False)
+    nic.setCurrentIndex(nic.findData("wifi"))
+    spy = QSignalSpy(dialog.preferences_changed)
+    nic.showPopup()
+    qtbot.waitUntil(lambda: nic.view().isVisible())
+    dialog.set_connection_discovery({"interfaces": list(reversed(report["interfaces"]))})
+    index = nic.model().index(nic.findData("vehicle"), 0)
+    if input_method == "mouse":
+        qtbot.mouseClick(nic.view().viewport(), Qt.MouseButton.LeftButton, pos=nic.view().visualRect(index).center())
+    else:
+        qtbot.keyClick(nic.view(), Qt.Key.Key_Down)
+        qtbot.keyClick(nic.view(), Qt.Key.Key_Return)
+    qtbot.waitUntil(lambda: not nic.view().isVisible())
+    qtbot.wait(10)
+    assert nic.currentData() == "vehicle"
+    assert spy.count() == 1 and spy.at(0)[0] == {"nic_id": "vehicle"}

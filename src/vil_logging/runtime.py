@@ -1240,25 +1240,32 @@ class Runtime:
         return self._submit(self._exit)
 
     def _exit(self) -> bool:
-        if self.phase in {SessionPhase.RECORDING, SessionPhase.PARTIAL} or (
-            self.phase == SessionPhase.INCOMPLETE and not self.demo and self._plan and not self._storage_failed
-        ):
-            self._stop()
-        if self.phase in ACTIVE or self.phase == SessionPhase.INCOMPLETE:
-            self._exit_pending = False
-            self._event("SESSION_INCOMPLETE", level="WARNING", original="Exit postponed; unresolved state")
-            self._publish("exit_ready", False)
-            return False
+        ready = False
         try:
+            if self.phase in {SessionPhase.RECORDING, SessionPhase.PARTIAL} or (
+                self.phase == SessionPhase.INCOMPLETE and not self.demo and self._plan and not self._storage_failed
+            ):
+                self._stop()
+            # Historical recovery records do not belong to this process. Keep
+            # them and their files intact; they block new capture, not app exit.
+            if self.phase in ACTIVE or (self.phase == SessionPhase.INCOMPLETE and self._plan is not None):
+                self._event("SESSION_INCOMPLETE", level="WARNING", original="Exit postponed; unresolved current capture")
+                return False
             self._close_owned_resources()
+            ready = True
+            return True
         except Exception as error:
             log.exception("application.orderly_close_failed")
-            self._exit_pending = False
             self._event("OPERATION_ERROR", level="ERROR", original=str(error))
-            self._publish("exit_ready", False)
+            if self.phase in ACTIVE:
+                self._set_phase(SessionPhase.INCOMPLETE if self._plan else SessionPhase.FAILED)
             return False
-        self._publish("exit_ready", True)
-        return True
+        finally:
+            # A stop exception must also release both runtime/UI exit latches.
+            if not ready:
+                self._exit_pending = False
+            log.info("application.exit_result", extra={"fields": {"ready": ready, "phase": self.phase.value}})
+            self._publish("exit_ready", ready)
 
     def _close_owned_resources(self, *, abnormal=False) -> None:
         if self._pool:

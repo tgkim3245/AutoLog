@@ -41,6 +41,14 @@ TEXT = {
     "packets": ("패킷 보기", "Packets"),
     "environment": ("환경 확인", "Check environment"),
     "exit": ("프로그램 종료", "Exit program"),
+    "exit_deferred_title": ("종료 보류", "Exit postponed"),
+    "exit_deferred_help": (
+        "현재 기록의 정지 또는 파일·출력 설정 정리를 완료하지 못했습니다.\n"
+        "최근 활동의 오류를 확인한 뒤 X를 다시 누르면 종료를 재시도합니다.\n"
+        "계속 실패하면 버그리포트를 보내 주세요. 미완료 파일은 보존합니다.",
+        "The current capture stop or file/output cleanup could not be completed.\n"
+        "Check the error in Recent activity, then press X again to retry exiting.\n"
+        "If it keeps failing, send a bug report. Incomplete files are preserved."),
     "show": ("창 열기", "Show window"),
     "next_files": ("다음 캡처 파일명", "Next capture filenames"),
     "current_files": ("현재 기록 파일", "Currently recording"),
