@@ -43,3 +43,11 @@ AutoLog는 이 패널을 클릭하거나 해당 시스템 변수를 바꾸지 �
 구버전이 출력 복구 오류 때문에 X 종료를 계속 보류하면, 수동 기록과 AutoLog 기록이 모두 정지한 것을 직접 확인한 뒤 작업 관리자에서 구버전 AutoLog를 종료해야 할 수 있다. 이는 구버전 교체 절차이며 새 버전이 실행 중인 이전 프로세스를 자동 종료하거나 해당 CANoe를 임의 인수하지 않는다.
 
 재시험은 **cfg별 연결 확인 → 전용 CANoe에서 F9/Trace 확인 → AutoLog 연결 재확인 → AutoLog logging 시작/정지**로 한다. 패널 버튼은 함께 사용하지 않는다. [현장 체크리스트](licensed_canoe_validation.md)에 실제 BLF 구간과 측정 유지·원래 설정 복구 결과를 기록한다.
+
+## 배포 확인
+
+- 깨끗한 소스 커밋 `30e41f7540e2b8043f796f46fc87f9f5c7777325`에서 `build.cmd --no-pause`로 `AutoLog-0.9.2_20261020_105034`을 만들었다. 로컬 위치는 `Downloads/AutoLog_Builds/AutoLog-0.9.2_20261020_105034/`다.
+- ZIP은 **52,933,267바이트**, SHA256 `7641a934fa195c1b767188f907f4b59daef1df4c8d22c8d33d9b082985507d67`이다. EXE SHA256은 `90aa64a813b1d2020c6cd860e11fe0362ae3e89517b72af725287d4b3192f3a2`다. ZIP CRC·압축 해제 EXE 해시·제품/파일 버전 0.9.2와 COM mutex 의존 파일을 확인했다.
+- 개발 Python 변수/경로를 제외한 환경의 압축 해제 EXE에서 중국어 설정 복원·모의 기록/정지·정상 종료·실제 네트워크 목록 조회를 통과했다. 이 실행의 EXE 옆 개발자로그 89개 레코드에 ERROR/CRITICAL이 없었다. 근거는 배포 결과 `verification/result.json`이다.
+- 배포 EXE의 PYZ에서 **실제 포함된 CANoe 어댑터 코드**를 읽어 새 프록시 대역의 3구간 configure/start/query/stop/BLF 구조 검사·출력 복구 검사를 다시 통과했다. 다른 블록을 조작하지 않았으며 구 identity 함수가 없는 것도 확인했다. 근거는 `adapter-verification/result.json`이다. 이것은 개발 Python에서 추출 어댑터 코드를 대역으로 검사한 것이며 EXE의 실제 COM·CAN 측정 성공을 뜻하지 않는다.
+- 빌드 PC의 XL DLL 미발견은 기존과 같으며 이번 버전에서 드라이버 검색/하드웨어 기준 정책을 바꾸지 않았다. 실제 장비 재시험은 수행하지 않았다.
