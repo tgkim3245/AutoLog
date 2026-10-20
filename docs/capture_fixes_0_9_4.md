@@ -50,3 +50,13 @@ Qt가 항목의 선택을 확정하기 전에 popup 닫힘 콜백에서 clear/ad
 3. CAN+Zipy로 짧은 기록을 시작·정지하고 보관 완료까지의 시간을 확인한다. 3회 반복해 다음 기록이 가능한지 확인한다.
 4. 매회 CANoe 측정 유지, 원래 BLF 출력/옵션 복구, 최종 BLF 실제 프레임·PCAP 수신 내용을 확인한다.
 5. 미완료가 남으면 정지 재시도 후 버그리포트를 보낸다. 정리 전 임시 파일을 삭제하지 않는다.
+
+## 배포 검증 (2026-10-21)
+
+- 깨끗한 소스 `0e10923aa9560b10552f53f556697db3b013905b`에서 `AutoLog-0.9.4_20261021_050622`를 빌드했다. 기본 저장소는 `%USERPROFILE%/Downloads/AutoLog_Builds/`다.
+- ZIP 52,948,037바이트, SHA256 `9f63c16d08014c848be1c13d53d48c4020fceb472f922270535f0170d63e5e51`. EXE SHA256 `3b453cb8c19b5975d2c7fe924ae19d3e1226d43a45cbd1b68c1e58929cd8428b`.
+- ZIP CRC·해시·EXE 제품/파일 버전을 확인했다. 압축 해제 EXE를 개발 Python 없는 PATH에서 실행해 중국어 설정, 모의 기록·정상 종료, NIC 목록, 오류 없는 개발자로그 87개를 확인했다.
+- 같은 EXE의 실제 dumpcap/TShark localhost PCAP/PCAPNG 각 0패킷·5패킷·재시작 6구간을 통과했다. 모든 recorder/decoder 종료 코드 0, 파일 전체 읽기·패킷 수 일치, 오프라인 ARP 해석을 확인했다. 물리 NIC·차량 캡처는 실행하지 않았다.
+- EXE에서 추출한 CAN 어댑터 코드의 대역 검사 20개, Runtime 코드의 이전 미완료 종료·정지 예외 후 재시도 검사 2개를 개발 Python에서 통과했다. 실제 CANoe 장비 시험이 아니다.
+- 가이드 개정 2026-10-21.1을 8개 뷰포트로 렌더링했다. HTML 23,177바이트·START_HERE 3,311바이트이며 ZIP/EXE 폴더/압축 해제본/렌더링 문서와 build_info의 개정·크기·SHA256이 일치한다.
+- 로컬 근거: 배포 폴더의 `verification/result.json`, `verification/ethernet/result.json`, `verification/frozen_adapter_result.json`, `verification/frozen-runtime/result.json`, `documentation_verification.json`. 실제 캡처와 상세 진단은 Git에서 제외한다.
