@@ -142,6 +142,101 @@ def test_fresh_com_proxies_record_three_segments_without_touching_other_block(tm
     assert app.Measurement.Running and len(app.open_calls) == 1
 
 
+@pytest.mark.parametrize("role", ["can", "diag"])
+@pytest.mark.parametrize("fresh_proxies", [False, True])
+def test_manual_recording_filename_changes_allow_three_segments(tmp_path, role, fresh_proxies):
+    cfg = tmp_path / f"{role}.cfg"
+    cfg.write_bytes(b"user configuration")
+    app = Application(2 if role == "can" else 1)
+    app.fresh_proxies = fresh_proxies
+    block = app.blocks[0]
+    block.Name = "CAN_Logging" if role == "can" else "Logging"
+    if role == "can":
+        app.blocks[1].Name, app.blocks[1].FullName = "ETH_Logging", "untouched.pcapng"
+    capture = CanoeCapture(create_application=lambda: app)
+    params = {"cfg_path": str(cfg), "logging_block": "1"}
+    capture.connect(params)  # The cfg's original filename is observed before the manual test.
+    app.Measurement.Running = True
+    for number in range(3):
+        manual = tmp_path / f"manual_{number:03}.blf"
+        manual.write_bytes(empty_blf())
+        block.FullName = str(manual)  # Manual recording / CANoe filename increment, then stopped.
+        block.FileNameOptions.IncrementAfterTrigger = True
+        capture.prepare(params)
+        path, session = tmp_path / f"segment_{number}.blf", f"{role}-{number}"
+        capture.configure(session, {"temp_path": str(path)})
+        capture.start(session, {"temp_path": str(path)})
+        assert capture.query()[0] == "recording"
+        capture.stop(session)
+        assert capture.inspect_file(session)["actual_format"] == "blf"
+        assert block.FullName == str(manual) and block.FileNameOptions.IncrementAfterTrigger
+        assert manual.read_bytes() == empty_blf()
+        assert not capture.stats()["output_restore_pending"]
+    assert block.Trigger.starts == block.Trigger.stops == 3
+    assert len([row for row in capture.journal if row["event"] == "canoe.idle_output_refreshed"]) >= 1
+    if role == "can":
+        assert app.blocks[1].FullName == "untouched.pcapng"
+        assert app.blocks[1].Trigger.starts == app.blocks[1].Trigger.stops == 0
+    assert len(app.open_calls) == 1 and app.Measurement.Running
+    assert cfg.read_bytes() == b"user configuration"
+
+
+def test_idle_filename_change_between_prepare_and_configure_restores_latest_path(fixture):
+    capture, app, params, root = fixture
+    capture.connect(params)
+    app.Measurement.Running = True
+    capture.prepare(params)
+    manual = str(root / "manual_increment_003.blf")
+    app.blocks[0].FullName = manual
+    path = root / "segment.blf"
+    capture.configure("segment", {"temp_path": str(path)})
+    capture.stop("segment")  # Cancellation before Start also restores the most recent manual path.
+    assert app.blocks[0].FullName == manual
+    assert app.blocks[0].Trigger.starts == app.blocks[0].Trigger.stops == 0
+    assert not capture.stats()["output_restore_pending"]
+
+
+@pytest.mark.parametrize("stage", ["prepare", "configure"])
+def test_changed_manual_filename_while_active_is_not_adopted_or_stopped(fixture, stage):
+    capture, app, params, root = fixture
+    capture.connect(params)
+    app.Measurement.Running = True
+    if stage == "configure":
+        capture.prepare(params)
+    block = app.blocks[0]
+    block.FullName = str(root / "manual_active.blf")
+    block.Trigger.Active = True
+    args = (params,) if stage == "prepare" else ("segment", {"temp_path": str(root / "segment.blf")})
+    with pytest.raises(RuntimeError, match="already recording"):
+        getattr(capture, stage)(*args)
+    assert capture._selection["blocks"][0]["path"] == "original_0.blf"
+    assert block.FullName == str(root / "manual_active.blf") and block.Trigger.Active
+    assert block.Trigger.starts == block.Trigger.stops == 0
+    assert not capture.stats()["output_restore_pending"]
+    block.Trigger.Active = False  # Manual stop by the user, not AutoLog.
+    capture.prepare(params)
+    assert capture._selection["blocks"][0]["path"] == block.FullName
+
+
+@pytest.mark.parametrize("change", ["sibling_path", "duplicate_name"])
+def test_idle_filename_refresh_does_not_hide_layout_or_sibling_changes(fixture, change):
+    capture, app, params, _ = fixture
+    other = Block("untouched.pcapng")
+    other.Name = "ETH_Logging" if change == "sibling_path" else "Logging"
+    app.blocks.append(other)
+    app.Configuration.OnlineSetup.LoggingCollection.Count = 2
+    params = {**params, "logging_block": "1"}
+    capture.connect(params)
+    app.Measurement.Running = True
+    app.blocks[0].FullName = "manual_increment_002.blf"
+    if change == "sibling_path":
+        other.FullName = "externally_changed.pcapng"
+    with pytest.raises(RuntimeError, match="changed"):
+        capture.prepare(params)
+    assert capture._selection["blocks"][0]["path"] == "original_0.blf"
+    assert all(block.Trigger.starts == block.Trigger.stops == 0 for block in app.blocks)
+
+
 @pytest.mark.parametrize("status", ["mismatch", "unavailable"])
 def test_saved_hardware_reference_blocks_start_when_unverified(fixture, monkeypatch, status):
     capture, app, params, _ = fixture
@@ -222,6 +317,7 @@ def test_preparation_cannot_silently_adopt_an_external_replacement(fixture, chan
     app.Measurement.Running = True
     if change == "block":
         app.blocks[0] = Block("replacement.blf")
+        app.blocks[0].Name = "Replacement logging block"
     else:
         app.Configuration.FullName = str(root / "another.cfg")
     with pytest.raises(RuntimeError, match="changed"):
@@ -284,7 +380,7 @@ def test_disconnected_idle_com_handle_can_be_reacquired(fixture):
     assert capture.block is app.blocks[0]
 
 
-@pytest.mark.parametrize("change", ["name", "path", "count", "order", "ambiguous"])
+@pytest.mark.parametrize("change", ["name", "format", "count", "order", "ambiguous"])
 def test_idle_rebuild_never_adopts_changed_or_ambiguous_selection(fixture, change):
     capture, app, params, _ = fixture
     if change in {"order", "ambiguous"}:
@@ -296,8 +392,8 @@ def test_idle_rebuild_never_adopts_changed_or_ambiguous_selection(fixture, chang
     app.blocks[0] = Block(old.FullName)
     if change == "name":
         app.blocks[0].Name = "Different logging block"
-    elif change == "path":
-        app.blocks[0].FullName = "different.blf"
+    elif change == "format":
+        app.blocks[0].FullName = "different.pcapng"
     elif change == "count":
         app.blocks.append(Block("second.blf"))
         app.Configuration.OnlineSetup.LoggingCollection.Count = 2

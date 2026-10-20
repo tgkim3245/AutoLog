@@ -4,7 +4,7 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 
 배포받은 사용자는 EXE 옆 **START_HERE.txt**와 **AutoLog_User_Guide.html**을 먼저 읽으세요. Defender의 `CAPLcompExec.exe`·`CANoe64.exe` 허용 앱 등록과 최초 연결·기록·복구 절차를 안내합니다. [공식 사용자 가이드 관리 원본·변경 이력](user_guide/README.md)은 소프트웨어 변경과 함께 갱신하며 빌드/ZIP에 자동 포함합니다.
 
-현재 소스 버전은 **0.9.2**입니다. [CANoe 기록 시작 오류 수정](docs/canoe_fixes_0_9_2.md), 이전 [준비 오류 수정](docs/canoe_fixes_0_9_1.md), [사용성·채널 확인·캡처 분리 변경](docs/usability_update_0_9_0.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md)를 확인하세요. CAN과 Diag의 **연결 확인**은 각 .cfg를 별도 CANoe 창에 연결하고 구성 열기·측정 대기·구간 기록 준비를 구분합니다. 로컬 Vector 장치의 채널을 조회할 수 있으면 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교합니다. 조회 불가와 실제 수신 성공은 구분합니다. 이전 [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)도 참고하세요.
+현재 소스 버전은 **0.9.3**입니다. [수동 기록 후 파일명 변경 차단 수정](docs/canoe_fixes_0_9_3.md), 이전 [CANoe 기록 시작 오류 수정](docs/canoe_fixes_0_9_2.md), [준비 오류 수정](docs/canoe_fixes_0_9_1.md), [사용성·채널 확인·캡처 분리 변경](docs/usability_update_0_9_0.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md)를 확인하세요. CAN과 Diag의 **연결 확인**은 각 .cfg를 별도 CANoe 창에 연결하고 구성 열기·측정 대기·구간 기록 준비를 구분합니다. 로컬 Vector 장치의 채널을 조회할 수 있으면 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교합니다. 조회 불가와 실제 수신 성공은 구분합니다. 이전 [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)도 참고하세요.
 
 **기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
 
@@ -21,6 +21,8 @@ CAN과 Diag는 각각 하나의 .cfg와 그 안의 BLF 기록 블록 하나를 �
 AutoLog로 cfg를 연 뒤 해당 CANoe 창에서 채널 매핑과 cfg에 필요한 모든 버스 옵션의 라이선스를 확인하고 **F9 측정 실행 → Trace 수신 확인 → AutoLog 연결 확인** 순서로 준비하세요. 측정 실패 시 CANoe Write 창의 오류를 확인합니다. BLF 블록만 선택하거나 AutoLog의 Zipy를 해제해도 cfg의 Ethernet 요구 사항이 없어지지는 않습니다. 원본 cfg와 라이선스 설정은 AutoLog가 변경하지 않습니다.
 
 대표 cfg의 `Logging` 패널 버튼은 CAPL에서 로깅을 제어하는 별도 버튼입니다. AutoLog는 패널을 클릭하거나 시스템 변수를 바꾸지 않고 선택한 `CAN_Logging` 같은 BLF 블록을 직접 제어합니다. 패널 색으로 AutoLog의 기록 상태를 판단하거나 두 제어를 함께 사용하지 마세요. 0.9.1 현장 로그에서 측정 실행과 BLF 블록 선택은 확인됐지만 출력 적용 직후 COM 객체 비교가 실패했습니다. 0.9.2는 전체 구간에서 논리 블록과 소유 출력 경로를 검증하며 조회 객체 주소에 의존하지 않습니다. 새 버전의 실제 장비 구간 기록 재시험은 남아 있습니다.
+
+0.9.2의 다음 현장 시도에서는 수동 시험 후 바뀐 BLF 파일명을 다른 블록으로 오인해 시작 전에 차단했습니다. 0.9.3은 수동 기록을 멈춘 뒤 같은 cfg·유일한 이름의 블록에서 BLF 파일명만 바뀌면 재연결 없이 받아들입니다. AutoLog가 출력 경로를 적용한 뒤에는 외부 경로 변경을 계속 차단하며 정리 후에는 시작 직전의 경로·옵션으로 복구합니다. CAN·Diag 수동 성공은 사용자 확인이고 새 AutoLog 버전의 실제 자동 기록 성공은 아직 확인하지 못했습니다.
 
 ## 폴더와 Git 관리 범위
 

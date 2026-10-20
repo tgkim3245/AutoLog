@@ -1,6 +1,6 @@
 # 검증 계획
 
-최신 검토: [0.9.2 CANoe 기록 시작 수정·회귀 검사](canoe_fixes_0_9_2.md), 이전 [0.8.6 전반 검토](project_audit_0_8_6.md). 매 조회 새 COM 프록시를 반환하는 조건에서 전체 구간과 출력 복구를 검사하며, 실제 CAN 시험 절차는 [라이선스 PC 체크리스트](licensed_canoe_validation.md)를 따른다.
+최신 검토: [0.9.3 수동 시험 후 파일명 변경 수정·회귀 검사](canoe_fixes_0_9_3.md), 이전 [0.9.2 CANoe 기록 시작 수정](canoe_fixes_0_9_2.md), [0.8.6 전반 검토](project_audit_0_8_6.md). 매 조회 새 COM 프록시와 수동 BLF 파일명 변경 조건에서 전체 구간·최신 출력 복구·진행 중 수동 기록 미조작을 검사하며, 실제 CAN 시험 절차는 [라이선스 PC 체크리스트](licensed_canoe_validation.md)를 따른다.
 
 상태: 요구사항 55개에 대응하는 시나리오 66개(T-01~T-66). [0.8.5 화면·언어·그래프·진단 ZIP 검사](ui_update_0_8_5.md), CANoe 자동 독립 연결·실제 두 cfg 연결 근거는 [0.8.4 결과](canoe_independent_connection.md), 품질·부하는 [8단계](development_stage_8.md), Ethernet 감시는 [7단계](development_stage_7.md), 수동 복구는 [6단계](development_stage_6.md)를 따른다. 0.8.5 자동 검사 386개와 아래 시나리오 전체의 현장 통과는 구분한다. 실제 CANoe 측정·구간 기록, CAN/Diag 수신/채널 관측, 차량 NIC의 대표 부하·장시간/1 GiB 초과와 팀 배포 검증은 남아 있다. 임계값과 시험 조건이 미확정인 항목에는 실측 결과를 입력하지 않는다.
 

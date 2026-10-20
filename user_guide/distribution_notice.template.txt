@@ -25,6 +25,8 @@
 4. CAN/Diag: cfg 선택·연결 확인 → 전용 CANoe 창에서 컴파일/채널·라이선스 확인
    → F9 측정·Trace 수신 확인 → AutoLog 연결 재확인 → logging 시작/정지.
    CAN과 Diag는 서로 다른 cfg를 각각 별도 CANoe 창에서 사용합니다.
+   먼저 수동 기록을 시험했다면 해당 기록만 정지하고 F9 측정은 유지하세요.
+   같은 블록에서 BLF 파일명만 바뀐 경우 연결을 다시 하지 않고 logging을 누르면 됩니다.
    CANoe의 수동 Logging 패널과 AutoLog를 함께 조작하지 마세요.
 
 5. Zipy: tshark.exe 직접 선택 → 장비에 연결된 네트워크 선택·연결 확인

@@ -83,9 +83,9 @@ class CanoeCapture:
                 "stop_confirmed": self.stop_confirmed,
                 "output_restore_pending": self._output_snapshot is not None,
                 "output_restore_error": self.output_restore_error,
-                "block_validation": "cfg_index_order_name_paths_and_owned_output", "diagnostics": list(self.journal)}
+                "block_validation": "logical_selection_owned_output_idle_blf_refresh", "diagnostics": list(self.journal)}
 
-    def _validate(self):
+    def _validate(self, *, allow_idle_output_refresh=False):
         if self.app is None or not _same_path(self.app.Configuration.FullName, self.cfg):
             raise RuntimeError("CANoe configuration changed or window closed. Reconnect while measurement is stopped.")
         if self.block is not None:
@@ -107,6 +107,7 @@ class CanoeCapture:
                     current = item
             expected_paths = []
             reason = ""
+            idle_output_change = None
             for i, (before, after) in enumerate(zip(expected["blocks"], observed), 1):
                 paths = [before["path"]]
                 if i == self.index and self._output_snapshot is not None:
@@ -114,6 +115,18 @@ class CanoeCapture:
                     # Start/query/stop additionally require the exact working
                     # path; restore validates every option before writing.
                     paths = [self._output_snapshot["full_name"], str(self.path)]
+                elif (i == self.index and allow_idle_output_refresh
+                      and (not self.attempted or self.stop_confirmed)
+                      and before["name"] == after["name"]
+                      and Path(after["path"]).suffix.lower() == ".blf"
+                      and sum(item["name"] == after["name"] for item in observed) == 1
+                      and not _same_path(before["path"], after["path"])):
+                    # A manual test or CANoe's file-number increment changes
+                    # FullName without changing the selected logical block.
+                    # Only accept this before taking output ownership, with a
+                    # unique name and unchanged cfg/layout/sibling outputs.
+                    paths = [after["path"]]
+                    idle_output_change = {"previous": before["path"], "current": after["path"]}
                 expected_paths.append(paths)
                 if before["name"] != after["name"] or not any(_same_path(after["path"], path) for path in paths):
                     reason = "block_layout_or_output_changed"
@@ -128,6 +141,15 @@ class CanoeCapture:
                             measurement_running=bool(self.app.Measurement.Running))
                 raise RuntimeError("Logging block changed or output was edited externally. "
                                    "Reconnect and select the intended block again.")
+            if idle_output_change is not None:
+                if current.Trigger.Active:
+                    self._trace("canoe.preparation_blocked", reason="manual_recording_active", block=self.index,
+                                **idle_output_change)
+                    raise RuntimeError("The selected Logging Block is already recording. "
+                                       "Stop it manually before AutoLog starts a new segment.")
+                expected["blocks"][self.index - 1] = dict(selected)
+                self._trace("canoe.idle_output_refreshed", block=self.index, name=selected["name"],
+                            **idle_output_change)
             self.block = current
 
     def record_failure(self, action, error):
@@ -340,10 +362,11 @@ class CanoeCapture:
     def prepare(self, params):
         # A logging click is not consent to replace the previously selected
         # block. Validate the selection before connect refreshes it, allowing
-        # a verified idle model rebuild after the user's CANoe preparation.
+        # a verified idle model rebuild or BLF filename change after the user's
+        # manual test. Output is frozen as soon as configure takes ownership.
         # Explicit connection checks can deliberately adopt a new selection.
         if self.app is not None:
-            self._validate()
+            self._validate(allow_idle_output_refresh=True)
         details = self.connect(params)
         if self.block is None:
             raise RuntimeError(details["selection_error"] or
@@ -372,7 +395,7 @@ class CanoeCapture:
     def configure(self, session_id, params):
         if self._output_snapshot is not None:
             raise RuntimeError("Restore the previous output settings before configuring another segment.")
-        self._validate()
+        self._validate(allow_idle_output_refresh=True)
         if self.block is None or not self.app.Measurement.Running or self.block.Trigger.Active:
             raise RuntimeError("Measurement must be running and the selected logging trigger must be idle.")
         path = Path(params["temp_path"]).resolve()
