@@ -40,13 +40,32 @@ class Block:
                                                IncrementAfterDuration=False)
 
 
+class FreshComProxy:
+    """A different wrapper/IUnknown per Item() over the same CANoe block."""
+
+    def __init__(self, target):
+        object.__setattr__(self, "_target", target)
+        object.__setattr__(self, "_oleobj_", SimpleNamespace(QueryInterface=lambda _iid: object()))
+
+    def __getattr__(self, name):
+        return getattr(self._target, name)
+
+    def __setattr__(self, name, value):
+        setattr(self._target, name, value)
+
+
 class Application:
     def __init__(self, count=1):
         self.blocks = [Block(f"original_{i}.blf") for i in range(count)]
+        self.fresh_proxies = False
         self.Configuration = SimpleNamespace(FullName="", Modified=False, OnlineSetup=SimpleNamespace(
-            LoggingCollection=SimpleNamespace(Count=count, Item=lambda index: self.blocks[index - 1])))
+            LoggingCollection=SimpleNamespace(Count=count, Item=self.item)))
         self.Measurement = SimpleNamespace(Running=False)
         self.open_calls = []
+
+    def item(self, index):
+        block = self.blocks[index - 1]
+        return FreshComProxy(block) if self.fresh_proxies else block
 
     def Open(self, path, auto_save, prompt):
         self.open_calls.append((path, auto_save, prompt))
@@ -90,6 +109,37 @@ def test_three_segments_keep_measurement_and_original_configuration(fixture):
     assert app.open_calls[0][1:] == (False, True)
     assert app.blocks[0].Trigger.starts == app.blocks[0].Trigger.stops == 3
     assert Path(params["cfg_path"]).read_bytes() == b"original configuration, never saved by AutoLog"
+
+
+def test_fresh_com_proxies_record_three_segments_without_touching_other_block(tmp_path):
+    cfg = tmp_path / "can.cfg"
+    cfg.write_bytes(b"original configuration")
+    app = Application(2)
+    app.fresh_proxies = True
+    block, other = app.blocks
+    block.Name = "CAN_Logging"
+    other.Name, other.FullName = "ETH_Logging", "original.pcapng"
+    block.FileNameOptions.IncrementAfterTrigger = True
+    capture = CanoeCapture(create_application=lambda: app)
+    params = {"cfg_path": str(cfg), "logging_block": "1"}
+    capture.connect(params)
+    app.Measurement.Running = True
+    for number in range(3):
+        capture.prepare(params)
+        session, path = f"session-{number}", tmp_path / f"capture_{number}.blf"
+        capture.configure(session, {"temp_path": str(path)})
+        assert not block.FileNameOptions.IncrementAfterTrigger
+        capture.start(session, {"temp_path": str(path)})
+        assert capture.query()[0] == "recording"
+        capture.stop(session)
+        assert capture.inspect_file(session)["actual_format"] == "blf"
+        assert block.FullName == "original_0.blf" and block.FileNameOptions.IncrementAfterTrigger
+        assert not capture.stats()["output_restore_pending"]
+    assert block.Trigger.starts == block.Trigger.stops == 3
+    assert other.Trigger.starts == other.Trigger.stops == 0
+    assert other.FullName == "original.pcapng"
+    assert cfg.read_bytes() == b"original configuration"
+    assert app.Measurement.Running and len(app.open_calls) == 1
 
 
 @pytest.mark.parametrize("status", ["mismatch", "unavailable"])
@@ -139,9 +189,11 @@ def test_multiple_blocks_require_selection_and_other_trigger_is_untouched(tmp_pa
     assert app.blocks[0].Trigger.starts == app.blocks[0].Trigger.stops == 0
 
 
-@pytest.mark.parametrize("fault", ["configuration", "block", "filename", "measurement", "splitting"])
-def test_external_changes_prevent_start(fixture, fault):
+@pytest.mark.parametrize("fresh_proxies", [False, True])
+@pytest.mark.parametrize("fault", ["configuration", "block", "filename", "measurement", "splitting", "name", "sibling"])
+def test_external_changes_prevent_start(fixture, fault, fresh_proxies):
     capture, app, path = prepared(fixture)
+    app.fresh_proxies = fresh_proxies
     block = app.blocks[0]
     if fault == "configuration":
         app.Configuration.FullName = "C:/another.cfg"
@@ -151,8 +203,13 @@ def test_external_changes_prevent_start(fixture, fault):
         block.FullName = "other.blf"
     elif fault == "measurement":
         app.Measurement.Running = False
-    else:
+    elif fault == "splitting":
         block.FileNameOptions.IncrementAfterTrigger = True
+    elif fault == "name":
+        block.Name = "Another block"
+    else:
+        app.blocks.append(Block("another.blf"))
+        app.Configuration.OnlineSetup.LoggingCollection.Count = 2
     with pytest.raises(RuntimeError):
         capture.start("s1", {"temp_path": str(path)})
     assert block.Trigger.starts == 0
@@ -210,26 +267,24 @@ def test_idle_model_rebuild_after_manual_measurement_reacquires_exact_block(fixt
     assert old.Trigger.starts == old.Trigger.stops == 0
     assert replacement.FullName == old.FullName
     assert replacement.FileNameOptions.IncrementAfterGrowth
-    assert any(row["event"] == "canoe.idle_block_reacquired" for row in capture.journal)
+    assert not capture.stats()["output_restore_pending"]
 
 
-def test_disconnected_idle_com_handle_can_be_reacquired(fixture, monkeypatch):
+def test_disconnected_idle_com_handle_can_be_reacquired(fixture):
     capture, app, params, _ = fixture
     capture.connect(params)
     old = app.blocks[0]
     app.blocks[0] = Block(old.FullName)
     app.Measurement.Running = True
-    def identity(block):
-        if block is old:
+    class Disconnected:
+        def __getattr__(self, _name):
             raise RuntimeError("COM object disconnected during model rebuild")
-        return block
-    monkeypatch.setattr("vil_logging.adapters.canoe._identity", identity)
+    capture.block = Disconnected()
     capture.prepare(params)
     assert capture.block is app.blocks[0]
-    assert any(row["event"] == "canoe.block_identity_unavailable" for row in capture.journal)
 
 
-@pytest.mark.parametrize("change", ["name", "path", "options", "count", "order", "ambiguous"])
+@pytest.mark.parametrize("change", ["name", "path", "count", "order", "ambiguous"])
 def test_idle_rebuild_never_adopts_changed_or_ambiguous_selection(fixture, change):
     capture, app, params, _ = fixture
     if change in {"order", "ambiguous"}:
@@ -243,8 +298,6 @@ def test_idle_rebuild_never_adopts_changed_or_ambiguous_selection(fixture, chang
         app.blocks[0].Name = "Different logging block"
     elif change == "path":
         app.blocks[0].FullName = "different.blf"
-    elif change == "options":
-        app.blocks[0].FileNameOptions.IncrementAfterTrigger = True
     elif change == "count":
         app.blocks.append(Block("second.blf"))
         app.Configuration.OnlineSetup.LoggingCollection.Count = 2
@@ -259,21 +312,19 @@ def test_idle_rebuild_never_adopts_changed_or_ambiguous_selection(fixture, chang
 
 
 @pytest.mark.parametrize("active", [False, True])
-def test_owned_output_never_rebinds_a_structurally_identical_replacement(fixture, active):
+def test_owned_output_accepts_fresh_proxy_during_start_and_stop(fixture, active):
     capture, app, path = prepared(fixture)
     old = app.blocks[0]
     if active:
         capture.start("s1", {"temp_path": str(path)})
-    app.blocks[0] = Block(old.FullName)
-    app.blocks[0].Trigger.Active = old.Trigger.Active
-    with pytest.raises(RuntimeError, match="changed"):
-        if active:
-            capture.stop("s1")
-        else:
-            capture.start("s1", {"temp_path": str(path)})
-    assert capture.block is old
-    assert not app.blocks[0].Trigger.starts and not app.blocks[0].Trigger.stops
-    assert capture.stats()["output_restore_pending"]
+    app.fresh_proxies = True
+    if not active:
+        capture.start("s1", {"temp_path": str(path)})
+    assert capture.query()[0] == "recording"
+    capture.stop("s1")
+    assert old.Trigger.starts == old.Trigger.stops == 1
+    assert old.FullName == "original_0.blf"
+    assert not capture.stats()["output_restore_pending"]
 
 
 def test_failed_preparation_records_measurement_and_option_history(fixture):
@@ -367,16 +418,20 @@ def test_automatic_filename_options_are_temporary_for_three_segments(fixture):
         assert app.Measurement.Running
 
 
-def test_cancel_after_configuration_restores_without_touching_trigger(fixture):
+@pytest.mark.parametrize("fresh_proxies", [False, True])
+def test_cancel_after_configuration_restores_without_touching_trigger(fixture, fresh_proxies):
     capture, app, path = prepared(fixture)
+    app.fresh_proxies = fresh_proxies
     capture.restore_output("s1")
     assert app.blocks[0].FullName == "original_0.blf"
     assert not path.exists()
     assert app.blocks[0].Trigger.starts == app.blocks[0].Trigger.stops == 0
 
 
-def test_output_apply_failure_rolls_back_partial_option_changes(fixture):
+@pytest.mark.parametrize("fresh_proxies", [False, True])
+def test_output_apply_failure_rolls_back_partial_option_changes(fixture, fresh_proxies):
     capture, app, params, root = fixture
+    app.fresh_proxies = fresh_proxies
 
     class RejectGrowth:
         IncrementAtMeasurementStart = False
@@ -402,14 +457,48 @@ def test_output_apply_failure_rolls_back_partial_option_changes(fixture):
     assert not capture.stats()["output_restore_pending"]
 
 
-def test_external_output_edit_is_preserved_and_blocks_next_configuration(fixture):
+@pytest.mark.parametrize("fresh_proxies", [False, True])
+def test_external_output_edit_is_preserved_and_blocks_next_configuration(fixture, fresh_proxies):
     capture, app, path = prepared(fixture)
+    app.fresh_proxies = fresh_proxies
     app.blocks[0].FullName = "user-edited.blf"
     with pytest.raises(RuntimeError, match="externally"):
         capture.restore_output("s1")
     with pytest.raises(RuntimeError, match="previous output"):
         capture.configure("s2", {"temp_path": str(path.with_name("next.blf"))})
     assert app.blocks[0].FullName == "user-edited.blf"
+    assert capture.stats()["output_restore_pending"]
+
+
+@pytest.mark.parametrize("fault", ["name", "path", "sibling_path", "order", "ambiguity"])
+def test_recording_logical_changes_never_stop_a_foreign_block(tmp_path, fault):
+    cfg = tmp_path / "can.cfg"
+    cfg.write_bytes(b"original")
+    app = Application(2)
+    app.fresh_proxies = True
+    app.blocks[0].Name, app.blocks[1].Name = "CAN_Logging", "Other"
+    capture = CanoeCapture(create_application=lambda: app)
+    params = {"cfg_path": str(cfg), "logging_block": "1"}
+    capture.connect(params)
+    app.Measurement.Running = True
+    capture.prepare(params)
+    path = tmp_path / "owned.blf"
+    capture.configure("s1", {"temp_path": str(path)})
+    capture.start("s1", {"temp_path": str(path)})
+    owned, other = app.blocks
+    if fault == "name":
+        owned.Name = "Externally renamed"
+    elif fault == "path":
+        owned.FullName = "foreign.blf"
+    elif fault == "sibling_path":
+        other.FullName = "edited.blf"
+    elif fault == "order":
+        app.blocks.reverse()
+    else:
+        other.Name, other.FullName = owned.Name, owned.FullName
+    with pytest.raises(RuntimeError, match="changed"):
+        capture.stop("s1")
+    assert owned.Trigger.stops == other.Trigger.stops == 0
     assert capture.stats()["output_restore_pending"]
 
 

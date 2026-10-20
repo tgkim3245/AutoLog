@@ -9,6 +9,8 @@ AutoLog 버전별 실제 근거를 관리한다. 이전 버전에서 구성 연�
 | 0.9.0 | CANoe 19 COM 타입 정보 기준 | 현장 시험 대기 | 로컬 XL 매핑 조회·시리얼/포트 기준 비교 구현, 실제 VN 실증 대기 | CAN·Diag 각각 BLF 블록 하나 | 실제 장비 재시험 대기 | 미실행 | [시험 절차](licensed_canoe_validation.md) |
 | 0.9.0 현장 시도 | 19.3.118 /pro CAN.LIN | CAN available / Ethernet missing (사용자 제공 Write 오류) | VN 상세 미확인, 기존 분산 판정 오류로 채널 조회 불가 | CAN · CAN_Logging / Diag · Logging | 서로 다른 PID로 cfg 연결 | 준비 실패 · start 명령 미전송 | [두 리포트 분석](canoe_fixes_0_9_1.md) |
 | 0.9.1 | 설치된 CANoe 19 타입 정보·COM 대역 | 실제 측정 미실행 | 로컬/원격 판정 수정, 실제 VN 재시험 대기 | 블록 갱신·교체 구분 대역 검사 | 이전 현장 연결 근거만 있음 | 미실행 | [수정·검증 범위](canoe_fixes_0_9_1.md) |
+| 0.9.1 현장 시도 | 19.3.118 | CAN 측정 실행 관측·수동 기록 사용자 확인, 옵션별 상세 미검증 | 로컬 모드 확인, XL DLL 조회 불가·기준 미저장 | CAN · CAN_Logging BLF | CAN·Diag 각 cfg/PID 연결 관측 | 출력 적용/복구 실패 · CAN start 미전송 | [새 리포트 분석](canoe_fixes_0_9_2.md) |
+| 0.9.2 | 매 조회 새 COM 프록시를 반환하는 대역 | 실제 장비 재시험 대기 | XL 조회 변경 없음 | 전체 구간 논리 블록/소유 출력 검증 | 이전 현장 연결 근거만 있음 | 대역 3구간 통과 · 실제 BLF 미시험 | [회귀 검사와 수정](canoe_fixes_0_9_2.md) |
 
 ## 새 시험 결과 추가 규칙
 

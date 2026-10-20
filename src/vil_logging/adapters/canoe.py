@@ -52,13 +52,6 @@ def _create_application():
         return ActivatedApplication(app, created.pop(), setup)
 
 
-def _identity(obj):
-    if hasattr(obj, "_oleobj_"):
-        import pythoncom
-        return obj._oleobj_.QueryInterface(pythoncom.IID_IUnknown)
-    return obj  # Test doubles expose stable identity just like an unchanged COM model.
-
-
 class CanoeCapture:
     def __init__(self, *, create_application=None):
         self._create_application = create_application or _create_application
@@ -89,7 +82,8 @@ class CanoeCapture:
                 "path": str(self.path or ""), "start_attempted": self.attempted,
                 "stop_confirmed": self.stop_confirmed,
                 "output_restore_pending": self._output_snapshot is not None,
-                "output_restore_error": self.output_restore_error, "diagnostics": list(self.journal)}
+                "output_restore_error": self.output_restore_error,
+                "block_validation": "cfg_index_order_name_paths_and_owned_output", "diagnostics": list(self.journal)}
 
     def _validate(self):
         if self.app is None or not _same_path(self.app.Configuration.FullName, self.cfg):
@@ -102,37 +96,39 @@ class CanoeCapture:
                 self._trace("canoe.block_validation_failed", reason="block_count_changed", count=count,
                             block=self.index, expected=expected)
                 raise RuntimeError("Logging block layout changed. Reconnect and select the intended block again.")
-            current = collection.Item(self.index)
-            name = str(current.Name)
-            if name != expected["blocks"][self.index - 1]["name"]:
-                self._trace("canoe.block_validation_failed", reason="block_layout_changed", count=count,
-                            block=self.index, observed_name=name, expected=expected)
-                raise RuntimeError("Logging block layout changed. Reconnect and select the intended block again.")
-            try:
-                same_identity = _identity(current) == _identity(self.block)
-            except Exception as error:
-                same_identity = False
-                self._trace("canoe.block_identity_unavailable", error=str(error))
-            idle = self._output_snapshot is None and (not self.attempted or self.stop_confirmed)
-            if not same_identity:
-                observed = []
-                for i in range(1, count + 1):
-                    item = collection.Item(i)
-                    observed.append({"name": str(item.Name), "path": str(item.FullName)})
-                options = {key: bool(getattr(current.FileNameOptions, key)) for key in FILE_OPTIONS}
-                selected = expected["blocks"][self.index - 1]
-                unique = observed.count(selected) == 1
-                # Starting measurement or applying channel mapping can rebuild
-                # idle COM objects. Rebind only the exact, unambiguous selection.
-                # Never adopt a replacement during output ownership/recording.
-                if not idle or observed != expected["blocks"] or options != expected["options"] or not unique:
-                    self._trace("canoe.block_validation_failed", reason="identity_or_selection_changed",
-                                idle=idle, expected=expected, observed=observed, options=options,
-                                measurement_running=bool(self.app.Measurement.Running))
-                    raise RuntimeError("Logging block changed. Reconnect and select the intended block again.")
-                self.block = current
-                self._trace("canoe.idle_block_reacquired", block=self.index, name=name,
+            # CANoe can return a new COM identity on every Item(), including
+            # during capture. Validate the logical selection and output we own,
+            # never Python/IDispatch/IUnknown object identity.
+            observed, current = [], None
+            for i in range(1, count + 1):
+                item = collection.Item(i)
+                observed.append({"name": str(item.Name), "path": str(item.FullName)})
+                if i == self.index:
+                    current = item
+            expected_paths = []
+            reason = ""
+            for i, (before, after) in enumerate(zip(expected["blocks"], observed), 1):
+                paths = [before["path"]]
+                if i == self.index and self._output_snapshot is not None:
+                    # Partial COM setters/restoration can leave either path.
+                    # Start/query/stop additionally require the exact working
+                    # path; restore validates every option before writing.
+                    paths = [self._output_snapshot["full_name"], str(self.path)]
+                expected_paths.append(paths)
+                if before["name"] != after["name"] or not any(_same_path(after["path"], path) for path in paths):
+                    reason = "block_layout_or_output_changed"
+            selected = observed[self.index - 1]
+            matches = sum(item["name"] == selected["name"] and _same_path(item["path"], selected["path"])
+                          for item in observed)
+            if matches != 1:
+                reason = "ambiguous_logging_block"
+            if reason:
+                self._trace("canoe.block_validation_failed", reason=reason, block=self.index,
+                            expected=expected, expected_paths=expected_paths, observed=observed,
                             measurement_running=bool(self.app.Measurement.Running))
+                raise RuntimeError("Logging block changed or output was edited externally. "
+                                   "Reconnect and select the intended block again.")
+            self.block = current
 
     def record_failure(self, action, error):
         """Best-effort read-only failure evidence; never mask the command error."""
@@ -321,8 +317,7 @@ class CanoeCapture:
             index = 0
         self.index = index
         self.block = collection.Item(index) if index else None
-        self._selection = {"blocks": [{"name": item["name"], "path": item["path"]} for item in blocks],
-                           "options": {key: bool(getattr(self.block.FileNameOptions, key)) for key in FILE_OPTIONS}
+        self._selection = {"blocks": [{"name": item["name"], "path": item["path"]} for item in blocks]
                            } if self.block is not None else None
         self.session_id, self.path = "", None
         self.attempted = self.stop_confirmed = False
@@ -404,7 +399,8 @@ class CanoeCapture:
             except Exception:
                 pass  # The pending snapshot and both failures remain in the journal.
             raise
-        self._trace("canoe.output_confirmed", path=str(path))
+        self._trace("canoe.output_confirmed", path=str(path), block=self.index,
+                    name=str(self.block.Name), block_validation="logical_selection_and_owned_output")
         return self.stats()
 
     def start(self, session_id, params):
