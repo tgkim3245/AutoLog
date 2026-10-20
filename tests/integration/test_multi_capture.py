@@ -100,6 +100,27 @@ def test_canoe_output_failure_reserves_no_number_and_starts_nothing(real):
     assert not (runtime.data_dir / "captures/.vil_work").exists()
 
 
+@pytest.mark.parametrize("failed_role", [Role.CAN, Role.DIAG])
+def test_zipy_only_records_after_unselected_canoe_preparation_failed(real, failed_role):
+    runtime, tools = real
+    tools.fail = (failed_role, "prepare")
+    runtime.toggle((failed_role, Role.ETHERNET)).result(timeout=5)
+    assert runtime.phase == SessionPhase.FAILED
+    assert runtime._settings.next_index == 1 and runtime._plan is None
+    assert not any(action == "start" for _, action in tools.calls)
+    tools.calls.clear()
+    # The CANoe failure remains; deselecting it must exclude it from the retry.
+    runtime.toggle((Role.ETHERNET,)).result(timeout=5)
+    assert runtime.phase == SessionPhase.RECORDING
+    assert tuple(file.role for file in runtime._plan.files) == (Role.ETHERNET,)
+    runtime.toggle((Role.ETHERNET,)).result(timeout=5)
+    assert runtime.phase == SessionPhase.COMPLETED
+    assert tools.calls == [((Role.ETHERNET,), action) for action in ("prepare", "start", "stop", "inspect")]
+    assert runtime._settings.next_index == 2
+    assert runtime._plan.files[0].final_path.is_file()
+    assert not (runtime.data_dir / "captures/.vil_work").exists()
+
+
 def test_one_start_failure_reconciles_all_issued_targets_without_reusing_index(real):
     runtime, tools = real
     tools.fail = (Role.DIAG, "start")
