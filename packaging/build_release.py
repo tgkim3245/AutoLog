@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tomllib
 import zipfile
-from datetime import datetime
+from datetime import date, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -119,6 +119,48 @@ def write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def load_user_documentation(root: Path, app_name: str, app_version: str) -> tuple[dict, dict[str, str]]:
+    """Require reviewed documentation before reserving/building a release."""
+    source = root / "user_guide"
+    metadata = json.loads((source / "guide_metadata.json").read_text(encoding="utf-8"))
+    required = {"reviewed_app_version", "revision", "updated", "language"}
+    if not isinstance(metadata, dict) or set(metadata) != required or any(
+            not isinstance(value, str) for value in metadata.values()):
+        raise ValueError("Invalid user guide metadata.")
+    if metadata["reviewed_app_version"] != app_version:
+        raise ValueError(f"Review the user guide for {app_name} {app_version} and update guide_metadata.json.")
+    updated = date.fromisoformat(metadata["updated"])
+    if (metadata["language"] != "ko" or updated.isoformat() != metadata["updated"] or
+            not re.fullmatch(re.escape(metadata["updated"]) + r"\.[1-9][0-9]*", metadata["revision"])):
+        raise ValueError("Invalid user guide revision/date/language.")
+    guide_name = f"{app_name}_User_Guide.html"
+    variables = {"APP_NAME": app_name, "APP_VERSION": app_version,
+                 "GUIDE_REVISION": metadata["revision"], "UPDATED_DATE": metadata["updated"],
+                 "GUIDE_FILENAME": guide_name}
+    documents = {}
+    for template, filename in (("AutoLog_User_Guide.template.html", guide_name),
+                               ("distribution_notice.template.txt", "START_HERE.txt")):
+        text = (source / template).read_text(encoding="utf-8")
+        for key in ("APP_VERSION", "GUIDE_REVISION", "UPDATED_DATE"):
+            if "{{" + key + "}}" not in text:
+                raise ValueError(f"The user guide template {template} must include {key}.")
+        for key, value in variables.items():
+            text = text.replace("{{" + key + "}}", value)
+        if re.search(r"\{\{.*?\}\}", text, flags=re.S):
+            raise ValueError(f"Unresolved user guide placeholder in {template}.")
+        documents[filename] = text
+    return metadata, documents
+
+
+def write_user_documentation(package: Path, metadata: dict, documents: dict[str, str]) -> dict:
+    files = []
+    for filename, text in documents.items():
+        path = package / filename
+        path.write_text(text, encoding="utf-8")
+        files.append({"name": filename, "bytes": path.stat().st_size, "sha256": sha256(path)})
+    return {**metadata, "files": files}
+
+
 def new_output_directory(root: Path, name: str) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     for suffix in range(1000):
@@ -135,6 +177,7 @@ def build(
     root: Path, app_name: str, app_version: str, packages: dict,
     output_root: Path | None = None,
 ) -> Path:
+    guide_metadata, documents = load_user_documentation(root, app_name, app_version)
     built_at = datetime.now().astimezone()
     build_id = f"{app_name}-{app_version}_{built_at:%Y%m%d_%H%M%S}"
     location_note = None
@@ -199,7 +242,9 @@ def build(
         executable = package / f"{app_name}.exe"
         if not executable.is_file() or not (package / "_internal").is_dir():
             raise RuntimeError("The build did not produce the expected EXE and _internal folder.")
-        package_info = dict(info, status="succeeded", exe_sha256=sha256(executable))
+        documentation = write_user_documentation(package, guide_metadata, documents)
+        package_info = dict(info, status="succeeded", exe_sha256=sha256(executable),
+                            documentation=documentation)
         write_json(package / "build_info.json", package_info)
         archive = output / f"{output.name}.zip"
         logger.info("Creating %s", archive.name)
@@ -239,8 +284,9 @@ def main() -> int:
         app_name, app_version = read_app_metadata(root)
         packages = check_environment()
         if args.check:
+            guide_metadata, _documents = load_user_documentation(root, app_name, app_version)
             print(json.dumps({"app_name": app_name, "version": app_version, "packages": packages,
-                              "python": sys.executable}, indent=2))
+                              "python": sys.executable, "documentation": guide_metadata}, indent=2))
             return 0
         build(root, app_name, app_version, packages, args.output_root)
         return 0

@@ -58,6 +58,8 @@ AutoLog-0.4.5_20261018_153000/
 ├─ AutoLog/
 │  ├─ AutoLog.exe
 │  ├─ _internal/
+│  ├─ START_HERE.txt
+│  ├─ AutoLog_User_Guide.html
 │  └─ build_info.json
 ├─ AutoLog-0.4.5_20261018_153000.zip
 ├─ AutoLog-0.4.5_20261018_153000.zip.sha256.txt
@@ -70,6 +72,14 @@ AutoLog-0.4.5_20261018_153000/
 프로젝트가 사용자 `Documents` 안에 있으면 보호 폴더 쓰기를 시도하지 않고 `%USERPROFILE%\Downloads\AutoLog_Builds\` 아래에 저장합니다. 그 외에는 프로젝트 `outputs/`를 사용하며, 폴더 쓰기 보호가 확인되면 다운로드 위치를 사용합니다. 이 PC에서 확인된 제어된 폴더 액세스 차단도 이 방식으로 처리하며 보안 설정은 변경하지 않습니다. 실제 결과 경로는 실행 화면과 빌드 로그에 표시합니다. 위치를 직접 정하려면 `build.cmd --output-root "D:\AutoLog_Builds"`를 사용합니다.
 
 빌드 로직은 `packaging/build_release.py`, PyInstaller 사양은 `packaging/app.spec`입니다. 중간 분석 파일은 선택된 산출물 위치의 `build/<빌드명>/`에 남겨 빌드 오류 확인에 사용합니다. 실행·빌드 결과는 Git에서 제외합니다. 배포 전 실행 흐름과 장비 연동을 확인하고 검증 범위를 릴리스 문서에 기록합니다.
+
+## 배포용 사용자 가이드 갱신
+
+사용자 동작·도구/라이선스·Defender 허용 앱·파일/복구·검증 범위가 바뀌면 [공식 가이드 관리 원본](user_guide/README.md)을 같은 변경에서 수정합니다. HTML 템플릿과 배포 안내문을 검토하고 `guide_metadata.json`의 적용 SW 버전·문서 개정·갱신일, `CHANGELOG.md`를 함께 갱신합니다. `AGENTS.md`에도 이 유지 규칙을 기록했습니다.
+
+빌드는 `AutoLog_User_Guide.html`과 `START_HERE.txt`를 EXE 옆과 ZIP에 넣습니다. `build_info.json`의 `documentation`에 적용 버전·개정·갱신일·파일별 크기/SHA256을 기록합니다. 가이드 누락·검토 버전 불일치·잘못된 개정 정보·남은 템플릿 치환자는 빌드 전에 오류로 처리하며 `--check`에서도 확인합니다. 문서만 변경한 경우 SW 버전은 유지하고 문서 개정과 새로운 빌드 시각으로 구분합니다.
+
+배포 전 두 문서를 압축 해제본에서 열어 읽고, HTML의 목차·Defender 절차·실제 사용 절차와 버전 표시를 확인하세요. 과거 개발 초안이나 발표 자료는 사용자 안내 대신 배포하지 않습니다.
 
 ## Git 작업
 

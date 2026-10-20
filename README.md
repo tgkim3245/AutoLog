@@ -2,6 +2,8 @@
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 공통 logging 버튼으로 기록을 제어합니다.
 
+배포받은 사용자는 EXE 옆 **START_HERE.txt**와 **AutoLog_User_Guide.html**을 먼저 읽으세요. Defender의 `CAPLcompExec.exe`·`CANoe64.exe` 허용 앱 등록과 최초 연결·기록·복구 절차를 안내합니다. [공식 사용자 가이드 관리 원본·변경 이력](user_guide/README.md)은 소프트웨어 변경과 함께 갱신하며 빌드/ZIP에 자동 포함합니다.
+
 현재 소스 버전은 **0.9.2**입니다. [CANoe 기록 시작 오류 수정](docs/canoe_fixes_0_9_2.md), 이전 [준비 오류 수정](docs/canoe_fixes_0_9_1.md), [사용성·채널 확인·캡처 분리 변경](docs/usability_update_0_9_0.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md)를 확인하세요. CAN과 Diag의 **연결 확인**은 각 .cfg를 별도 CANoe 창에 연결하고 구성 열기·측정 대기·구간 기록 준비를 구분합니다. 로컬 Vector 장치의 채널을 조회할 수 있으면 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교합니다. 조회 불가와 실제 수신 성공은 구분합니다. 이전 [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)도 참고하세요.
 
 **기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
@@ -57,6 +59,8 @@ Python 3.14 x64 환경 준비와 검사 절차는 [개발 안내](CONTRIBUTING.m
 
 SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉니다. 앱, 패키지, EXE 속성, 빌드 폴더명이 이 값을 함께 사용합니다. 빌드 상세 정보와 오류는 결과 폴더의 `build_info.json`과 `build.log`에 있습니다.
 
+배포 문서는 SW 버전과 별도로 개정을 관리합니다. 가이드의 검토 버전이 현재 SW와 다르거나 문서 원본이 누락되면 빌드를 중단합니다. `build_info.json`에는 문서 개정·갱신일·두 문서의 크기와 SHA256도 기록합니다.
+
 ## 실제 기록과 개발자로그
 
 차량 캡처 파일은 앱에서 사용자가 선택한 저장 위치에 저장합니다. 저장 폴더, CANoe 구성 경로, TShark 경로, NIC와 파일 형식은 앱이 기억합니다. 사용자 설정·번호·이력 DB는 `%LOCALAPPDATA%\AutoLog`에 보관합니다.
@@ -94,5 +98,5 @@ git ls-files src
 - [현재 프로젝트 구조](docs/project_structure.md)
 - [요구사항](docs/requirements.md), [설계](docs/architecture.md), [제어 정책](docs/control_policy.md)
 - [초기 구현 검토 — 과거 기록](docs/requirements_implementation_review.md), [검증 계획](docs/validation_plan.md)
-- [시험 PC 준비 항목](docs/test_pc_setup.md), [사용자 가이드](user_guide/user_guide_draft.md)
+- [시험 PC 준비 항목](docs/test_pc_setup.md), [공식 사용자 가이드](user_guide/README.md)
 - [개발 이력](docs/development_log.md), [로컬 산출물 안내](outputs/README.md)
