@@ -1,5 +1,10 @@
 # 개발 기록
 
+## 2026-10-20 — Diag CAPL 컴파일 쓰기 차단 원인 확인
+
+- Diag 수동 기록 실패는 CBF 쓰기 거부였다. Defender 이벤트 1123에서 10:33:24의 `CAPLcompExec.exe` 차단 두 건과 10:31:30의 `CANoe64.exe` 차단을 해당 프로젝트 경로와 대조했다. 읽기 전용이 아닌 파일 속성·사용자 ACL과 유효한 Vector 실행 파일 서명도 확인했다.
+- AutoLog 코드/버전/EXE, 원본 cfg/CAPL/CBF, Defender 정책은 변경하지 않았다. 정확한 Vector 실행 파일 허용 후 CANoe 재시작·재컴파일·수동 기록·AutoLog 순서로 재시험하도록 [환경 조치 안내](canoe_capl_compile_troubleshooting.md)에 기록했다. 해결 후 실제 Diag 시험은 아직 수행하지 않았다.
+
 ## 2026-10-20 — CANoe 출력 적용 후 시작·복구 차단 수정 (0.9.2)
 
 - 새 현장 버그리포트 432개 레코드의 ZIP CRC·manifest 크기/SHA256을 검증했다. CAN 측정 실행과 `CAN_Logging` BLF 선택을 확인했으나 출력 설정 직후 COM 객체 비교로 configure와 rollback이 실패했다. CAN start 명령은 전송되지 않았다. 사용자는 수동 기록 성공을 확인했다.

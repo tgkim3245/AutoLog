@@ -6,6 +6,8 @@
 
 1. CANoe 빌드·라이선스 활성/측정 가능 여부, VN 모델·드라이버·CAN/Diag의 실제 채널을 기록한다. View Only 상태에서는 기록 시험을 진행할 수 없다.
 2. 대표 CAN/Diag cfg와 필요한 데이터베이스/CAPL 등 의존 파일을 준비한다. 원본은 별도 보관하고 시험 전후 해시를 비교한다. 기존 CAPL 자동시험·송신·로깅 버튼의 실행 상태를 확인한다.
+
+   CAPL 컴파일의 `Error writing binary file ... .cbf: 액세스가 거부되었습니다`는 먼저 [CBF 쓰기 거부 진단](canoe_capl_compile_troubleshooting.md)을 따른다. 2026-10-20 Diag 현장 오류에서는 Defender CFA가 Vector 컴파일러를 차단한 이벤트 1123을 확인했다. 원본 CAPL 수정이나 AutoLog 재빌드로 해결할 오류가 아니다.
 3. AutoLog에서 빈 시험 출력 폴더, 구분 가능한 prefix/시작 번호를 지정한다. 기본 선택 CAN·Zipy 중 시험할 대상만 체크한다.
 4. CAN·Diag 카드에서 서로 다른 cfg를 지정하고 연결 확인한다. **서로 다른 CANoe PID와 정확한 cfg**가 표시되는지 확인한다. CAN의 `CAN_Logging` BLF, Diag의 `Logging` BLF를 선택한다. CAN의 `ETH_Logging` PCAPNG는 CAN BLF 대상이 아니다.
 5. 독립 연결 설정이 처음 필요한 경우 기존 CANoe 작업을 저장하고 창을 닫은 후 다시 연결한다. AutoLog가 원본 can.ini를 백업하고 필요한 모드를 준비한다. 공유 창을 대신 제어하지 않는다.
