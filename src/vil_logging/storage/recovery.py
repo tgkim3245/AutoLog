@@ -15,7 +15,9 @@ from vil_logging.contracts.models import CaptureFilePlan, Role, utc_now
 from vil_logging.diagnostics.environment import _tool_candidates
 from vil_logging.storage.blf import inspect_blf
 from vil_logging.storage.blf_snapshot import (
+    cleanup_finalization_files,
     cleanup_retained_source,
+    finalization_paths,
     publication_source,
     snapshot_path,
 )
@@ -44,6 +46,9 @@ def _paths(file):
     paths = [file["temp_path"], file["final_path"], file["metadata"].get("actual_path", file["temp_path"])]
     if file["role"] in {"can", "diag"}:
         paths.append(str(snapshot_path(Path(file["temp_path"]))))
+        capture = CaptureFilePlan(Role(file["role"]), file["filename"], Path(file["temp_path"]), Path(file["final_path"]))
+        evidence = file["metadata"].get("inspection") or file["metadata"].get("stop_evidence", {})
+        paths.extend(str(path) for path, _ in finalization_paths(capture, evidence))
     return list(dict.fromkeys(paths))
 
 
@@ -128,7 +133,8 @@ class RecoveryService:
         if not file or file["state"] in SETTLED:
             raise FileManagementError("This capture is not awaiting publication")
         self.repo.check_file_claims(_paths(file))
-        inspection = file["metadata"].get("inspection", {})
+        inspection = {"finalization_files": file["metadata"].get("stop_evidence", {}).get("finalization_files", []),
+                      **file["metadata"].get("inspection", {})}
         capture_file = CaptureFilePlan(Role(role), file["filename"], Path(file["temp_path"]), Path(file["final_path"]))
         source, destination = publication_source(capture_file, inspection), capture_file.final_path
         if file["state"] == "publishing" and destination.exists():
@@ -172,6 +178,12 @@ class RecoveryService:
                 cleanup_retained_source(capture_file, inspection)
             except (OSError, ValueError):
                 log.info("recovery.blf_source_cleanup_deferred", extra={"session_id": session_id})
+        if inspection.get("finalization_files"):
+            try:
+                inspection["finalization_files"] = cleanup_finalization_files(capture_file, inspection)
+                self.repo.update_capture_file(session_id, Role(role), "published", inspection=inspection)
+            except (OSError, ValueError):
+                log.info("recovery.blf_finalization_cleanup_deferred", extra={"session_id": session_id})
         cleanup_work_directory(Path(file["temp_path"]).parent)
         log.info("recovery.file_published", extra={"session_id": session_id, "role": role,
                                                    "inspection": inspection, "operation_id": identifier})

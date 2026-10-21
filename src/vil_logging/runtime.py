@@ -31,7 +31,7 @@ from vil_logging.contracts.models import (
 )
 from vil_logging.diagnostics.capture_quality import LOW_SPACE_BYTES, SPACE_RECOVERY_BYTES
 from vil_logging.monitors.observation import fresh_report
-from vil_logging.storage.blf_snapshot import cleanup_retained_source
+from vil_logging.storage.blf_snapshot import cleanup_finalization_files, cleanup_retained_source
 from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
 from vil_logging.storage.file_access import matches, observe
 from vil_logging.storage.file_service import FileResultStorageError, FileService
@@ -993,22 +993,30 @@ class Runtime:
         for session in self._repo.captures(limit=None):
             for item in session["files"]:
                 inspection = item["metadata"].get("inspection", {})
-                if (item["state"] != "published" or not inspection.get("retained_source")
-                        or inspection.get("retained_source_cleaned")):
+                pending_source = inspection.get("retained_source") and not inspection.get("retained_source_cleaned")
+                pending_helpers = any(not row.get("cleaned") for row in inspection.get("finalization_files", []))
+                if item["state"] != "published" or not (pending_source or pending_helpers):
                     continue
                 file = CaptureFilePlan(Role(item["role"]), item["filename"],
                                        Path(item["temp_path"]), Path(item["final_path"]))
                 try:
-                    cleanup_retained_source(file, inspection)
+                    if pending_source:
+                        cleanup_retained_source(file, inspection)
+                    if pending_helpers:
+                        inspection["finalization_files"] = cleanup_finalization_files(file, inspection)
                     cleanup_work_directory(file.temp_path.parent)
                 except (OSError, ValueError) as error:
                     log.info("storage.blf_source_cleanup_deferred", extra={"fields": {
                         "session_id": session["session_id"], "path": str(file.temp_path), "error": str(error)}})
                 else:
-                    inspection["retained_source_cleaned"] = True
+                    if pending_source:
+                        inspection["retained_source_cleaned"] = True
                     self._repo.update_capture_file(session["session_id"], file.role, "published", inspection=inspection)
-                    log.info("storage.blf_source_cleaned", extra={"fields": {
-                        "session_id": session["session_id"], "path": str(file.temp_path)}})
+                    log.info("storage.blf_cleanup_checked", extra={"fields": {
+                        "session_id": session["session_id"], "path": str(file.temp_path),
+                        "source_cleaned": bool(inspection.get("retained_source_cleaned")),
+                        "finalization_files_pending": sum(not row.get("cleaned")
+                            for row in inspection.get("finalization_files", []))}})
 
     def _start_real(self, roles: tuple[Role, ...]) -> None:
         if self._storage_failed:
@@ -1167,13 +1175,15 @@ class Runtime:
                         self._event("FILE_ERROR", level="ERROR", target=role.label,
                                     original=str(error), path=str(actual_path))
                 elif not stopped:
-                    self._repo.update_capture_file(plan.session_id, role, "unknown", actual_path=str(actual_path))
+                    self._repo.update_capture_file(plan.session_id, role, "unknown", actual_path=str(actual_path),
+                                                   stop_evidence=results[role].details if role in results else {})
                 elif not file.temp_path.exists():
                     if phase != SessionPhase.INCOMPLETE:
                         phase = SessionPhase.FAILED
                     self._repo.update_capture_file(plan.session_id, role, "not_created")
                 else:
-                    self._repo.update_capture_file(plan.session_id, role, "closed", actual_path=str(actual_path))
+                    self._repo.update_capture_file(plan.session_id, role, "closed", actual_path=str(actual_path),
+                                                   stop_evidence=results[role].details if role in results else {})
                     self._event("FILE_CHECKING", target=role.label, path=str(actual_path))
                     self._publish("capture_step", {"step": "checking_file", "target": role.label})
                     checked = self._pool.request((role,), "inspect", plan.session_id,

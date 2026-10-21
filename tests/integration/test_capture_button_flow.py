@@ -49,7 +49,7 @@ class ExercisedWindow(ui.MainWindow):
                 assert '취소 처리 중' in button.text() and not button.isEnabled()
                 outcome['step'] = 2
             elif step == 2 and self._phase == SessionPhase.FAILED:
-                assert button.isEnabled() and '다시 시도' in button.text()
+                assert button.isEnabled() and '새 기록 시작' in button.text()
                 button.click()
                 outcome['step'] = 3
             elif step == 3 and self._phase == SessionPhase.RECORDING:

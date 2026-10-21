@@ -9,6 +9,7 @@ import time
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
 from vil_logging.diagnostics.canoe_measurement import measurement_diagnostics
 from vil_logging.diagnostics.canoe_setup import CanoeActivationError
@@ -75,6 +76,7 @@ class CanoeCapture:
         self.output_restore_error = ""
         self.file_exclusive = False
         self._inspection = None
+        self._handoff = None
 
     def _trace(self, event, **fields):
         entry = {"event": event, "monotonic": time.monotonic(), **fields}
@@ -89,6 +91,7 @@ class CanoeCapture:
                 "trigger_stopped": self.trigger_stopped,
                 "stop_confirmed": self.stop_confirmed,
                 "file_exclusive": self.file_exclusive,
+                "finalization_files": [dict(self._handoff)] if self._handoff else [],
                 "output_restore_pending": self._output_snapshot is not None,
                 "output_restore_error": self.output_restore_error,
                 "block_validation": "logical_selection_owned_output_idle_blf_refresh", "diagnostics": list(self.journal)}
@@ -124,6 +127,8 @@ class CanoeCapture:
                     # Start/query/stop additionally require the exact working
                     # path; restore validates every option before writing.
                     paths = [self._output_snapshot["full_name"], str(self.path)]
+                    if self._handoff:
+                        paths.append(self._handoff["path"])
                 elif (i == self.index and allow_idle_output_refresh
                       and (not self.attempted or self.stop_confirmed)
                       and before["name"] == after["name"]
@@ -181,6 +186,8 @@ class CanoeCapture:
         bases = [snapshot["full_name"]]
         if not original_only and self._output_snapshot is not None:
             bases.append(str(self.path))
+            if self._handoff:
+                bases.append(self._handoff["path"])
         value = Path(value)
         for name in bases:
             if _same_path(value, name):
@@ -248,6 +255,7 @@ class CanoeCapture:
                 raise RuntimeError("Logging trigger became active; output settings were preserved.")
             current_path = str(self.block.FullName)
             if not (_same_path(current_path, self.path) or current_path == snapshot["full_name"]
+                    or self._handoff and self._handoff["stopped"] and _same_path(current_path, self._handoff["path"])
                     or self._restored_path_matches(current_path)):
                 raise RuntimeError("Logging output was edited externally; restoration would overwrite it.")
             options = self.block.FileNameOptions
@@ -405,6 +413,7 @@ class CanoeCapture:
         self.session_id, self.path = "", None
         self._restore_context = None
         self.file_exclusive, self._inspection = False, None
+        self._handoff = None
         self.attempted = self.trigger_stopped = self.stop_confirmed = False
         details = {**self.stats(), "blocks": blocks, "selected_block": str(index) if index else "",
                    "measurement_running": bool(self.app.Measurement.Running),
@@ -449,7 +458,7 @@ class CanoeCapture:
             history = f" CANoe Write history reports missing options: {missing} (may be an earlier attempt)." if missing else ""
             raise RuntimeError("Start measurement (F9) in the AutoLog-created CANoe window after checking channel mapping "
                                "and all bus-option licenses required by this cfg. If F9 fails, review CANoe's Write window. "
-                               "Confirm CAN reception in Trace, then check the connection again." + history)
+                               "Confirm CAN reception in Trace, then press Start recording; measurement is checked automatically." + history)
         if self.block.Trigger.Active:
             raise RuntimeError("The selected Logging Block is already recording. Stop it manually before AutoLog starts a new segment.")
         self._trace("canoe.prepared", block=self.index)
@@ -469,6 +478,7 @@ class CanoeCapture:
         self.session_id, self.path = session_id, path
         self._restore_context = None
         self.file_exclusive, self._inspection = False, None
+        self._handoff = None
         self.attempted = self.trigger_stopped = self.stop_confirmed = False
         options = self.block.FileNameOptions
         self._output_snapshot = {"full_name": str(self.block.FullName),
@@ -535,6 +545,103 @@ class CanoeCapture:
         return "error", {**self.stats(), "measurement_running": running, "trigger_active": active,
                          "error": "Measurement, logging trigger or exact output no longer matches this session"}
 
+    def _stop_handoff(self):
+        """Stop only the unique finalization segment whose Start we issued."""
+        handoff = self._handoff
+        self._validate()
+        if not handoff or not _same_path(self.block.FullName, handoff["path"]):
+            raise RuntimeError("Finalization output changed; refusing to stop another recording")
+        self._require_single_file()
+        if not handoff["start_attempted"]:
+            if self.block.Trigger.Active:
+                raise RuntimeError("Another recording started before our finalization trigger")
+            handoff["stopped"] = True
+            return
+        if handoff["stopped"]:
+            if self.block.Trigger.Active:
+                raise RuntimeError("Finalization recording restarted externally; leave it unchanged")
+            return
+        if handoff["identity"] is None and Path(handoff["path"]).is_file():
+            handoff["identity"] = observe(Path(handoff["path"]))
+        if self.block.Trigger.Active:
+            self.block.Trigger.Stop()
+        deadline = time.monotonic() + 4
+        while True:
+            self._validate()
+            if not _same_path(self.block.FullName, handoff["path"]):
+                raise RuntimeError("Finalization output changed; leave it unchanged")
+            if not self.block.Trigger.Active:
+                handoff["stopped"] = True
+                self._trace("canoe.finalization_trigger_stopped", path=handoff["path"])
+                return
+            if time.monotonic() >= deadline:
+                raise TimeoutError("Finalization trigger stop is unconfirmed")
+            time.sleep(.02)
+
+    def _finalize_output(self):
+        """Rotate an open, unfinalized BLF onto a disposable owned segment.
+
+        CANoe can buffer the final container/header until the next trigger.
+        A new filename alone is insufficient. Keep measurement running and
+        rotate only this block; never patch a BLF header or discard its tail.
+        """
+        if self._handoff:
+            if not self._handoff["stopped"]:
+                self._stop_handoff()
+            return
+        if not self.path.is_file():
+            return  # A failed start may never have created a capture.
+        with self.path.open("rb") as source:
+            header = source.read(FILE_HEADER.size)
+        if len(header) != FILE_HEADER.size:
+            return  # Inspection reports a damaged/partial header; never synthesize one.
+        values = FILE_HEADER.unpack(header)
+        if values[0] != b"LOGG" or values[1] < FILE_HEADER.size:
+            return
+        if values[10] == self.path.stat().st_size:
+            return  # Already finalized: no extra trigger/file is needed.
+        if not self.app.Measurement.Running:
+            return  # Measurement stop may already be flushing; never restart it.
+        self._validate()
+        if self.block.Trigger.Active or not _same_path(self.block.FullName, self.path):
+            raise RuntimeError("Finalization requires this stopped segment's exact output")
+        self._require_single_file()
+        path = self.path.parent / (".AutoLog_finalize_" + uuid4().hex + ".blf")
+        if path.exists():
+            raise FileExistsError("Existing finalization output is preserved")
+        self._handoff = {"path": str(path), "start_attempted": False, "stopped": False, "identity": None}
+        self._trace("canoe.finalization_handoff_requested", source=str(self.path), destination=str(path),
+                    declared_bytes=values[10], actual_bytes=self.path.stat().st_size)
+        self.block.FullName = str(path)
+        self._validate()
+        if not _same_path(self.block.FullName, path):
+            raise RuntimeError("CANoe did not accept the exact finalization path")
+        self._handoff["start_attempted"] = True
+        try:
+            self.block.Trigger.Start()
+            deadline = time.monotonic() + 4
+            while True:
+                self._validate()
+                self._require_single_file()
+                if not _same_path(self.block.FullName, path):
+                    raise RuntimeError("Finalization output changed externally")
+                if self.block.Trigger.Active and path.is_file():
+                    with path.open("rb") as source:
+                        if source.read(4) == b"LOGG":
+                            self._handoff["identity"] = observe(path)
+                            break
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("CANoe finalization trigger start is unconfirmed")
+                time.sleep(.02)
+        except Exception:
+            # Best-effort cleanup is restricted to our exact issued helper.
+            try:
+                self._stop_handoff()
+            except Exception as stop_error:
+                self._trace("canoe.finalization_stop_failed", error=str(stop_error))
+            raise
+        self._stop_handoff()
+
     def stop(self, session_id):
         if not self.attempted:
             return self.restore_output(session_id)  # Undo configured output without stopping any foreign trigger.
@@ -544,6 +651,8 @@ class CanoeCapture:
             return self.stats()
         started = time.monotonic()
         self._validate()
+        if self._handoff and not self._handoff["stopped"]:
+            self._stop_handoff()
         if not self.trigger_stopped and not _same_path(self.block.FullName, self.path):
             raise RuntimeError("Logging output changed externally; refusing to stop another segment.")
         if self.trigger_stopped:
@@ -564,6 +673,8 @@ class CanoeCapture:
                 if not self.trigger_stopped:
                     self.trigger_stopped = True
                     self._trace("canoe.trigger_stopped", elapsed_ms=round((time.monotonic() - started) * 1000))
+                if self._output_snapshot is not None and self._restore_context is None:
+                    self._finalize_output()
                 if self._output_snapshot is not None and restore_attempts < 3:
                     restore_attempts += 1
                     try:

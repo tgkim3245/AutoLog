@@ -8,7 +8,7 @@ TEXT = {
     "capture_recording": "正在记录 · 停止", "capture_partial": "部分记录中 · 停止",
     "capture_stopping": "正在停止并整理文件…", "capture_checking_file": "正在检查 {targets} 文件…",
     "capture_saving": "正在保存 {targets} 文件…", "capture_file_busy": "正在处理文件…",
-    "capture_completed": "开始下次记录", "capture_failed": "重试", "capture_incomplete": "检查记录状态",
+    "capture_completed": "开始下次记录", "capture_failed": "开始新记录", "capture_incomplete": "检查记录状态",
     "capture_review_help": "文件已保留，停止或归档尚未确认。请在恢复窗口检查原因和实际文件。",
     "capture_no_targets": "请选择记录对象", "capture_exiting": "正在准备退出…", "capture_demo": "模拟 · {text}",
     "capture_exiting_help": "清理超过约 3 秒将强制退出。再次按 X 可立即退出。",

@@ -22,7 +22,7 @@ def window(qtbot):
     (SessionPhase.PARTIAL, "일부 기록 중 · 정지", True, "attention"),
     (SessionPhase.STOPPING, "정지 · 파일 정리 중…", False, "progress"),
     (SessionPhase.COMPLETED, "다음 기록 시작", True, "success"),
-    (SessionPhase.FAILED, "다시 시도", True, "attention"),
+    (SessionPhase.FAILED, "새 기록 시작", True, "attention"),
     (SessionPhase.INCOMPLETE, "기록 마무리 확인", False, "attention"),
 ])
 def test_phase_describes_action_and_click_availability(window, phase, text, enabled, tone):
@@ -43,7 +43,7 @@ def test_cancel_is_requested_once_and_does_not_reenable_during_start_transition(
     window.set_phase(SessionPhase.STARTING)
     assert not window.logging_button.isEnabled()
     window.set_phase(SessionPhase.FAILED)
-    assert window.logging_button.isEnabled() and window.logging_button.text() == "다시 시도"
+    assert window.logging_button.isEnabled() and window.logging_button.text() == "새 기록 시작"
 
 
 def test_stop_remains_available_during_background_checks_and_cannot_be_double_clicked(window):

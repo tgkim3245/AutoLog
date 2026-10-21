@@ -83,6 +83,25 @@ def test_interrupted_sealed_blf_publication_reconciles_without_overwrite(recover
     assert not service.report()["sessions"]
 
 
+def test_recovery_keeps_finalization_file_ownership_from_interrupted_stop(recovery):
+    from uuid import uuid4
+
+    repo, service, plan = recovery
+    file = plan.files[0]
+    helper = file.temp_path.parent / (".AutoLog_finalize_" + uuid4().hex + ".blf")
+    helper.write_bytes(b"disposable output from a stopped owned trigger")
+    repo.update_capture_file(plan.session_id, Role.CAN, "unknown", stop_evidence={
+        "finalization_files": [{"path": str(helper), "identity": observe(helper),
+                                "start_attempted": True, "stopped": True}]})
+    row = selected(service, plan)
+    assert str(helper) in [candidate["path"] for candidate in row["files"][0]["candidates"]]
+    result = service.publish(plan.session_id, "can", row["token"], True)
+    assert result["inspection"]["finalization_files"][0]["cleaned"]
+    assert file.final_path.exists() and not helper.exists() and not file.temp_path.parent.exists()
+    service.finish_session(plan.session_id, selected(service, plan)["token"], True)
+    assert not service.report()["sessions"]
+
+
 @pytest.mark.parametrize("fault", ["damaged", "used", "collision", "link", "missing"])
 def test_unreadable_used_ambiguous_files_are_preserved(recovery, fault):
     repo, service, plan = recovery

@@ -8,12 +8,14 @@ import pytest
 from vil_logging.contracts.models import CaptureFilePlan, Role
 from vil_logging.storage.blf import FILE_HEADER
 from vil_logging.storage.blf_snapshot import (
+    cleanup_finalization_files,
     cleanup_retained_source,
     publication_source,
     seal_blf,
     snapshot_path,
 )
 from vil_logging.storage.capture_files import publish_capture
+from vil_logging.storage.file_access import observe
 
 
 @pytest.fixture
@@ -116,3 +118,32 @@ def test_source_change_during_snapshot_is_rejected(capture, monkeypatch):
     with pytest.raises(ValueError, match="changed"):
         seal_blf(capture.temp_path)
     assert capture.temp_path.exists() and not snapshot_path(capture.temp_path).exists()
+
+
+@pytest.mark.parametrize("fault", ["locked", "wrong_name", "wrong_parent", "replaced", "archive_missing"])
+def test_disposable_finalization_files_are_cleaned_only_with_exact_ownership(capture, fault):
+    from uuid import uuid4
+
+    checked = seal_blf(capture.temp_path)
+    publish_capture(capture, checked)
+    path = capture.temp_path.parent / (".AutoLog_finalize_" + uuid4().hex + ".blf")
+    if fault == "wrong_name":
+        path = path.with_name("user_recording.blf")
+    elif fault == "wrong_parent":
+        path = path.parent.parent / path.name
+    path.write_bytes(b"owned disposable output")
+    checked["finalization_files"] = [{"path": str(path), "identity": observe(path)}]
+    if fault == "replaced":
+        path.unlink()
+        path.write_bytes(b"foreign replacement")
+    elif fault == "archive_missing":
+        capture.final_path.unlink()
+    if fault == "locked":
+        with path.open("rb"):
+            result = cleanup_finalization_files(capture, checked)
+            assert path.exists() and not result[0].get("cleaned")
+        assert cleanup_finalization_files(capture, checked)[0]["cleaned"] and not path.exists()
+    else:
+        with pytest.raises((ValueError, OSError)):
+            cleanup_finalization_files(capture, checked)
+        assert path.exists()

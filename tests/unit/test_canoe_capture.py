@@ -773,6 +773,214 @@ def test_incomplete_blf_is_not_certified_even_when_trigger_has_stopped(fixture, 
     assert capture.journal[-1]["observed"]["file"]["declared_bytes"] == 0
 
 
+class NextTriggerFinalizesBlock(Block):
+    """Field behavior: Stop leaves header zero and a buffered tail until Start."""
+
+    def __init__(self, name):
+        super().__init__(name)
+        self.writer = None
+        self.number = 0
+        self.started_paths = []
+        self.Trigger.Start, self.Trigger.Stop = self.begin, self.pause
+
+    def finish(self):
+        if self.writer:
+            import struct
+            tail = struct.pack("<4sHHIIQ", b"LOBJ", 16, 1, 24, 9999, self.number)
+            content = FILE_HEADER.pack(b"LOGG", 144, *([0] * 8), 168, 168, 1, 0, *([0] * 16)).ljust(144, b"\0") + tail
+            self.writer.seek(0)
+            self.writer.write(content)
+            self.writer.flush()
+            self.writer.close()
+            self.writer = None
+
+    def begin(self):
+        self.finish()
+        self.number += 1
+        self.Trigger.starts += 1
+        self.Trigger.Active = True
+        self.started_paths.append(self.FullName)
+        self.writer = Path(self.FullName).open("w+b")
+        pending = FILE_HEADER.pack(b"LOGG", 144, *([0] * 8), 0, 144, 0, 0, *([0] * 16)).ljust(144, b"\0")
+        self.writer.write(pending)
+        self.writer.flush()
+
+    def pause(self):
+        self.Trigger.stops += 1
+        self.Trigger.Active = False
+
+
+def test_real_runtime_can_zipy_three_segments_publish_with_buffered_tail(fixture):
+    import struct
+
+    from vil_logging.contracts.commands import Command, CommandResult
+    from vil_logging.contracts.models import Role, SessionPhase
+    from vil_logging.runtime import Runtime
+
+    capture, app, params, root = fixture
+    app.blocks[0] = block = NextTriggerFinalizesBlock(str(root / "original.blf"))
+    capture.connect(params)
+    app.Measurement.Running = True
+    paths = {}
+
+    class Tools:
+        def request(self, roles, action, session_id, **kwargs):
+            results = {}
+            for role in roles:
+                p = kwargs.get("role_params", {}).get(role, kwargs.get("params", {}))
+                if role == Role.CAN:
+                    if action in {"connect", "prepare"}:
+                        details = getattr(capture, action)(p)
+                    elif action in {"configure", "start"}:
+                        details = getattr(capture, action)(session_id, p)
+                    elif action == "inspect":
+                        details = capture.inspect_file(session_id)
+                    elif action == "restore":
+                        details = capture.restore_output(session_id)
+                    else:
+                        details = capture.stop(session_id)
+                else:
+                    details = {}
+                    if action == "start":
+                        paths[role] = Path(p["temp_path"])
+                        paths[role].write_bytes(struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1))
+                    elif action == "inspect":
+                        info = paths[role].stat()
+                        details = {"actual_format": "pcap", "packet_count": 0, "bytes": info.st_size,
+                                   "inode": info.st_ino, "mtime_ns": info.st_mtime_ns}
+                state = {"connect": "ready", "prepare": "ready", "configure": "configured", "start": "recording",
+                         "stop": "stopped", "restore": "stopped", "inspect": "verified"}[action]
+                results[role] = CommandResult(Command(action, role, session_id), True, state, details=details)
+            return results
+
+        def close(self, **kwargs):
+            pass
+
+        def drain_packets(self):
+            return []
+
+    runtime = Runtime(root / "profile")
+    try:
+        runtime.initialize().result(timeout=5)
+        runtime._pool.close(abnormal=True)
+        runtime._pool = Tools()
+        runtime.save_preferences({"can_cfg": params["cfg_path"], "can_logging_block": "1"}).result(timeout=5)
+        for number in range(3):
+            runtime.toggle((Role.CAN, Role.ETHERNET)).result(timeout=5)
+            assert runtime.phase == SessionPhase.RECORDING
+            runtime.toggle((Role.CAN, Role.ETHERNET)).result(timeout=5)
+            assert runtime.phase == SessionPhase.COMPLETED
+            assert all(file.final_path.is_file() for file in runtime._plan.files)
+            can_file = next(file for file in runtime._plan.files if file.role == Role.CAN)
+            assert not can_file.temp_path.exists()
+            assert can_file.final_path.read_bytes()[-8:] == (2 * number + 1).to_bytes(8, "little")
+            assert app.Measurement.Running and not block.Trigger.Active
+        assert runtime._settings.next_index == 4
+        block.finish()
+        runtime._submit(runtime._cleanup_retained_blf_sources).result(timeout=5)
+        assert not (runtime.data_dir / "captures/.vil_work").exists()
+        history = runtime._submit(lambda: runtime._repo.captures()).result(timeout=5)
+        assert len(history) == 3 and all(row["phase"] == "completed" for row in history)
+        assert all(file["metadata"]["inspection"]["finalization_files"][0]["cleaned"]
+                   for row in history for file in row["files"] if file["role"] == "can")
+    finally:
+        block.finish()
+        runtime.close_for_test()
+
+
+def test_next_trigger_finalizes_every_real_file_without_stopping_measurement(fixture):
+    from vil_logging.contracts.models import CaptureFilePlan, Role
+    from vil_logging.storage.blf_snapshot import cleanup_finalization_files
+    from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
+
+    capture, app, params, root = fixture
+    app.blocks[0] = block = NextTriggerFinalizesBlock(str(root / "user original.blf"))
+    app.fresh_proxies = True
+    block.FileNameOptions.IncrementAfterTrigger = True
+    saved = []
+    try:
+        capture.connect(params)
+        app.Measurement.Running = True
+        for number in range(3):
+            capture.prepare(params)
+            directory = root / ".vil_work" / str(number)
+            directory.mkdir(parents=True)
+            path = directory / f"real_{number}.blf"
+            file = CaptureFilePlan(Role.CAN, path.name, path, root / path.name)
+            capture.configure(str(number), {"temp_path": str(path)})
+            capture.start(str(number), {"temp_path": str(path)})
+            with path.open("rb") as reader:
+                assert FILE_HEADER.unpack(reader.read(FILE_HEADER.size))[10] == 0
+            stopped = capture.stop(str(number))
+            checked = capture.inspect_file(str(number))
+            assert stopped["stop_confirmed"] and stopped["finalization_files"][0]["stopped"]
+            assert checked["object_count"] == 1 and checked["bytes"] == 168
+            assert not checked.get("blf_snapshot_path")  # Native closure, including buffered tail.
+            publish_capture(file, checked)
+            assert file.final_path.read_bytes()[-8:] == (2 * number + 1).to_bytes(8, "little")
+            assert block.FullName == str(root / "user original.blf")
+            assert block.FileNameOptions.IncrementAfterTrigger and app.Measurement.Running
+            assert not block.Trigger.Active
+            saved.append((file, checked))
+        assert block.Trigger.starts == block.Trigger.stops == 6  # Three user + three disposable segments.
+        for file, checked in saved:
+            checked["finalization_files"] = cleanup_finalization_files(file, checked)
+        assert not saved[-1][1]["finalization_files"][0].get("cleaned")  # Still owned by CANoe.
+        block.finish()
+        for file, checked in saved:
+            assert all(row["cleaned"] for row in cleanup_finalization_files(file, checked))
+            cleanup_work_directory(file.temp_path.parent)
+        assert not (root / ".vil_work").exists()
+        assert Path(params["cfg_path"]).read_bytes() == b"original configuration, never saved by AutoLog"
+    finally:
+        block.finish()
+
+
+@pytest.mark.parametrize("fault", ["start_after_apply", "stop_once", "foreign_output"])
+def test_finalization_faults_keep_evidence_and_never_stop_foreign_output(fixture, monkeypatch, fault):
+    capture, app, params, root = fixture
+    app.blocks[0] = block = NextTriggerFinalizesBlock(str(root / "manual.blf"))
+    capture.connect(params)
+    app.Measurement.Running = True
+    capture.prepare(params)
+    path = root / "record.blf"
+    capture.configure("s1", {"temp_path": str(path)})
+    capture.start("s1", {"temp_path": str(path)})
+    begin, pause = block.begin, block.pause
+    injected = []
+
+    def start():
+        begin()
+        if fault == "foreign_output":
+            block.FullName = str(root / "foreign.blf")
+        if fault == "start_after_apply":
+            raise RuntimeError("injected helper start acknowledgement failure")
+
+    def stop():
+        if fault == "stop_once" and block.Trigger.stops == 1 and not injected:
+            injected.append(True)
+            raise RuntimeError("injected helper stop failure")
+        pause()
+
+    monkeypatch.setattr(block.Trigger, "Start", start)
+    monkeypatch.setattr(block.Trigger, "Stop", stop)
+    try:
+        with pytest.raises(RuntimeError):
+            capture.stop("s1")
+        assert not capture.stop_confirmed and path.is_file() and app.Measurement.Running
+        if fault == "foreign_output":
+            assert block.Trigger.Active and block.Trigger.stops == 1
+            with pytest.raises(RuntimeError):
+                capture.stop("s1")
+            assert block.Trigger.stops == 1  # No Stop for a foreign path, even during retries.
+        else:
+            assert capture.stop("s1")["stop_confirmed"]
+            assert capture.inspect_file("s1")["object_count"] == 1
+            assert not block.Trigger.Active
+    finally:
+        block.finish()
+
+
 def test_stop_releases_idle_output_before_waiting_for_closed_file_and_can_repeat(fixture, monkeypatch):
     capture, app, params, root = fixture
     app.blocks[0] = block = RetainedWriterBlock(str(root / "manual.blf"))

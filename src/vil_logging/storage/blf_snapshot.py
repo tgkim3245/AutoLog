@@ -6,6 +6,7 @@ writer is never unlocked or deleted. Only a complete, unchanged copy is sealed.
 
 import hashlib
 import os
+import re
 import time
 from pathlib import Path
 
@@ -102,3 +103,48 @@ def cleanup_retained_source(file, inspection) -> bool:
                     raise ValueError("Retained BLF contents changed; preserve the source")
             opened.delete()
     return True
+
+
+def finalization_paths(file, inspection):
+    """Validate journalled disposable files against the exact owned session."""
+    result = []
+    for item in inspection.get("finalization_files", []):
+        path = plain_path(Path(item["path"]))
+        if (file.role.value not in {"can", "diag"} or path.parent != plain_path(file.temp_path).parent
+                or not re.fullmatch(r"\.AutoLog_finalize_[0-9a-f]{32}\.blf", path.name)):
+            raise ValueError("Finalization file does not belong to this capture")
+        result.append((path, item))
+    return result
+
+
+def cleanup_finalization_files(file, inspection):
+    """Once the capture is archived, remove only our own released helper files."""
+    result = []
+    paths = finalization_paths(file, inspection)
+    if not paths:
+        return result
+    expected = {key: inspection[key] for key in ("inode", "bytes", "mtime_ns")}
+    with ExclusiveFile(file.final_path, expected):
+        for path, item in paths:
+            item = dict(item)
+            if item.get("cleaned"):
+                result.append(item)
+                continue
+            try:
+                before = observe(path)
+            except FileNotFoundError:
+                item["cleaned"] = True
+            else:
+                owned = item.get("identity") or {}
+                if not owned.get("inode") or any(before[key] != owned.get(key) for key in ("device", "inode")):
+                    raise ValueError("Finalization file identity changed; preserve it")
+                try:
+                    with ExclusiveFile(path, before) as opened:
+                        opened.delete()
+                except OSError as error:
+                    if getattr(error, "winerror", None) != 32:
+                        raise
+                else:
+                    item["cleaned"] = True
+            result.append(item)
+    return result

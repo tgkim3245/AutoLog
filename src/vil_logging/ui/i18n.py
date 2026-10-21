@@ -38,7 +38,7 @@ TEXT = {
     "capture_saving": ("{targets} 파일 저장 중…", "Saving {targets} file…"),
     "capture_file_busy": ("파일 처리 중…", "Processing files…"),
     "capture_completed": ("다음 기록 시작", "Start next recording"),
-    "capture_failed": ("다시 시도", "Try again"),
+    "capture_failed": ("새 기록 시작", "Start new recording"),
     "capture_incomplete": ("기록 마무리 확인", "Review capture status"),
     "capture_review_help": ("파일이 없다는 뜻이 아닙니다. 정지·보관 확인이 끝나지 않아 파일을 보존했습니다. 복구 화면에서 원인과 실제 파일을 확인하세요.",
                             "Files are preserved. Stop or archival confirmation is unfinished; review the cause and actual files in recovery."),

@@ -51,11 +51,11 @@ GUIDES = {
         "无法验证已保存的设备和端口基准。请检查下方通道信息和设备连接。"),
     "measurement_waiting": (
         "AutoLog가 연 이 CANoe 창에서 채널 매핑과 cfg에 필요한 버스 옵션 라이선스를 확인한 뒤 F9로 측정을 시작하세요. "
-        "실패하면 CANoe Write 창의 오류를 확인하세요. Trace의 CAN 수신을 확인한 뒤 연결 확인을 다시 누르세요.",
+        "실패하면 CANoe Write 창의 오류를 확인하세요. Trace의 CAN 수신을 확인한 뒤 메인의 기록 시작을 누르세요. 측정 상태는 시작할 때 다시 확인합니다.",
         "In this CANoe window opened by AutoLog, check channel mapping and licenses for the bus options required by the cfg, "
-        "then start measurement with F9. If it fails, review CANoe's Write window. Confirm CAN reception in Trace, then check the connection again.",
+        "then start measurement with F9. If it fails, review CANoe's Write window. Confirm CAN reception in Trace, then press Start recording; measurement is checked automatically.",
         "请在 AutoLog 打开的此 CANoe 窗口中检查通道映射和 cfg 所需的总线选项许可证，然后按 F9 开始测量。"
-        "若失败，请查看 CANoe Write 窗口的错误。确认 Trace 中收到 CAN 消息后，重新检查连接。"),
+        "若失败，请查看 CANoe Write 窗口的错误。确认 Trace 中收到 CAN 消息后，点击开始记录；程序会自动检查测量状态。"),
     "block_recording": (
         "선택한 기록 블록이 이미 기록 중입니다. CANoe에서 해당 블록의 기록을 끝낸 뒤 다시 확인하세요.",
         "The selected logging block is already recording. Stop that block in CANoe, then check again.",
