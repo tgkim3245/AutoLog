@@ -30,3 +30,11 @@
 실착 재시험: CAN+Zipy 3구간의 시작→정지→파일 보관→다음 시작, 원래 옵션과 CANoe 자동 번호, 실제 BLF 프레임/PCAP 패킷을 확인한다. 강제 종료는 파일 완결을 보장하지 않으므로 별도 짧은 시험에서 X와 재실행의 미완료 상태·파일 보존을 확인한다.
 
 소스 전체 자동 검사 527개(56.14초)를 통과했다. 새 검사는 지연된 자동 번호 2가지의 3회 연속 구간·복구 전 외부 번호 거부, 독립 종료 감시 3가지, 실제 별도 앱 프로세스의 초기화/기록 정지/진단 정체와 반복 X 종료 4가지, 소유 job 종료/이미 사라진 job 처리 2가지를 포함한다. 기록 중 강제 종료 후 같은 프로필의 재실행·미완료 보존·notice 회수도 확인했다.
+
+## 배포 검증
+
+- 깨끗한 소스 `ed65b19b40c607e7edff7bb7d6f51d9d779359b3`에서 `AutoLog-0.9.6_20261021_180128`을 빌드했다. ZIP 52,960,708바이트, SHA256 `228daf49bf2749c757d2eef4be9aca5c46fd2bfb70867c00a8b6e3bcf7dcf745`. EXE SHA256 `a2325cdca0f78e3d41c98069cf8ad1da8c5bde9ef4df96b9869ef0943f26d3b2`.
+- 압축 해제 EXE의 CRC/해시/버전, 중국어 설정·실제 메인 버튼을 통한 모의 시작/정지·완료 표시·X 정상 종료·NIC 조회와 오류 없는 진단 101개를 확인했다. EXE에서 추출한 CAN 복구/파일 닫힘 대역 4개와 ExitGuard 3개를 개발 Python에서 통과했다.
+- 같은 EXE의 실제 localhost PCAP/PCAPNG 각 0패킷·5패킷·재시작 6구간과 오프라인 ARP를 확인했다. 실제 CANoe 장비의 새 구간 시험은 수행하지 않았다.
+- 가이드 2026-10-21.3을 8개 뷰포트로 렌더링했다. HTML 25,718바이트·START_HERE 3,783바이트의 ZIP/EXE 폴더/압축 해제본/미리보기와 build_info 개정·크기·해시가 일치한다. Ruff·의존성·diff 검사를 통과했다.
+- 최종 빌드 폴더의 `verification/result.json`, `verification/frozen-core/result.json`, `verification/ethernet/result.json`, `documentation_verification.json`에 근거를 남겼다. 실제 캡처 복구 근거와 사전 DB 백업은 로컬 빌드 저장소의 `field-recovery-0.9.6/`에 보관하고 Git에는 포함하지 않는다.
