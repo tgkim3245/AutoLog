@@ -61,9 +61,9 @@ GUIDES = {
         "The selected logging block is already recording. Stop that block in CANoe, then check again.",
         "所选记录块已在记录。请先在 CANoe 中停止该块的记录，然后重新检查。"),
     "segment_ready": (
-        "측정 실행과 기록 블록을 확인했습니다. logging으로 구간 기록을 시작하세요. Trace의 실제 CAN 수신도 확인하세요.",
-        "Measurement and logging block found. Start segment recording with logging. Also confirm actual CAN reception in Trace.",
-        "已确认测量运行和记录块。请使用 logging 开始分段记录，并确认 Trace 中实际收到 CAN 消息。"),
+        "측정 실행과 기록 블록을 확인했습니다. 기록 시작을 누르세요. Trace의 실제 CAN 수신도 확인하세요.",
+        "Measurement and logging block found. Press Start recording. Also confirm actual CAN reception in Trace.",
+        "已确认测量运行和记录块。请点击开始记录，并确认 Trace 中实际收到 CAN 消息。"),
 }
 
 

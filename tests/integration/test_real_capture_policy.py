@@ -72,6 +72,8 @@ def test_real_start_reserves_once_and_normal_stop_verifies_then_publishes(real):
     runtime.toggle((Role.ETHERNET,)).result(timeout=5)
     assert runtime.phase == SessionPhase.COMPLETED
     assert pool.calls == ["prepare", "start", "stop", "inspect"]
+    steps = [value for kind, value in list(runtime.messages.queue) if kind == "capture_step"]
+    assert steps == [{"step": "checking_file", "target": "Zipy"}, {"step": "saving", "target": "Zipy"}]
     assert file.final_path.is_file() and not file.temp_path.exists()
     assert not file.temp_path.parent.exists()
     assert not file.temp_path.parent.parent.exists()

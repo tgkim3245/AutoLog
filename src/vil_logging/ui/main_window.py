@@ -44,6 +44,7 @@ from vil_logging.diagnostics.canoe_readiness import stage_text
 from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.naming import capture_prefix
 
+from .capture_button import CaptureButton
 from .file_manager_dialog import FileManagerDialog, confirm_delete
 from .i18n import render_event, report_text, tr
 from .language_button import LanguageButton
@@ -70,10 +71,17 @@ MAIN_STYLE = """
 QPushButton#loggingButton { color: #FFFFFF; background: #4263EB; border: 1px solid #4263EB;
     border-radius: 10px; font-size: 18px; font-weight: 700; padding: 0;
     min-height: 50px; max-height: 50px; }
-QPushButton#loggingButton:hover { background: #3455D8; border-color: #3455D8; }
+QPushButton#loggingButton:hover:enabled { background: #3455D8; border-color: #3455D8; }
 QPushButton#loggingButton:focus { border: 2px solid #92A5FF; padding: 0; }
-QPushButton#loggingButton:disabled { background: #A6B5E7; border-color: #A6B5E7; }
-QPushButton#loggingButton[recording="true"] { background: #B63B4A; border-color: #B63B4A; }
+QPushButton#loggingButton[compact="true"] { font-size: 15px; }
+QPushButton#loggingButton[tone="neutral"] { color: #FFFFFF; background: #64748B; border-color: #64748B; }
+QPushButton#loggingButton[tone="progress"] { color: #FFFFFF; background: #52649B; border-color: #52649B; }
+QPushButton#loggingButton[tone="stop"] { background: #B92E43; border-color: #B92E43; }
+QPushButton#loggingButton[tone="stop"]:hover:enabled { background: #A12337; border-color: #A12337; }
+QPushButton#loggingButton[tone="attention"] { background: #9C540D; border-color: #9C540D; }
+QPushButton#loggingButton[tone="attention"]:hover:enabled { background: #804309; border-color: #804309; }
+QPushButton#loggingButton[tone="success"] { background: #087F6D; border-color: #087F6D; }
+QPushButton#loggingButton[tone="success"]:hover:enabled { background: #066657; border-color: #066657; }
 QFrame#targetCard QCheckBox { font-size: 13px; font-weight: 700; }
 QLabel#captureFilenames { font-size: 13px; font-weight: 700; }
 QLabel#readinessSubtitle { font-size: 12px; color: #64748B; }
@@ -142,6 +150,14 @@ class MainWindow(QMainWindow):
         self._debug_error = ""
         self._capture_history = []
         self._file_busy = False
+        self._initializing = False
+        self._initialization_failed = False
+        self._environment_checking = False
+        self._exiting = False
+        self._capture_step = {}
+        self._pending_capture_action = ""
+        self._capture_action = ""
+        self._capture_button_state = None
         self._last_file_result = None
         self._recovery_report = {}
         self._preparation_report: dict = {}
@@ -249,10 +265,8 @@ class MainWindow(QMainWindow):
             card_layout.addWidget(observation)
             cards.addWidget(card, 1)
         outer.addLayout(cards)
-        self.logging_button = QPushButton("logging")
-        self.logging_button.setObjectName("loggingButton")
-        self.logging_button.setFixedHeight(52)
-        self.logging_button.clicked.connect(self.logging_requested)
+        self.logging_button = CaptureButton()
+        self.logging_button.clicked.connect(self._capture_clicked)
         outer.addWidget(self.logging_button)
         self.phase_label = _label(variant="helper")
         self.phase_label.setWordWrap(True)
@@ -543,25 +557,101 @@ class MainWindow(QMainWindow):
             message = report_text(self._preparation_report, "message", self._language) or message
         self.subtitle.setText(message)
         self.subtitle.setToolTip(str(self._preparation_report.get("detail", message)))
+        self._render_capture_button()
+
+    def set_initializing(self, pending, failed=False):
+        self._initializing, self._initialization_failed = pending, failed
+        self._render_capture_button()
+
+    def set_environment_checking(self, pending):
+        self._environment_checking = pending
+        self._render_capture_button()
+
+    def set_exiting(self, pending):
+        self._exiting = pending
+        self._render_capture_button()
+
+    def set_capture_step(self, step):
+        self._capture_step = step
+        self._render_capture_button()
+
+    def _capture_clicked(self):
+        if self._capture_action == "review":
+            self._show_recovery()
+        elif self._capture_action:
+            self._pending_capture_action = self._capture_action
+            self._render_capture_button()
+            self.logging_requested.emit()
+
+    def _render_capture_button(self):
+        phase = self._phase
+        key, tone, enabled, busy, action = "ready", "primary", True, False, "start"
+        targets = ""
+        if self._exiting:
+            key, tone, enabled, busy, action = "exiting", "progress", False, True, ""
+        elif self._initializing or self._initialization_failed:
+            key, tone, enabled, busy, action = (
+                "loading" if self._initializing else "load_failed", "neutral", False, self._initializing, "")
+        elif phase in {SessionPhase.PREPARING, SessionPhase.STARTING}:
+            key, tone, busy, action = phase.value, "attention", True, "cancel"
+            if self._pending_capture_action == "cancel":
+                key, enabled, action = "cancelling", False, ""
+        elif self._pending_capture_action in {"start", "stop"}:
+            key, tone, enabled, busy, action = self._pending_capture_action + "_requested", "progress", False, True, ""
+        elif phase in {SessionPhase.RECORDING, SessionPhase.PARTIAL}:
+            key, tone, action = phase.value, "stop" if phase == SessionPhase.RECORDING else "attention", "stop"
+        elif phase == SessionPhase.STOPPING:
+            key, tone, enabled, busy, action = self._capture_step.get("step", "stopping"), "progress", False, True, ""
+            targets = self._capture_step.get("target", "")
+        elif self._file_busy:
+            key, tone, enabled, busy, action = "file_busy", "progress", False, True, ""
+        elif phase == SessionPhase.INCOMPLETE:
+            key, tone, action = "incomplete", "attention", "review"
+            enabled = bool(self._recovery_report.get("sessions") or self._recovery_report.get("operations")
+                           or self._recovery_report.get("live_session_id"))
+        elif not self.selected_roles():
+            key, tone, enabled, action = "no_targets", "neutral", False, ""
+        else:
+            connecting = [role.label for role, target in self._targets.items() if target.connection.value == "connecting"]
+            if connecting:
+                key, tone, enabled, busy, action = "connecting", "progress", False, True, ""
+                targets = " · ".join(connecting)
+            elif self._environment_checking:
+                key, tone, enabled, busy, action = "checking", "progress", False, True, ""
+            elif phase == SessionPhase.COMPLETED:
+                key, tone = "completed", "success"
+            elif phase == SessionPhase.FAILED:
+                key, tone = "failed", "attention"
+        text = tr("capture_" + key, self._language).format(targets=targets)
+        if self.demo:
+            text = tr("capture_demo", self._language).format(text=text)
+        tip = self.subtitle.text()
+        if key in {"cancelling", "start_requested", "stop_requested", "loading", "checking", "connecting", "exiting"}:
+            tip = text
+        elif key == "incomplete":
+            tip = tr("capture_review_help", self._language)
+        self._capture_action = action if enabled else ""
+        state = (key, tone, enabled, busy, self._capture_action, text, tip)
+        if state != self._capture_button_state:
+            self._capture_button_state = state
+            logger.debug("Capture button: state=%s action=%s enabled=%s phase=%s", key, action, enabled, phase.value)
+            self.logging_button.set_status(text, tone, enabled, busy, tip)
 
     def set_phase(self, phase: SessionPhase):
         if self._phase != phase:
             logger.debug("UI phase transition: %s -> %s", self._phase.value, phase)
         self._phase = SessionPhase(phase)
         phase = self._phase
+        if self._pending_capture_action != "cancel" or phase not in {SessionPhase.PREPARING, SessionPhase.STARTING}:
+            self._pending_capture_action = ""
+        if phase != SessionPhase.STOPPING:
+            self._capture_step = {}
         busy = phase in LOCKED_PHASES or self._file_busy
         for check in self.role_checks.values():
             check.setEnabled(not busy)
             check.setToolTip(tr("locked" if busy else "ready_tip", self._language))
         self.language_button.setEnabled(not busy)
         self.settings_dialog.set_busy(busy)
-        self.logging_button.setEnabled(
-            not self._file_busy and phase not in (SessionPhase.STOPPING, SessionPhase.INCOMPLETE)
-            and (busy or bool(self.selected_roles()))
-        )
-        self.logging_button.setProperty("recording", phase in (SessionPhase.RECORDING, SessionPhase.PARTIAL))
-        self.logging_button.style().unpolish(self.logging_button)
-        self.logging_button.style().polish(self.logging_button)
         phase_key = (
             "demo_" + phase.value
             if self.demo and phase in (
@@ -570,7 +660,6 @@ class MainWindow(QMainWindow):
             else phase.value
         )
         self.phase_label.setText(tr(phase_key, self._language))
-        self.logging_button.setToolTip(tr(phase_key, self._language))
         self._render_readiness()
         self._render_file_controls()
         self.recovery_dialog.set_locked(self._file_busy or phase in BUSY_PHASES)
@@ -717,6 +806,7 @@ class MainWindow(QMainWindow):
         self.recovery_button.setText(tr("recovery_count", self._language).format(count=count))
         self.recovery_button.setVisible(bool(count) or bool(report.get("live_session_id")))
         self.recovery_dialog.set_report(report)
+        self._render_capture_button()
 
     def set_file_result(self, result: dict):
         self._last_file_result = result

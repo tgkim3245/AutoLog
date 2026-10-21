@@ -66,8 +66,10 @@ def test_main_panel_exposes_recovery_when_incomplete_while_capture_stays_locked(
     window.set_recovery(report)
     assert not window.recovery_button.isHidden()
     assert window.recovery_button.isEnabled()
-    assert not window.logging_button.isEnabled()
-    window.recovery_button.click()
+    assert window.logging_button.isEnabled()
+    start = QSignalSpy(window.logging_requested)
+    window.logging_button.click()
+    assert start.count() == 0
     assert window.recovery_dialog.isVisible()
     assert not window.recovery_dialog._locked
     window.set_file_busy(True)

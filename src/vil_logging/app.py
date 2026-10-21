@@ -180,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         QMessageBox.critical(None, APP_NAME, str(error))
         return 1
     window = MainWindow(demo=args.demo)
+    window.set_initializing(True)
     instance.activated.connect(window.restore_window)
     log_dir = developer_log_directory(
         data_dir, use_data_dir=explicit_data_dir or args.smoke_test,
@@ -227,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
         if not exiting:
             exiting = True
             debug.log("app.exit_requested", phase=runtime.phase.value)
+            window.set_exiting(True)
             window.set_phase(SessionPhase.STOPPING)
             runtime.request_exit()
 
@@ -278,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
         environment_dialog.raise_()
         environment_dialog.activateWindow()
         environment_state["pending"] = True
+        window.set_environment_checking(True)
         environment_state["error"] = ""
         environment_dialog.set_busy(True)
         runtime.diagnose()
@@ -288,8 +291,10 @@ def main(argv: list[str] | None = None) -> int:
                 and missing_dependencies(environment_state["environment"], environment_state["connections"],
                                          window.selected_roles())):
             show_environment()
+            window.set_phase(runtime.phase)
             return
         runtime.toggle(window.selected_roles())
+        window.set_phase(runtime.phase)
 
     window.logging_requested.connect(toggle_capture)
     window.environment_requested.connect(show_environment)
@@ -297,6 +302,7 @@ def main(argv: list[str] | None = None) -> int:
     environment_dialog.settings_requested.connect(window.settings_dialog.open_section)
 
     def update_environment():
+        window.set_environment_checking(environment_state["pending"] or environment_state["discovering"])
         environment_dialog.set_roles(window.selected_roles())
         environment_dialog.set_report(environment_state["environment"], environment_state["connections"])
         environment_dialog.set_busy(environment_state["pending"] or environment_state["discovering"])
@@ -318,6 +324,8 @@ def main(argv: list[str] | None = None) -> int:
 
     def drain():
         nonlocal last_debug_error, exiting
+        if window._initializing and initialization.done():
+            window.set_initializing(False, failed=not runtime._ready)
         for _ in range(256):
             try:
                 kind, value = runtime.messages.get_nowait()
@@ -328,6 +336,8 @@ def main(argv: list[str] | None = None) -> int:
                 environment_dialog.set_language(value.language)
             elif kind == "phase":
                 window.set_phase(value)
+            elif kind == "capture_step":
+                window.set_capture_step(value)
             elif kind == "target":
                 window.set_target(value)
             elif kind == "event":
@@ -383,6 +393,7 @@ def main(argv: list[str] | None = None) -> int:
                     return
                 else:
                     exiting = False
+                    window.set_exiting(False)
                     window.restore_window()
                     window.set_phase(runtime.phase)
                     QMessageBox.warning(window, tr("exit_deferred_title", window._language),
@@ -407,14 +418,14 @@ def main(argv: list[str] | None = None) -> int:
     health_timer.setInterval(700)
     health_timer.timeout.connect(runtime.poll_workers)
     health_timer.start()
-    runtime.initialize()
+    initialization = runtime.initialize()
     if not args.smoke_test or args.smoke_discovery:
         runtime.discover()
     if not args.demo:
         environment_state["pending"] = True
         runtime.diagnose()
     window.show()
-    smoke = {"started": False, "stopped": False, "passed": False,
+    smoke = {"started": False, "stopped": False, "passed": False, "button_actions": [],
              "discovery_passed": not args.smoke_discovery}
     if args.smoke_test:
         smoke_timer = QTimer()
@@ -432,17 +443,22 @@ def main(argv: list[str] | None = None) -> int:
                     return
                 smoke["discovery_passed"] = True
             if runtime._ready and not smoke["started"]:
+                if not window.logging_button.isEnabled():
+                    return
                 smoke["started"] = True
                 if args.smoke_debug_log:
                     debug.log("smoke.debug_log_verified", phase=runtime.phase.value)
-                runtime.toggle(window.selected_roles())
+                window.logging_button.click()
+                smoke["button_actions"].append("start")
             elif runtime.phase == SessionPhase.RECORDING and not smoke["stopped"]:
                 smoke["stopped"] = True
-                runtime.toggle(window.selected_roles())
+                window.logging_button.click()
+                smoke["button_actions"].append("stop")
             elif runtime.phase == SessionPhase.COMPLETED:
                 smoke["passed"] = True
                 smoke_timer.stop()
-                request_exit()
+                window.close()
+                smoke["button_actions"].append("exit")
         smoke_timer.timeout.connect(smoke_step)
         smoke_timer.start()
         QTimer.singleShot(30000 if args.smoke_discovery else 15000, lambda: app.exit(2))
@@ -466,6 +482,7 @@ def main(argv: list[str] | None = None) -> int:
             legacy_instance.close()
     if args.smoke_test:
         print(json.dumps({"smoke_passed": smoke["passed"], "data_dir": str(data_dir),
+                          "capture_button_actions": smoke["button_actions"],
                           "developer_log_default": developer_log_default,
                           "developer_log_path": str(debug.log_path or ""),
                           "discovery_ui_verified": smoke["discovery_passed"] if args.smoke_discovery else None,

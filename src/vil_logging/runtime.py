@@ -192,8 +192,6 @@ class Runtime:
             self._event(**retention_notice)
         for snapshot in self._snapshots.values():
             self._publish("target", snapshot)
-        self._ready = True
-        self._event("APP_READY", demo=self.demo, data_dir=str(self.data_dir))
         if self.demo:
             self._event("DEMO_NOTICE")
         if recovered:
@@ -224,6 +222,9 @@ class Runtime:
                     self._quality_report = {**quality, "state": "historical" if quality.get("state") == "archived" else "unknown"}
                     self._publish("capture_quality", dict(self._quality_report))
                     break
+
+        self._ready = True
+        self._event("APP_READY", demo=self.demo, data_dir=str(self.data_dir))
 
     def refresh_file_history(self) -> Future:
         return self._submit(self._refresh_file_history)
@@ -473,10 +474,11 @@ class Runtime:
                           hardware=details.get("hardware", {}), measurement_diagnostics=diagnostics,
                           message_zh=stage_guidance(stage, "zh"))
             if ready:
-                report.update(next_action_ko="logging으로 구간 기록을 제어하세요. 기록 중에는 CANoe의 기존 로깅 버튼과 "
+                report.update(next_action_ko="메인의 기록 시작·정지 버튼으로 구간 기록을 제어하세요. 기록 중에는 CANoe의 기존 로깅 버튼과 "
                               "파일 설정을 함께 조작하지 마세요.",
-                              next_action_en="Control segments with logging. Avoid concurrent CANoe logging controls "
-                              "or filename edits during recording.")
+                              next_action_en="Use Start recording / Stop to control segments. Avoid concurrent CANoe logging controls "
+                              "or filename edits during recording.",
+                              next_action_zh="使用主界面的开始记录/停止按钮控制分段记录。记录期间不要同时操作 CANoe 的记录按钮或文件设置。")
             else:
                 report.update(next_action_ko="위 항목을 조치한 뒤 연결 확인을 다시 누르세요.",
                               next_action_en="Complete the steps above, then check the connection again.")
@@ -575,9 +577,9 @@ class Runtime:
                           "The capinfos.exe or dumpcap.exe tool is missing. Check your Wireshark installation."), connections
         result = report("ready", f"{selected['name']} 캡처 준비를 확인했습니다. 패킷 기록은 시작하지 않았습니다.",
                       f"{selected['name']} is available for capture. Recording has not started.", tool["path"]), connections
-        result[0].update(next_action_ko="메인에서 Zipy를 선택하고 logging을 누르면 선택한 네트워크 기록을 시작합니다.",
+        result[0].update(next_action_ko="메인에서 Zipy를 선택하고 기록 시작을 누르면 선택한 네트워크 기록을 시작합니다.",
                          message_zh=f"{selected['name']} 已准备好采集，尚未开始记录。",
-                         next_action_en="Select Zipy on the main screen and press logging to capture the selected network.")
+                         next_action_en="Select Zipy on the main screen and press Start recording to capture the selected network.")
         return result
 
     def _finish_prepare(self, role: Role, captured: AppSettings, generation: int, future: Future) -> None:
@@ -1135,6 +1137,7 @@ class Runtime:
                 else:
                     self._repo.update_capture_file(plan.session_id, role, "closed", actual_path=str(actual_path))
                     self._event("FILE_CHECKING", target=role.label, path=str(actual_path))
+                    self._publish("capture_step", {"step": "checking_file", "target": role.label})
                     checked = self._pool.request((role,), "inspect", plan.session_id,
                                                  timeout=120 if role != Role.ETHERNET else 65)[role]
                     if not checked.success:
@@ -1150,6 +1153,7 @@ class Runtime:
                         self._repo.update_capture_file(plan.session_id, role, "publishing",
                                                        actual_path=str(actual_path), inspection=inspection)
                         try:
+                            self._publish("capture_step", {"step": "saving", "target": role.label})
                             actual_path = publish_capture(file, inspection)
                         except (OSError, ValueError) as error:
                             if phase != SessionPhase.INCOMPLETE:
