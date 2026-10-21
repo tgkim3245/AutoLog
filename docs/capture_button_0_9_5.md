@@ -27,3 +27,13 @@
 검사 범위: 단계별 문구·클릭 차단, 취소 중복/phase 경합, 백그라운드 진단 중 정지 우선, 파일 검사→저장 메시지, 종료 표시 유지, 복구 경로, 언어 변경·숨김 시 회전 중단. 실제 앱 버튼으로 모의 시작→취소→재시도→기록→정지→다음 기록→X 종료를 확인한다. CANoe 장비의 실제 기록 검증 범위는 0.9.4와 동일하게 현장 재시험 대기다.
 
 소스 전체 검사 **515개(50.46초)**, Ruff·의존성·diff 검사를 통과했다. 실제 Qt 버튼의 14개 상태와 360px 폭 영어·중국어 화면을 렌더링해 글자·버튼 영역을 확인했다. 오프스크린 Qt에는 Windows 글꼴을 명시적으로 등록했으며 일반 앱의 글꼴 설정은 바꾸지 않았다. 가이드 개정 2026-10-21.2를 8개 뷰포트로 렌더링해 상태 표와 시작/정지 안내를 확인했다. 로컬 화면 근거는 빌드 저장소의 `ui-0.9.5/`와 `user-guide-2026-10-21.2/visual-qa/`에 보관한다.
+
+## 최종 배포 검증
+
+- 지연된 phase 알림 수정 후 실제 앱 신호 연결 검사 7개(10.70초), Ruff·diff를 다시 통과했다. 소스 `fd7b5061d5273d7f3a98be37e6241c00d1288113`의 깨끗한 상태에서 `AutoLog-0.9.5_20261021_164810`을 빌드했다.
+- ZIP 52,956,176바이트, SHA256 `6c15efce159cdf03aec758f2f9dd1858254d60e8a2990d8ae212c30f2953cba8`. EXE SHA256 `21b7196c87b1536296b9b4525b34531bcf9d495325a911490fba422e1ce00e2a`.
+- ZIP CRC·제품/파일 버전·해시를 확인했다. 압축 해제 EXE를 개발 Python 없는 PATH에서 실행해 중국어 설정, 실제 버튼 클릭으로 모의 시작/정지, 완료 표시, X 정상 종료, NIC 조회와 오류 없는 개발자로그 101개를 확인했다.
+- 버튼 상태는 `ready → checking → ready → start_requested → preparing → starting → recording → stop_requested → stopping → completed → exiting` 순서로 관측했다. 준비/시작 단계의 취소는 별도 실제 앱 회귀 검사에서 확인했고, 최종 배포 모의 검사에서는 취소 표시나 정지 후 기록 중으로 되돌아가는 알림이 없었다.
+- EXE에서 추출한 버튼·메인 UI·번역 코드의 Qt 검사 17개를 개발 Python에서 통과했다. 같은 압축 해제 EXE의 실제 localhost PCAP/PCAPNG 각 0패킷·5패킷·재시작 총 6구간과 오프라인 ARP를 통과했다. 물리 NIC·차량/CANoe 장비 취득은 시험하지 않았다.
+- 가이드 HTML 25,194바이트·START_HERE 3,548바이트, 개정 2026-10-21.2의 ZIP/EXE 폴더/압축 해제본/렌더링 원본과 build_info의 크기·SHA256이 일치한다.
+- 로컬 근거는 최종 빌드 폴더의 `verification/result.json`, `verification/capture_button_result.json`, `verification/frozen-ui/result.json`, `verification/ethernet/result.json`, `documentation_verification.json`이다. 원본 캡처·상세 진단은 Git에 넣지 않는다.
