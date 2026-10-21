@@ -29,3 +29,10 @@ Windows의 실제 읽기/쓰기 핸들을 연 상태에서 복사·보관·핸�
 전체 자동 검사 545개(56.25초), Ruff·의존성·diff·문서 로컬 링크 266개 검사를 통과했다. 정지 직후 완결 header가 늦게 반영되는 경우는 최대 2초 동안 실제 파일 검사만 재시도하며 핸들 해제를 기다리지는 않는다. 미완결 상태 지속 거부와 실패 시 파일의 실제/선언 크기 진단도 검사했다. 가이드 개정 2026-10-21.4는 PC/작은 폭 8개 뷰포트로 렌더링하고 기록 절차 화면을 확인했다.
 
 공식 근거: Vector의 [Trigger](https://help.vector.com/CANoeDEFamily/19/en/Help/Content/Topics/COMInterface/Objects/COMObjectTrigger.htm)는 비활성을 기록 정지로 설명하며, [Logging](https://help.vector.com/CANoeDEFamily/19/en/Help/Content/Topics/COMInterface/Objects/COMObjectLogging.htm)은 파일명 설정을 제공하지만 일반적인 강제 파일 핸들 닫기/Flush를 제공하지 않는다. 모든 파일 핸들 해제를 필수 정지 조건으로 삼은 것은 AutoLog의 구현 선택이었다.
+
+## 배포 검증
+
+- 깨끗한 소스 `76aa0a5116cafb40fa76818315937e51232627a3`에서 `AutoLog-0.9.7_20261021_184857` EXE 폴더와 ZIP을 생성했다. ZIP SHA256 `2395cdff9cb945e905832cf3d450bc4050ad72d6420d62fa935e52b6f55bb98f`, EXE SHA256 `803f64c4671280d9d98601b556bda6b0234910480c781378e658785d35123efc`.
+- ZIP CRC·해시·Windows 제품/파일 버전 0.9.7과 새로 압축 해제한 EXE의 중국어 모의 기록 시작/정지·완료 버튼·X 종료·읽기 전용 NIC 목록 조회를 확인했다. 개발 Python 없는 PATH로 실행했으며 개발자로그 101개에 ERROR/CRITICAL이 없었다.
+- 같은 압축 해제 EXE의 PYZ에서 CAN 어댑터·BLF 봉인/보관/정리·Runtime·복구 코드를 로드해 개발 Python에서 대역 검사 88개를 통과했다. 실제 CANoe 서버 측정 시험과 구분한다.
+- 가이드 HTML 26,649바이트·START_HERE 3,993바이트가 미리보기·EXE 폴더·ZIP·압축 해제본 및 build_info 문서 개정/해시와 일치한다. 빌드 폴더의 `verification/result.json`, `verification/capture_button_result.json`, `frozen-core/result.json`, `documentation_verification.json`에 근거를 남겼다.
