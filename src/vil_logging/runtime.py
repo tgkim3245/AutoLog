@@ -19,6 +19,7 @@ from vil_logging.contracts.commands import FakeBehavior
 from vil_logging.contracts.models import (
     AppEvent,
     AppSettings,
+    CaptureFilePlan,
     CapturePlan,
     ConnectionState,
     ObservationState,
@@ -30,6 +31,7 @@ from vil_logging.contracts.models import (
 )
 from vil_logging.diagnostics.capture_quality import LOW_SPACE_BYTES, SPACE_RECOVERY_BYTES
 from vil_logging.monitors.observation import fresh_report
+from vil_logging.storage.blf_snapshot import cleanup_retained_source
 from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
 from vil_logging.storage.file_access import matches, observe
 from vil_logging.storage.file_service import FileResultStorageError, FileService
@@ -176,6 +178,7 @@ class Runtime:
         self._recovery = RecoveryService(self._repo)
         file_recovery = self._file_service.recover()
         recovered = self._repo.recover_incomplete()
+        self._cleanup_retained_blf_sources()
         from vil_logging.storage.retention import maintain
         retention_notice = None
         try:
@@ -985,6 +988,28 @@ class Runtime:
                             original="CANoe 출력 설정 복구를 확인하지 못했습니다. 다음 연결에서 다시 확인합니다. " + result.evidence,
                             details=result.details)
 
+    def _cleanup_retained_blf_sources(self):
+        """Only published, unchanged BLF copies; handle retention never blocks capture."""
+        for session in self._repo.captures(limit=None):
+            for item in session["files"]:
+                inspection = item["metadata"].get("inspection", {})
+                if (item["state"] != "published" or not inspection.get("retained_source")
+                        or inspection.get("retained_source_cleaned")):
+                    continue
+                file = CaptureFilePlan(Role(item["role"]), item["filename"],
+                                       Path(item["temp_path"]), Path(item["final_path"]))
+                try:
+                    cleanup_retained_source(file, inspection)
+                    cleanup_work_directory(file.temp_path.parent)
+                except (OSError, ValueError) as error:
+                    log.info("storage.blf_source_cleanup_deferred", extra={"fields": {
+                        "session_id": session["session_id"], "path": str(file.temp_path), "error": str(error)}})
+                else:
+                    inspection["retained_source_cleaned"] = True
+                    self._repo.update_capture_file(session["session_id"], file.role, "published", inspection=inspection)
+                    log.info("storage.blf_source_cleaned", extra={"fields": {
+                        "session_id": session["session_id"], "path": str(file.temp_path)}})
+
     def _start_real(self, roles: tuple[Role, ...]) -> None:
         if self._storage_failed:
             raise RuntimeError("Persistent history failed; resolve storage errors before capture")
@@ -1209,6 +1234,7 @@ class Runtime:
             self._event("OPERATION_ERROR", level="ERROR", original=str(error))
             actual_paths = [str(file.final_path if file.final_path.is_file() else file.temp_path) for file in plan.files]
         try:
+            self._cleanup_retained_blf_sources()
             cleanup_work_directory(plan.files[0].temp_path.parent)
         except OSError as error:
             log.exception("storage.work_directory_cleanup_failed")

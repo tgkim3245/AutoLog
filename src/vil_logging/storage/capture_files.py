@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from vil_logging.contracts.models import CaptureFilePlan
+from vil_logging.storage.blf_snapshot import publication_source
 
 
 def cleanup_work_directory(session_dir: Path) -> bool:
@@ -39,7 +40,7 @@ def cleanup_work_directory(session_dir: Path) -> bool:
 
 
 def publish_capture(file: CaptureFilePlan, inspection: dict) -> Path:
-    source, destination = file.temp_path, file.final_path
+    source, destination = publication_source(file, inspection), file.final_path
     if source.is_symlink():
         raise ValueError("Working capture cannot be a symbolic link")
     current = source.stat()

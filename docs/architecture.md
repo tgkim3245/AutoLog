@@ -1,6 +1,6 @@
 # 통합 제어 설계
 
-최신 현황(2026-10-21, 0.9.6): Qt 앱, 대상별 worker, SQLite 설정/번호/이력, dumpcap 원본 취득·독립 TShark 해석·감시·품질, 파일 관리·수동 복구, CAN/Diag 독립 연결과 준비 상태/로컬 채널 기준 비교가 구현되어 있다. 개발자로그는 EXE 옆에서 순환 저장하고 버그리포트 ZIP으로 내보낸다. CANoe 블록은 COM 객체 주소 대신 cfg·논리 선택·소유 출력 경로로 모든 구간 단계에서 검증한다. 수동 시험 후 정지한 동일 BLF 블록의 파일명 변경은 출력 소유 전에만 재조회한다. 최신 수정은 [0.9.4 종료·네트워크 선택 수정](capture_fixes_0_9_4.md), 이전 [0.9.3](canoe_fixes_0_9_3.md), 기능 범위는 [0.9.0 변경](usability_update_0_9_0.md)을 따른다. 메인 기록 버튼은 [0.9.5 상태 표시](capture_button_0_9_5.md)를 따른다. [0.9.6 자동 번호 복구·강제 종료](canoe_fixes_0_9_6.md)를 반영했다.
+최신 현황(2026-10-21, 0.9.7): Qt 앱, 대상별 worker, SQLite 설정/번호/이력, dumpcap 원본 취득·독립 TShark 해석·감시·품질, 파일 관리·수동 복구, CAN/Diag 독립 연결과 준비 상태/로컬 채널 기준 비교가 구현되어 있다. 개발자로그는 EXE 옆에서 순환 저장하고 버그리포트 ZIP으로 내보낸다. CANoe 블록은 COM 객체 주소 대신 cfg·논리 선택·소유 출력 경로로 모든 구간 단계에서 검증한다. 수동 시험 후 정지한 동일 BLF 블록의 파일명 변경은 출력 소유 전에만 재조회한다. 최신 수정은 [0.9.4 종료·네트워크 선택 수정](capture_fixes_0_9_4.md), 이전 [0.9.3](canoe_fixes_0_9_3.md), 기능 범위는 [0.9.0 변경](usability_update_0_9_0.md)을 따른다. 메인 기록 버튼은 [0.9.5 상태 표시](capture_button_0_9_5.md)를 따른다. [0.9.6 자동 번호 복구·강제 종료](canoe_fixes_0_9_6.md)를 반영했다.
 
 현재 요구사항: 55개, 검증 시나리오 66개. 아래 설계 전체의 완료를 뜻하지 않는다. 라이선스가 필요한 CAN/Diag 구간 BLF·수신/채널 감시, 차량 고부하·장시간·새 PC 시험은 남아 있다. 상세 동작은 [제어 정책](control_policy.md), 검증은 [검증 계획](validation_plan.md), 진행은 [구현 계획](implementation_plan.md)을 따른다.
 
@@ -32,7 +32,7 @@ Logging/Trigger COM 제어를 구현했다. CANoe 19.3.118에서 다른 PID·정
 
 근거: [CANoe 19 COM](https://help.vector.com/CANoeDEFamily/19/en/Help/Content/Topics/COMInterface/COMInterface.htm), [Logging](https://help.vector.com/CANoeDEFamily/19/en/Help/Content/Topics/COMInterface/Objects/COMObjectLogging.htm), [Trigger](https://help.vector.com/CANoeDEFamily/19/en/Help/Content/Topics/COMInterface/Objects/COMObjectTrigger.htm).
 
-0.9.4의 정지는 trigger 비활성 확인→시작 전 출력/옵션 복구→작업 BLF 독점 접근 순서다. `trigger_stopped`는 `stop_confirmed`와 별개이며 경로 복구만으로 세션 완료를 인정하지 않는다. 닫힘 미확인 상태는 새 configure를 막고, 재시도 중 다른 수동 trigger가 활성화되면 이를 정지하지 않는다. 파일 닫힘 이후 구조 검사·보관을 수행한다.
+0.9.7의 CAN 정지는 trigger 비활성 확인→출력/옵션 복구→BLF 구조 검사·보관 순서다. `stop_confirmed`는 선택 trigger 정지 확인이며 파일 완결을 대신하지 않는다. 독점 접근이 가능하면 원본을 검사·이동하고, WinError 32이면 완전하고 내용이 변하지 않는 복사본을 봉인해 보관한다. 복사 전후 소스 ID·크기·수정 시각과 두 번 읽은 SHA256, 복사본의 전체 BLF 구조를 확인한다. 선택 trigger 재활성·구성 변경은 거부한다. 보관 전 봉인 경로·ID를 DB에 기록해 이동 직후 중단도 복구한다. 잠긴 원본은 이후 보관/다음 실행에서 최종 보관본 ID와 소스 전체 해시를 확인한 뒤 독점 핸들로만 정리한다. 파일 핸들 보유만으로 다음 기록을 막지 않는다. [분석](canoe_fixes_0_9_7.md).
 
 ## 3. Ethernet 캡처·패킷 목록
 

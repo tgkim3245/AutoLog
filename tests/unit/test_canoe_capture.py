@@ -601,21 +601,18 @@ def test_recording_logical_changes_never_stop_a_foreign_block(tmp_path, fault):
 def test_normal_file_close_survives_restore_failure_and_keeps_evidence(fixture, monkeypatch):
     capture, app, path = prepared(fixture)
     capture.start("s1", {"temp_path": str(path)})
-    real_validate = capture._validate
-    injected = []
+    real_restore = capture.restore_output
 
-    def fail_restore_only():
-        real_validate()
-        if capture.trigger_stopped and not injected:
-            injected.append(True)
-            raise RuntimeError("injected restore failure")
+    def fail_restore_only(session_id):
+        capture.output_restore_error = "injected restore failure"
+        raise RuntimeError(capture.output_restore_error)
 
-    monkeypatch.setattr(capture, "_validate", fail_restore_only)
+    monkeypatch.setattr(capture, "restore_output", fail_restore_only)
     details = capture.stop("s1")
     assert details["stop_confirmed"] and details["output_restore_pending"]
     assert "injected restore failure" in details["output_restore_error"]
     assert capture.inspect_file("s1")["actual_format"] == "blf"
-    monkeypatch.setattr(capture, "_validate", real_validate)
+    monkeypatch.setattr(capture, "restore_output", real_restore)
     capture.restore_output("s1")
     assert app.blocks[0].FullName == "original_0.blf"
 
@@ -658,6 +655,7 @@ class NormalizingRestoreBlock(RetainedWriterBlock):
 
     def __init__(self, name):
         self.armed = False
+        self.append_number = False
         self.pending = None
         self.reads = self.counter = 0
         super().__init__(name)
@@ -677,7 +675,7 @@ class NormalizingRestoreBlock(RetainedWriterBlock):
         import re
         path = Path(value)
         self.counter += 1
-        stem = re.sub(r"_T[0-9]+$", "", path.stem)
+        stem = path.stem if self.append_number else re.sub(r"_T[0-9]+$", "", path.stem)
         self.pending = str(path.with_name(f"{stem}_T{self.counter:03d}.blf"))
         self.reads = 0
 
@@ -696,10 +694,12 @@ class NormalizingRestoreBlock(RetainedWriterBlock):
             self.normalize(value)
 
 
-@pytest.mark.parametrize("name", ["manual.blf", "manual_T009.blf"])
-def test_delayed_trigger_numbering_during_restore_allows_three_closed_segments(fixture, name):
+@pytest.mark.parametrize("name,append", [("manual.blf", False), ("manual_T009.blf", False),
+                                        ("any name_T002_T001.blf", True), ("임의 초기 이름.blf", True)])
+def test_delayed_trigger_numbering_during_restore_allows_three_closed_segments(fixture, name, append):
     capture, app, params, root = fixture
     app.blocks[0] = block = NormalizingRestoreBlock(str(root / name))
+    block.append_number = append
     app.fresh_proxies = True
     capture.connect(params)
     app.Measurement.Running = True
@@ -714,7 +714,7 @@ def test_delayed_trigger_numbering_during_restore_allows_three_closed_segments(f
             assert result["stop_confirmed"] and not result["output_restore_pending"]
             assert capture.inspect_file(session)["actual_format"] == "blf"
             assert block.writer is None and block.FileNameOptions.IncrementAfterTrigger
-            assert Path(block.FullName).parent == root and "manual_T" in Path(block.FullName).name
+            assert Path(block.FullName).parent == root and Path(block.FullName).name.startswith(Path(name).stem.split("_T")[0])
             assert app.Measurement.Running
         assert block.Trigger.starts == block.Trigger.stops == 3
         assert any(row["event"] == "canoe.output_normalized" for row in capture.journal)
@@ -731,6 +731,46 @@ def test_trigger_suffix_is_not_accepted_as_external_output_before_our_restore(fi
     with pytest.raises(RuntimeError, match="changed"):
         capture.stop("s1")
     assert app.blocks[0].Trigger.stops == 0
+
+
+def test_retained_blf_header_can_finish_shortly_after_trigger_stop(fixture, monkeypatch):
+    capture, app, path = prepared(fixture)
+    capture.start("s1", {"temp_path": str(path)})
+    capture.stop("s1")
+    clock = SimpleNamespace(now=0.)
+    with path.open("r+b") as writer:
+        writer.write(b"LOGG" + bytes(140))
+        writer.flush()
+
+        def settle(delay):
+            clock.now += delay
+            writer.seek(0)
+            writer.write(empty_blf())
+            writer.flush()
+
+        monkeypatch.setattr("vil_logging.adapters.canoe.time", SimpleNamespace(
+            monotonic=lambda: clock.now, sleep=settle))
+        checked = capture.inspect_file("s1")
+        assert checked["blf_snapshot_path"] and checked["bytes"] == 144
+        assert clock.now == .1
+        assert any(row["event"] == "canoe.file_finalizing" for row in capture.journal)
+
+
+def test_incomplete_blf_is_not_certified_even_when_trigger_has_stopped(fixture, monkeypatch):
+    capture, app, path = prepared(fixture)
+    capture.start("s1", {"temp_path": str(path)})
+    capture.stop("s1")
+    path.write_bytes(b"LOGG" + bytes(140))
+    clock = SimpleNamespace(now=0.)
+    monkeypatch.setattr("vil_logging.adapters.canoe.time", SimpleNamespace(
+        monotonic=lambda: clock.now, sleep=lambda delay: setattr(clock, "now", clock.now + delay)))
+    with path.open("r+b"):
+        with pytest.raises(ValueError):
+            capture.inspect_file("s1")
+        assert capture._inspection is None and 2 <= clock.now < 3
+    assert path.exists() and not path.with_name(path.name + ".sealed").exists()
+    capture.record_failure("inspect", ValueError("incomplete"))
+    assert capture.journal[-1]["observed"]["file"]["declared_bytes"] == 0
 
 
 def test_stop_releases_idle_output_before_waiting_for_closed_file_and_can_repeat(fixture, monkeypatch):
@@ -762,25 +802,26 @@ def test_stop_releases_idle_output_before_waiting_for_closed_file_and_can_repeat
 
 
 @pytest.mark.parametrize("restart_manual", [False, True])
-def test_external_file_lock_remains_unconfirmed_and_retry_never_stops_manual_recording(fixture, monkeypatch, restart_manual):
+def test_retained_handle_does_not_block_stopped_complete_blf_and_manual_restart_is_preserved(fixture, monkeypatch, restart_manual):
     capture, app, path = prepared(fixture)
     capture.start("s1", {"temp_path": str(path)})
     clock = SimpleNamespace(now=0.)
     monkeypatch.setattr("vil_logging.adapters.canoe.time", SimpleNamespace(
         monotonic=lambda: clock.now, sleep=lambda delay: setattr(clock, "now", clock.now + delay)))
     with path.open("rb"):
-        with pytest.raises(TimeoutError, match="exclusive file close"):
-            capture.stop("s1")
-    assert capture.trigger_stopped and not capture.stop_confirmed
+        result = capture.stop("s1")
+        assert result["stop_confirmed"] and not result["file_exclusive"]
+        assert clock.now < 1
+        checked = capture.inspect_file("s1")
+        assert checked["actual_format"] == "blf" and checked["blf_snapshot_path"]
+    assert capture.trigger_stopped and capture.stop_confirmed
     assert not capture.stats()["output_restore_pending"]
     assert app.blocks[0].FullName == "original_0.blf"
-    with pytest.raises(RuntimeError, match="previous recording"):
-        capture.configure("s2", {"temp_path": str(path.with_name("new.blf"))})
     assert app.blocks[0].Trigger.stops == 1
     if restart_manual:
         app.blocks[0].Trigger.Active = True
         with pytest.raises(RuntimeError, match="restarted"):
-            capture.stop("s1")
+            capture.inspect_file("s1")
         assert app.blocks[0].Trigger.stops == 1 and app.blocks[0].Trigger.Active
         app.blocks[0].Trigger.Active = False
     capture.stop("s1")

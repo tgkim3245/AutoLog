@@ -33,7 +33,7 @@ def canoe_worker_main(role, pipe):
                     evidence = "Exact BLF path confirmed" if state == "configured" else "Trigger active and BLF header at exact path"
                 elif command.action == "stop":
                     details = capture.stop(command.session_id)
-                    state, evidence = "stopped", "Selected trigger stopped and BLF exclusively accessible; measurement untouched"
+                    state, evidence = "stopped", "Selected trigger inactive; BLF completeness checked separately; measurement untouched"
                 elif command.action == "restore":
                     details = capture.restore_output(command.session_id)
                     state, evidence = "stopped", "Idle output settings restored without saving the configuration"

@@ -64,6 +64,25 @@ def test_publish_valid_file_then_finish_never_marks_acquisition_success(recovery
     assert FileService(repo).history()[0]["files"][0]["manageable"]
 
 
+@pytest.mark.parametrize("already_moved", [False, True])
+def test_interrupted_sealed_blf_publication_reconciles_without_overwrite(recovery, already_moved):
+    from vil_logging.storage.blf_snapshot import seal_blf
+    from vil_logging.storage.capture_files import publish_capture
+
+    repo, service, plan = recovery
+    file = plan.files[0]
+    content = file.temp_path.read_bytes()
+    inspection = seal_blf(file.temp_path)
+    repo.update_capture_file(plan.session_id, Role.CAN, "publishing", inspection=inspection)
+    if already_moved:
+        publish_capture(file, inspection)
+    service.publish(plan.session_id, "can", selected(service, plan)["token"], True)
+    assert file.final_path.read_bytes() == content
+    assert not file.temp_path.exists() and not file.temp_path.parent.exists()
+    service.finish_session(plan.session_id, selected(service, plan)["token"], True)
+    assert not service.report()["sessions"]
+
+
 @pytest.mark.parametrize("fault", ["damaged", "used", "collision", "link", "missing"])
 def test_unreadable_used_ambiguous_files_are_preserved(recovery, fault):
     repo, service, plan = recovery

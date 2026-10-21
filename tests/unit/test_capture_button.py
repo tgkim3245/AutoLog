@@ -23,7 +23,7 @@ def window(qtbot):
     (SessionPhase.STOPPING, "정지 · 파일 정리 중…", False, "progress"),
     (SessionPhase.COMPLETED, "다음 기록 시작", True, "success"),
     (SessionPhase.FAILED, "다시 시도", True, "attention"),
-    (SessionPhase.INCOMPLETE, "미완료 기록 확인", False, "attention"),
+    (SessionPhase.INCOMPLETE, "기록 마무리 확인", False, "attention"),
 ])
 def test_phase_describes_action_and_click_availability(window, phase, text, enabled, tone):
     window.set_phase(phase)

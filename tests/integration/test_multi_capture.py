@@ -89,6 +89,49 @@ def test_three_roles_configure_before_reservation_and_stop_all_before_inspection
     assert all(file.final_path.is_file() for file in runtime._plan.files)
 
 
+def test_can_zipy_three_complete_sessions_with_retained_blf_handles(real, monkeypatch):
+    from vil_logging.storage.blf import FILE_HEADER
+    from vil_logging.storage.blf_snapshot import seal_blf
+
+    runtime, tools = real
+    request = tools.request
+    held, plans = [], []
+    content = FILE_HEADER.pack(b"LOGG", 144, *([0] * 8), 144, 144, 0, 0, *([0] * 16)).ljust(144, b"\0")
+
+    def retained(roles, action, session_id, **kwargs):
+        result = request(roles, action, session_id, **kwargs)
+        if Role.CAN in roles:
+            if action == "start":
+                tools.paths[Role.CAN].write_bytes(content)
+                held.append(tools.paths[Role.CAN].open("r+b"))
+            elif action == "inspect":
+                result[Role.CAN].details.update(seal_blf(tools.paths[Role.CAN]))
+        return result
+
+    monkeypatch.setattr(tools, "request", retained)
+    try:
+        for number in range(3):
+            runtime.toggle((Role.CAN, Role.ETHERNET)).result(timeout=5)
+            assert runtime.phase == SessionPhase.RECORDING
+            plans.append(runtime._plan)
+            runtime.toggle((Role.CAN, Role.ETHERNET)).result(timeout=5)
+            assert runtime.phase == SessionPhase.COMPLETED
+            assert all(file.final_path.is_file() for file in runtime._plan.files)
+            assert next(file for file in runtime._plan.files if file.role == Role.CAN).temp_path.exists()
+        assert runtime._settings.next_index == 4
+        for handle in held:
+            handle.close()
+        runtime._submit(runtime._cleanup_retained_blf_sources).result(timeout=5)
+        assert not (runtime.data_dir / "captures/.vil_work").exists()
+        rows = runtime._submit(lambda: runtime._repo.captures()).result(timeout=5)
+        assert len(rows) == 3 and all(row["phase"] == "completed" for row in rows)
+        for plan in plans:
+            assert next(file for file in plan.files if file.role == Role.CAN).final_path.read_bytes() == content
+    finally:
+        for handle in held:
+            handle.close()
+
+
 def test_canoe_output_failure_reserves_no_number_and_starts_nothing(real):
     runtime, tools = real
     tools.fail = (Role.DIAG, "configure")

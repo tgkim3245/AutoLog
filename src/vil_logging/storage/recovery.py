@@ -11,9 +11,14 @@ from pathlib import Path
 from uuid import uuid4
 
 from vil_logging.adapters.external import external_environment
-from vil_logging.contracts.models import Role, utc_now
+from vil_logging.contracts.models import CaptureFilePlan, Role, utc_now
 from vil_logging.diagnostics.environment import _tool_candidates
 from vil_logging.storage.blf import inspect_blf
+from vil_logging.storage.blf_snapshot import (
+    cleanup_retained_source,
+    publication_source,
+    snapshot_path,
+)
 from vil_logging.storage.capture_files import cleanup_work_directory
 from vil_logging.storage.file_access import ExclusiveFile, matches, observe
 from vil_logging.storage.file_service import FileManagementError, FileService
@@ -36,8 +41,10 @@ def _evidence(path):
 
 
 def _paths(file):
-    return list(dict.fromkeys([file["temp_path"], file["final_path"],
-                               file["metadata"].get("actual_path", file["temp_path"])]))
+    paths = [file["temp_path"], file["final_path"], file["metadata"].get("actual_path", file["temp_path"])]
+    if file["role"] in {"can", "diag"}:
+        paths.append(str(snapshot_path(Path(file["temp_path"]))))
+    return list(dict.fromkeys(paths))
 
 
 def inspect_recovery_file(path: Path, extension: str, tshark_path: str) -> dict:
@@ -121,10 +128,17 @@ class RecoveryService:
         if not file or file["state"] in SETTLED:
             raise FileManagementError("This capture is not awaiting publication")
         self.repo.check_file_claims(_paths(file))
-        source, destination = Path(file["temp_path"]), Path(file["final_path"])
-        if not source.exists():
+        inspection = file["metadata"].get("inspection", {})
+        capture_file = CaptureFilePlan(Role(role), file["filename"], Path(file["temp_path"]), Path(file["final_path"]))
+        source, destination = publication_source(capture_file, inspection), capture_file.final_path
+        if file["state"] == "publishing" and destination.exists():
+            expected = {key: inspection[key] for key in ("inode", "bytes", "mtime_ns") if key in inspection}
+            if not matches(observe(destination), expected):
+                raise FileManagementError("Published capture identity changed; existing files are preserved.")
+            source = destination
+        elif not source.exists():
             # Normal publication may have moved the file just before its DB update failed.
-            expected = file["metadata"].get("inspection", {})
+            expected = inspection
             expected = {key: expected[key] for key in ("inode", "bytes", "mtime_ns") if key in expected}
             if file["state"] != "publishing" or not matches(observe(destination), expected):
                 raise FileManagementError("작업 파일을 확인할 수 없습니다. 기존 파일은 유지합니다. / "
@@ -133,7 +147,7 @@ class RecoveryService:
         elif destination.exists() or destination.is_symlink():
             raise FileExistsError(f"기존 파일을 보존합니다. / Existing output: {destination}")
         log.info("recovery.inspection_started", extra={"session_id": session_id, "role": role, "path": str(source)})
-        inspection = inspect_recovery_file(source, destination.suffix[1:], tshark_path)
+        inspection = {**inspection, **inspect_recovery_file(source, destination.suffix[1:], tshark_path)}
         item = {"session_id": session_id, "role": role, "source": str(source),
                 "destination": str(destination), "identity": {key: inspection[key]
                     for key in ("device", "inode", "bytes", "mtime_ns")}, "status": "pending"}
@@ -153,6 +167,11 @@ class RecoveryService:
         # Persisted identity is sufficient for interrupted journal reconciliation.
         # Keep validation separately for display/audit; failure here cannot lose the move journal.
         self.repo.update_capture_file(session_id, Role(role), "published", inspection=inspection)
+        if inspection.get("retained_source"):
+            try:
+                cleanup_retained_source(capture_file, inspection)
+            except (OSError, ValueError):
+                log.info("recovery.blf_source_cleanup_deferred", extra={"session_id": session_id})
         cleanup_work_directory(Path(file["temp_path"]).parent)
         log.info("recovery.file_published", extra={"session_id": session_id, "role": role,
                                                    "inspection": inspection, "operation_id": identifier})

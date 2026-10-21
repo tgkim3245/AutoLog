@@ -12,7 +12,8 @@ from pathlib import Path
 
 from vil_logging.diagnostics.canoe_measurement import measurement_diagnostics
 from vil_logging.diagnostics.canoe_setup import CanoeActivationError
-from vil_logging.storage.blf import inspect_blf
+from vil_logging.storage.blf import FILE_HEADER, inspect_blf
+from vil_logging.storage.blf_snapshot import seal_blf
 from vil_logging.storage.file_access import ExclusiveFile, observe
 
 FILE_OPTIONS = ("IncrementAtMeasurementStart", "IncrementAfterTrigger",
@@ -72,6 +73,8 @@ class CanoeCapture:
         self._restore_context = None
         self._selection = None
         self.output_restore_error = ""
+        self.file_exclusive = False
+        self._inspection = None
 
     def _trace(self, event, **fields):
         entry = {"event": event, "monotonic": time.monotonic(), **fields}
@@ -85,6 +88,7 @@ class CanoeCapture:
                 "path": str(self.path or ""), "start_attempted": self.attempted,
                 "trigger_stopped": self.trigger_stopped,
                 "stop_confirmed": self.stop_confirmed,
+                "file_exclusive": self.file_exclusive,
                 "output_restore_pending": self._output_snapshot is not None,
                 "output_restore_error": self.output_restore_error,
                 "block_validation": "logical_selection_owned_output_idle_blf_refresh", "diagnostics": list(self.journal)}
@@ -182,11 +186,12 @@ class CanoeCapture:
             if _same_path(value, name):
                 return True
             base = Path(name)
-            stem = re.sub(r"_T[0-9]+$", "", base.stem, flags=re.IGNORECASE)
+            stem = re.sub(r"(?:_T[0-9]+)+$", "", base.stem, flags=re.IGNORECASE)
             if (snapshot["options"]["IncrementAfterTrigger"]
                     and _same_path(value.parent, base.parent)
                     and value.suffix.casefold() == base.suffix.casefold() == ".blf"
-                    and re.fullmatch(re.escape(stem) + r"_T[0-9]{1,9}", value.stem, re.IGNORECASE)):
+                    and any(re.fullmatch(re.escape(root) + r"(?:_T[0-9]{1,20})+", value.stem, re.IGNORECASE)
+                            for root in {stem, base.stem})):
                 return True
         return False
 
@@ -208,6 +213,18 @@ class CanoeCapture:
                                      "trigger_active": bool(block.Trigger.Active)}
         except Exception as diagnostic_error:
             observed["block_observation_error"] = str(diagnostic_error)
+        if self.path is not None and action in {"stop", "inspect"}:
+            try:
+                info = self.path.stat()
+                with self.path.open("rb") as source:
+                    header = source.read(FILE_HEADER.size)
+                observed["file"] = {"bytes": info.st_size, "mtime_ns": info.st_mtime_ns}
+                if len(header) == FILE_HEADER.size:
+                    fields = FILE_HEADER.unpack(header)
+                    observed["file"].update(blf_signature=fields[0] == b"LOGG",
+                                            declared_bytes=fields[10], declared_objects=fields[12])
+            except Exception as diagnostic_error:
+                observed["file_observation_error"] = str(diagnostic_error)
         self._trace("canoe.command_failed", action=action, error=str(error), block=self.index,
                     canoe_pid=self.canoe_pid, observed=observed)
 
@@ -387,6 +404,7 @@ class CanoeCapture:
                            } if self.block is not None else None
         self.session_id, self.path = "", None
         self._restore_context = None
+        self.file_exclusive, self._inspection = False, None
         self.attempted = self.trigger_stopped = self.stop_confirmed = False
         details = {**self.stats(), "blocks": blocks, "selected_block": str(index) if index else "",
                    "measurement_running": bool(self.app.Measurement.Running),
@@ -450,6 +468,7 @@ class CanoeCapture:
             raise ValueError("A new BLF working path is required; existing files are preserved.")
         self.session_id, self.path = session_id, path
         self._restore_context = None
+        self.file_exclusive, self._inspection = False, None
         self.attempted = self.trigger_stopped = self.stop_confirmed = False
         options = self.block.FileNameOptions
         self._output_snapshot = {"full_name": str(self.block.FullName),
@@ -535,9 +554,7 @@ class CanoeCapture:
             if self.block.Trigger.Active:
                 self.block.Trigger.Stop()
         deadline = time.monotonic() + 28
-        last_error = ""
         restore_attempts = 0
-        wait_reported = False
         while time.monotonic() < deadline:
             self._validate()
             active = bool(self.block.Trigger.Active)
@@ -549,38 +566,70 @@ class CanoeCapture:
                     self._trace("canoe.trigger_stopped", elapsed_ms=round((time.monotonic() - started) * 1000))
                 if self._output_snapshot is not None and restore_attempts < 3:
                     restore_attempts += 1
-                    # Trigger.Stop can pause logging while CANoe retains the
-                    # current file. Release our idle filename before waiting for
-                    # exclusive access; otherwise closure and restoration wait
-                    # on each other. The session remains unresolved until the
-                    # original working file is actually exclusively accessible.
                     try:
                         self.restore_output(session_id)
                     except Exception:
-                        pass  # Preserve the snapshot/error; closure can still be proven independently.
+                        if restore_attempts < 3:
+                            time.sleep(.05)
+                            continue
+                        # Settings restoration and a complete BLF are separate
+                        # outcomes. Preserve conflicts; never stop a foreign log.
                 if self.block.Trigger.Active:
                     raise RuntimeError("Logging restarted during output restoration; refusing to certify closure.")
                 try:
                     with ExclusiveFile(self.path, observe(self.path)):
                         pass
                 except (OSError, ValueError) as error:
-                    last_error = str(error)
-                    if not wait_reported:
-                        wait_reported = True
-                        self._trace("canoe.file_close_waiting", error=last_error,
-                                    output_restore_pending=self._output_snapshot is not None)
+                    self._trace("canoe.file_handle_retained", error=str(error),
+                                output_restore_pending=self._output_snapshot is not None,
+                                next_step="validate_complete_stable_snapshot")
                 else:
-                    self.stop_confirmed = True
-                    self._trace("canoe.segment_closed", measurement_running=bool(self.app.Measurement.Running),
-                                elapsed_ms=round((time.monotonic() - started) * 1000))
-                    return self.stats()
+                    self.file_exclusive = True
+                self.stop_confirmed = True  # Trigger stop; file completeness is checked by inspect_file.
+                self._trace("canoe.segment_stopped", measurement_running=bool(self.app.Measurement.Running),
+                            file_exclusive=self.file_exclusive,
+                            elapsed_ms=round((time.monotonic() - started) * 1000))
+                return self.stats()
             time.sleep(.05)
-        raise TimeoutError("CANoe normal stop / exclusive file close is unconfirmed: " + last_error)
+        raise TimeoutError("CANoe logging trigger did not stop within its time limit")
 
     def inspect_file(self, session_id):
         if session_id != self.session_id or not self.stop_confirmed:
-            raise RuntimeError("Inspect only this session's normally stopped, closed BLF.")
-        with ExclusiveFile(self.path, observe(self.path)):
-            pass
-        result = inspect_blf(self.path)
-        return {**result, **self.stats()}
+            raise RuntimeError("Inspect only this session's normally stopped BLF.")
+        self._validate()
+        if self.block.Trigger.Active:
+            raise RuntimeError("Logging restarted; refusing to archive a live recording")
+        if self._inspection is None:
+            settle_deadline = time.monotonic() + 2
+            waiting_reported = False
+            while True:
+                self._validate()
+                if self.block.Trigger.Active:
+                    raise RuntimeError("Logging restarted during inspection; capture was preserved")
+                try:
+                    try:
+                        with ExclusiveFile(self.path, observe(self.path)):
+                            pass
+                    except OSError as error:
+                        if getattr(error, "winerror", None) != 32:
+                            raise
+                        result = seal_blf(self.path)
+                        self._trace("canoe.snapshot_sealed", path=str(self.path), bytes=result["bytes"],
+                                    sha256=result["retained_source"]["sha256"], objects=result["object_count"])
+                    else:
+                        result = {**inspect_blf(self.path), "closure_evidence": "exclusive_access"}
+                except (OSError, ValueError) as error:
+                    if (time.monotonic() >= settle_deadline or isinstance(error, OSError)
+                            and getattr(error, "winerror", None) != 32):
+                        raise
+                    if not waiting_reported:
+                        self._trace("canoe.file_finalizing", error=str(error))
+                        waiting_reported = True
+                    time.sleep(.1)
+                else:
+                    break
+            self._validate()
+            if self.block.Trigger.Active:
+                raise RuntimeError("Logging restarted during inspection; capture was preserved")
+            self._inspection = result
+        return {**self._inspection, **self.stats()}
