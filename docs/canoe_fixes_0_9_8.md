@@ -40,3 +40,10 @@
 | 671 | 324,236 | 9,914 | `9d738a72ef0c370bb0e1a47530d6c626b2b42d333620347f2aeed337891fd8e1` |
 
 각 파일의 비-CAN header version 경고 2개와 선언/물리 object 수 차이 3개는 별도로 구분한다. CAN 프레임 읽기와 모든 객체 해석/취득 무손실을 동일시하지 않는다. 사전 DB 백업과 복구 근거는 로컬 빌드 저장소 `field-recovery-0.9.8/`에만 보관한다.
+
+## 배포 검증
+
+- 깨끗한 소스 `16256a4c9c79f1ce7f0b06721a9c516bba77591b`로 `AutoLog-0.9.8_20261021_201910`을 빌드했다. ZIP 52,976,367바이트, SHA256 `924078f5aad9e4ded15c467af4fbc5da5c5d622ed0b9bed1df3c3360979c6ed9`. EXE SHA256 `fdfa9b12b24eb39f97090b5f36584b6963da4836da211331bf08bd7499f50360`.
+- ZIP CRC/해시·Windows 제품/파일 버전과 압축 해제 EXE의 중국어 모의 기록 시작/정지·완료 버튼·X 종료·읽기 전용 NIC 목록을 확인했다. 개발 Python 없는 PATH에서 실행했고 개발자로그 101개에 ERROR/CRITICAL이 없었다.
+- 같은 EXE의 PYZ에서 추출한 CAN·파일 마무리/정리·Runtime·복구 코드를 개발 Python에서 실행해 대역 검사 99개를 통과했다. 실제 CANoe 측정 시험과 구분한다.
+- 가이드 HTML 27,898바이트·START_HERE 4,319바이트의 미리보기·ZIP·EXE 폴더·압축 해제본과 build_info 개정/해시가 일치한다. 최종 빌드 폴더의 `verification/result.json`, `verification/capture_button_result.json`, `frozen-core/result.json`, `documentation_verification.json`에 근거를 남겼다.
