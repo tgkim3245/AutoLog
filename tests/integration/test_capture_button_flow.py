@@ -8,6 +8,7 @@ import sys
 def test_main_button_controls_the_application_state_machine(tmp_path):
     script = r'''
 import sys
+import time
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 from vil_logging import ui
@@ -17,9 +18,11 @@ from vil_logging.contracts.commands import FakeBehavior
 from vil_logging.contracts.models import Role, SessionPhase
 
 create = Runtime.__init__
+instances = []
 def controlled(self, *args, **kwargs):
     kwargs['behaviors'] = {role: FakeBehavior(start_delay=.5, stop_delay=.15) for role in Role}
     create(self, *args, **kwargs)
+    instances.append(self)
 Runtime.__init__ = controlled
 Runtime.discover = lambda self: None
 outcome = {'step':0, 'error':''}
@@ -50,6 +53,11 @@ class ExercisedWindow(ui.MainWindow):
                 button.click()
                 outcome['step'] = 3
             elif step == 3 and self._phase == SessionPhase.RECORDING:
+                instances[0]._publish('phase', SessionPhase.STARTING)
+                self.stale_check_after = time.monotonic() + .25
+                outcome['step'] = 30
+            elif step == 30 and time.monotonic() >= self.stale_check_after:
+                assert self._phase == SessionPhase.RECORDING, 'Delayed phase notification regressed the button'
                 assert button.property('tone') == 'stop' and '정지' in button.text()
                 button.click()
                 assert self._phase == SessionPhase.STOPPING and not button.isEnabled()

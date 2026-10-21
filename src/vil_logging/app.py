@@ -335,7 +335,9 @@ def main(argv: list[str] | None = None) -> int:
                 window.set_settings(value)
                 environment_dialog.set_language(value.language)
             elif kind == "phase":
-                window.set_phase(value)
+                # A click already reflects the latest runtime phase immediately.
+                # Delayed queued notifications must not undo that newer state.
+                window.set_phase(runtime.phase)
             elif kind == "capture_step":
                 window.set_capture_step(value)
             elif kind == "target":
@@ -451,10 +453,14 @@ def main(argv: list[str] | None = None) -> int:
                 window.logging_button.click()
                 smoke["button_actions"].append("start")
             elif runtime.phase == SessionPhase.RECORDING and not smoke["stopped"]:
+                if window._phase != SessionPhase.RECORDING or not window.logging_button.isEnabled():
+                    return
                 smoke["stopped"] = True
                 window.logging_button.click()
                 smoke["button_actions"].append("stop")
             elif runtime.phase == SessionPhase.COMPLETED:
+                if window._phase != SessionPhase.COMPLETED:
+                    return
                 smoke["passed"] = True
                 smoke_timer.stop()
                 window.close()
