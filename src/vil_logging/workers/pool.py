@@ -86,6 +86,8 @@ class FakeWorkerPool:
             command = Command(action=action, role=role, session_id=session_id, params=dict(values))
             try:
                 self._ensure(role)
+                if self._closed:
+                    raise RuntimeError("worker pool is closed")
                 self._drain_late_replies(role)
                 self._pipes[role].send(command)
             except (OSError, EOFError, BrokenPipeError, RuntimeError) as error:
@@ -155,6 +157,16 @@ class FakeWorkerPool:
             except (queue.Empty, ValueError, OSError):
                 break
         return packets
+
+    def force_abort(self):
+        """Terminate only tracked worker handles; no joins or pipe/COM requests."""
+        self._closed = True
+        for process in tuple(self._processes.values()):
+            try:
+                if process.is_alive():
+                    process.terminate()
+            except (OSError, ValueError, AssertionError):
+                pass
 
     def close(self) -> None:
         if self._closed:

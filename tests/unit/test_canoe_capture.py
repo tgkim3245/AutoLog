@@ -653,6 +653,86 @@ class RetainedWriterBlock(Block):
         self._full_name = value
 
 
+class NormalizingRestoreBlock(RetainedWriterBlock):
+    """CANoe applies trigger numbering two FullName reads after a setter."""
+
+    def __init__(self, name):
+        self.armed = False
+        self.pending = None
+        self.reads = self.counter = 0
+        super().__init__(name)
+        block = self
+
+        class Options(SimpleNamespace):
+            def __setattr__(self, key, value):
+                previous = getattr(self, key, False)
+                super().__setattr__(key, value)
+                if key == "IncrementAfterTrigger" and value and not previous and block.armed:
+                    block.normalize(block._full_name)
+
+        self.FileNameOptions = Options(IncrementAtMeasurementStart=False, IncrementAfterTrigger=True,
+                                       IncrementAfterGrowth=False, IncrementAfterDuration=False)
+
+    def normalize(self, value):
+        import re
+        path = Path(value)
+        self.counter += 1
+        stem = re.sub(r"_T[0-9]+$", "", path.stem)
+        self.pending = str(path.with_name(f"{stem}_T{self.counter:03d}.blf"))
+        self.reads = 0
+
+    @property
+    def FullName(self):
+        if self.pending is not None:
+            self.reads += 1
+            if self.reads >= 2:
+                self._full_name, self.pending = self.pending, None
+        return self._full_name
+
+    @FullName.setter
+    def FullName(self, value):
+        RetainedWriterBlock.FullName.fset(self, value)
+        if self.armed and self.FileNameOptions.IncrementAfterTrigger:
+            self.normalize(value)
+
+
+@pytest.mark.parametrize("name", ["manual.blf", "manual_T009.blf"])
+def test_delayed_trigger_numbering_during_restore_allows_three_closed_segments(fixture, name):
+    capture, app, params, root = fixture
+    app.blocks[0] = block = NormalizingRestoreBlock(str(root / name))
+    app.fresh_proxies = True
+    capture.connect(params)
+    app.Measurement.Running = True
+    try:
+        for number in range(3):
+            capture.prepare(params)
+            path, session = root / f"segment_{number}.blf", f"segment-{number}"
+            capture.configure(session, {"temp_path": str(path)})
+            capture.start(session, {"temp_path": str(path)})
+            block.armed = True
+            result = capture.stop(session)
+            assert result["stop_confirmed"] and not result["output_restore_pending"]
+            assert capture.inspect_file(session)["actual_format"] == "blf"
+            assert block.writer is None and block.FileNameOptions.IncrementAfterTrigger
+            assert Path(block.FullName).parent == root and "manual_T" in Path(block.FullName).name
+            assert app.Measurement.Running
+        assert block.Trigger.starts == block.Trigger.stops == 3
+        assert any(row["event"] == "canoe.output_normalized" for row in capture.journal)
+    finally:
+        if block.writer:
+            block.writer.close()
+
+
+def test_trigger_suffix_is_not_accepted_as_external_output_before_our_restore(fixture):
+    capture, app, path = prepared(fixture)
+    capture.start("s1", {"temp_path": str(path)})
+    app.blocks[0].FullName = "original_0_T001.blf"
+    app.blocks[0].Trigger.Active = False
+    with pytest.raises(RuntimeError, match="changed"):
+        capture.stop("s1")
+    assert app.blocks[0].Trigger.stops == 0
+
+
 def test_stop_releases_idle_output_before_waiting_for_closed_file_and_can_repeat(fixture, monkeypatch):
     capture, app, params, root = fixture
     app.blocks[0] = block = RetainedWriterBlock(str(root / "manual.blf"))

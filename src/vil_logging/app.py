@@ -196,6 +196,8 @@ def main(argv: list[str] | None = None) -> int:
     developer_log_default = debug.enabled
     window.set_debug_status(str(debug_path or ""), last_debug_error)
     runtime = Runtime(data_dir, demo=args.demo)
+    from vil_logging.exit_guard import ExitGuard
+    exit_guard = ExitGuard(runtime.force_abort)
     exiting = False
     saved_excepthook = sys.excepthook
     saved_thread_hook = threading.excepthook
@@ -225,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def request_exit():
         nonlocal exiting
+        exit_guard.request()
         if not exiting:
             exiting = True
             debug.log("app.exit_requested", phase=runtime.phase.value)
@@ -394,12 +397,8 @@ def main(argv: list[str] | None = None) -> int:
                     app.exit(0)
                     return
                 else:
-                    exiting = False
-                    window.set_exiting(False)
-                    window.restore_window()
-                    window.set_phase(runtime.phase)
-                    QMessageBox.warning(window, tr("exit_deferred_title", window._language),
-                                        tr("exit_deferred_help", window._language))
+                    exit_guard.force("cleanup_failed")
+                    return
         for packet in runtime.drain_packets():
             window.add_packet(packet)
         window.check_monitor_freshness()
@@ -486,6 +485,7 @@ def main(argv: list[str] | None = None) -> int:
         instance.close()
         for legacy_instance in legacy_instances:
             legacy_instance.close()
+        exit_guard.finish()
     if args.smoke_test:
         print(json.dumps({"smoke_passed": smoke["passed"], "data_dir": str(data_dir),
                           "capture_button_actions": smoke["button_actions"],

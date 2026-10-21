@@ -30,6 +30,25 @@ def test_stop_requires_only_the_worker_to_remain_in_its_job(monkeypatch, active,
     assert result.state == (state if active == 1 else "unknown")
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows Job Object termination")
+@pytest.mark.parametrize("invalid_job", [False, True])
+def test_force_abort_kills_only_owned_jobs_and_workers_even_if_job_is_gone(monkeypatch, invalid_job):
+    import win32job
+    pool = object.__new__(ethernet_pool.CaptureWorkerPool)
+    pool._jobs = {Role.ETHERNET: "owned-job"}
+    pool._processes = {}
+    calls = []
+
+    def terminate(job, code):
+        calls.append((job, code))
+        if invalid_job:
+            raise RuntimeError("already closed")
+
+    monkeypatch.setattr(win32job, "TerminateJobObject", terminate)
+    pool.force_abort()
+    assert calls == [("owned-job", 1)] and pool._closed
+
+
 def test_failed_output_restore_keeps_canoe_worker_and_snapshot_available():
     pool = object.__new__(ethernet_pool.CaptureWorkerPool)
     pool._closed = False

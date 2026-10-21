@@ -92,6 +92,18 @@ class CaptureWorkerPool(FakeWorkerPool):
                 self._jobs.pop(role).Close()
             raise
 
+    def force_abort(self):
+        # The job owns dumpcap/decoder descendants, even if their parent is hung.
+        # CANoe is deliberately outside this job: its user-visible project stays.
+        if os.name == "nt":
+            import win32job
+            for job in tuple(self._jobs.values()):
+                try:
+                    win32job.TerminateJobObject(job, 1)
+                except Exception:
+                    pass
+        super().force_abort()
+
     def close(self, *, abnormal=False):
         if self._closed:
             return

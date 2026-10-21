@@ -630,6 +630,8 @@ class MainWindow(QMainWindow):
             tip = text
         elif key == "incomplete":
             tip = tr("capture_review_help", self._language)
+        if key == "exiting":
+            tip = tr("capture_exiting_help", self._language)
         self._capture_action = action if enabled else ""
         state = (key, tone, enabled, busy, self._capture_action, text, tip)
         if state != self._capture_button_state:

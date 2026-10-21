@@ -44,6 +44,8 @@ TEXT = {
                             "Open recovery to retry stopping the current capture or review earlier incomplete files."),
     "capture_no_targets": ("대상을 선택하세요", "Select a target"),
     "capture_exiting": ("종료 준비 중…", "Preparing to exit…"),
+    "capture_exiting_help": ("약 3초 안에 정리가 끝나지 않으면 강제 종료합니다. X를 다시 누르면 즉시 종료합니다.",
+                             "Force-exits if cleanup takes more than about 3 seconds. Press X again to exit immediately."),
     "capture_demo": ("모의 · {text}", "Demo · {text}"),
     "disconnected_short": ("미연결", "Offline"),
     "measurement_waiting_short": ("측정 대기", "Start meas."),
@@ -185,7 +187,7 @@ TEXT = {
     "demo_completed": ("모의 종료 · 파일 미생성", "Simulation ended · no files created"),
     "demo_recording": ("모의 기록 중 · 누르면 정지", "Simulation running · click to stop"),
     "demo_partial": ("일부 모의 기록 중 · 누르면 정지", "Partial simulation · click to stop"),
-    "real": ("X를 누르면 기록을 정리하고 프로그램을 종료합니다", "X stops capture cleanly, then exits the program"),
+    "real": ("X: 종료 · 다시 누르면 즉시 종료", "X: Exit · Press again to exit immediately"),
     "output": ("저장 위치", "Output folder"),
     "unset": ("미설정", "Not configured"),
     "prefix": ("파일 prefix", "Filename prefix"),
@@ -313,6 +315,8 @@ TEXT.update({
 })
 
 EVENTS = {
+    "PREVIOUS_FORCED_EXIT": ("이전 실행이 강제 종료됐습니다. 남은 기록은 미완료 확인에서 검토하세요.",
+                             "The previous run was force-closed. Review remaining captures in recovery."),
     "HISTORY_ARCHIVED": ("오래된 이력을 압축 보관했습니다. 캡처 파일은 유지됩니다.", "Older history archived. Capture files are retained."),
     "HISTORY_ARCHIVE_FAILED": ("이력 내보내기에 실패해 원래 이력을 유지했습니다.", "History export failed; original history was retained."),
     "DISK_SPACE_LOW": ("저장 공간 1 GiB 이하 · 저장 위치 확인 필요", "Free disk space ≤1 GiB · check output location"),

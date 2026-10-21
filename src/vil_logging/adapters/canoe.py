@@ -4,6 +4,7 @@ Never attach through the active-object table, save a configuration, create a
 logging block, or start/stop measurement. COM stays in the worker's STA thread.
 """
 
+import re
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -68,6 +69,7 @@ class CanoeCapture:
         self.journal = deque(maxlen=40)
         self.emit_trace = None
         self._output_snapshot = None
+        self._restore_context = None
         self._selection = None
         self.output_restore_error = ""
 
@@ -110,6 +112,7 @@ class CanoeCapture:
             expected_paths = []
             reason = ""
             idle_output_change = None
+            restored_output_change = None
             for i, (before, after) in enumerate(zip(expected["blocks"], observed), 1):
                 paths = [before["path"]]
                 if i == self.index and self._output_snapshot is not None:
@@ -130,6 +133,14 @@ class CanoeCapture:
                     paths = [after["path"]]
                     idle_output_change = {"previous": before["path"], "current": after["path"]}
                 expected_paths.append(paths)
+                if (i == self.index and self._restore_context is not None
+                        and (not self.attempted or self.trigger_stopped)
+                        and before["name"] == after["name"]
+                        and sum(item["name"] == after["name"] for item in observed) == 1
+                        and not current.Trigger.Active and self._restored_path_matches(after["path"])):
+                    paths.append(after["path"])
+                    if not _same_path(before["path"], after["path"]):
+                        restored_output_change = dict(selected=after, previous=before["path"])
                 if before["name"] != after["name"] or not any(_same_path(after["path"], path) for path in paths):
                     reason = "block_layout_or_output_changed"
             selected = observed[self.index - 1]
@@ -152,7 +163,32 @@ class CanoeCapture:
                 expected["blocks"][self.index - 1] = dict(selected)
                 self._trace("canoe.idle_output_refreshed", block=self.index, name=selected["name"],
                             **idle_output_change)
+            if restored_output_change is not None:
+                expected["blocks"][self.index - 1] = dict(selected)
+                self._trace("canoe.output_normalized", previous=restored_output_change["previous"],
+                            current=selected["path"], block=self.index)
             self.block = current
+
+    def _restored_path_matches(self, value, *, original_only=False):
+        """Accept only our idle restore's original path or CANoe's trigger suffix."""
+        snapshot = self._restore_context
+        if snapshot is None:
+            return False
+        bases = [snapshot["full_name"]]
+        if not original_only and self._output_snapshot is not None:
+            bases.append(str(self.path))
+        value = Path(value)
+        for name in bases:
+            if _same_path(value, name):
+                return True
+            base = Path(name)
+            stem = re.sub(r"_T[0-9]+$", "", base.stem, flags=re.IGNORECASE)
+            if (snapshot["options"]["IncrementAfterTrigger"]
+                    and _same_path(value.parent, base.parent)
+                    and value.suffix.casefold() == base.suffix.casefold() == ".blf"
+                    and re.fullmatch(re.escape(stem) + r"_T[0-9]{1,9}", value.stem, re.IGNORECASE)):
+                return True
+        return False
 
     def record_failure(self, action, error):
         """Best-effort read-only failure evidence; never mask the command error."""
@@ -194,7 +230,8 @@ class CanoeCapture:
             if self.block.Trigger.Active:
                 raise RuntimeError("Logging trigger became active; output settings were preserved.")
             current_path = str(self.block.FullName)
-            if not (_same_path(current_path, self.path) or current_path == snapshot["full_name"]):
+            if not (_same_path(current_path, self.path) or current_path == snapshot["full_name"]
+                    or self._restored_path_matches(current_path)):
                 raise RuntimeError("Logging output was edited externally; restoration would overwrite it.")
             options = self.block.FileNameOptions
             # Validate every property before any write. Original values also allow a retry
@@ -203,14 +240,19 @@ class CanoeCapture:
                 if bool(getattr(options, name)) not in (False, original):
                     raise RuntimeError(f"{name} was edited externally; restoration was deferred.")
             self._trace("canoe.output_restore_requested", original=snapshot)
-            if current_path != snapshot["full_name"]:
-                self.block.FullName = snapshot["full_name"]
+            self._restore_context = snapshot
+            # Re-enabling increment modes can itself normalize FullName (_T001).
+            # Restore modes first, then the user's filename, and accept that
+            # tightly scoped normalization even when CANoe applies it later.
             for name, original in snapshot["options"].items():
                 if bool(getattr(options, name)) != original:
                     setattr(options, name, original)
-            if str(self.block.FullName) != snapshot["full_name"] or any(
+            if not self._restored_path_matches(str(self.block.FullName), original_only=True):
+                self.block.FullName = snapshot["full_name"]
+            if not self._restored_path_matches(str(self.block.FullName), original_only=True) or any(
                     bool(getattr(options, name)) != value for name, value in snapshot["options"].items()):
                 raise RuntimeError("CANoe did not confirm restored output settings.")
+            self._validate()
         except Exception as error:
             self.output_restore_error = str(error)
             self._trace("canoe.output_restore_failed", error=str(error))
@@ -344,6 +386,7 @@ class CanoeCapture:
         self._selection = {"blocks": [{"name": item["name"], "path": item["path"]} for item in blocks]
                            } if self.block is not None else None
         self.session_id, self.path = "", None
+        self._restore_context = None
         self.attempted = self.trigger_stopped = self.stop_confirmed = False
         details = {**self.stats(), "blocks": blocks, "selected_block": str(index) if index else "",
                    "measurement_running": bool(self.app.Measurement.Running),
@@ -406,6 +449,7 @@ class CanoeCapture:
         if path.suffix.lower() != ".blf" or path.exists() or not path.parent.is_dir():
             raise ValueError("A new BLF working path is required; existing files are preserved.")
         self.session_id, self.path = session_id, path
+        self._restore_context = None
         self.attempted = self.trigger_stopped = self.stop_confirmed = False
         options = self.block.FileNameOptions
         self._output_snapshot = {"full_name": str(self.block.FullName),
@@ -492,7 +536,7 @@ class CanoeCapture:
                 self.block.Trigger.Stop()
         deadline = time.monotonic() + 28
         last_error = ""
-        restore_attempted = False
+        restore_attempts = 0
         wait_reported = False
         while time.monotonic() < deadline:
             self._validate()
@@ -503,8 +547,8 @@ class CanoeCapture:
                 if not self.trigger_stopped:
                     self.trigger_stopped = True
                     self._trace("canoe.trigger_stopped", elapsed_ms=round((time.monotonic() - started) * 1000))
-                if self._output_snapshot is not None and not restore_attempted:
-                    restore_attempted = True
+                if self._output_snapshot is not None and restore_attempts < 3:
+                    restore_attempts += 1
                     # Trigger.Stop can pause logging while CANoe retains the
                     # current file. Release our idle filename before waiting for
                     # exclusive access; otherwise closure and restoration wait

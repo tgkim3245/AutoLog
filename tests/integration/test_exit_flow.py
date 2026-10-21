@@ -108,4 +108,10 @@ print('X_EXIT_PASSED')
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "X_EXIT_PASSED" in result.stdout
+    if scenario == "history":
+        assert "X_EXIT_PASSED" in result.stdout
+    else:
+        import json
+        notice = json.loads((tmp_path / "AutoLog_force_exit.json").read_text(encoding="utf-8"))
+        assert notice["reason"] == "cleanup_failed"
+        assert notice["phase"] == "incomplete"

@@ -4,7 +4,7 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 
 배포받은 사용자는 EXE 옆 **START_HERE.txt**와 **AutoLog_User_Guide.html**을 먼저 읽으세요. Defender의 `CAPLcompExec.exe`·`CANoe64.exe` 허용 앱 등록과 최초 연결·기록·복구 절차를 안내합니다. [공식 사용자 가이드 관리 원본·변경 이력](user_guide/README.md)은 소프트웨어 변경과 함께 갱신하며 빌드/ZIP에 자동 포함합니다.
 
-현재 소스 버전은 **0.9.5**입니다. [메인 기록 버튼 상태 표시](docs/capture_button_0_9_5.md), [CAN 종료 지연·연속 기록·네트워크 선택 수정](docs/capture_fixes_0_9_4.md), 이전 [수동 기록 후 파일명 변경 차단 수정](docs/canoe_fixes_0_9_3.md), [CANoe 기록 시작 오류 수정](docs/canoe_fixes_0_9_2.md), [준비 오류 수정](docs/canoe_fixes_0_9_1.md), [사용성·채널 확인·캡처 분리 변경](docs/usability_update_0_9_0.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md)를 확인하세요. CAN과 Diag의 **연결 확인**은 각 .cfg를 별도 CANoe 창에 연결하고 구성 열기·측정 대기·구간 기록 준비를 구분합니다. 로컬 Vector 장치의 채널을 조회할 수 있으면 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교합니다. 조회 불가와 실제 수신 성공은 구분합니다. 이전 [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)도 참고하세요.
+현재 소스 버전은 **0.9.6**입니다. [CANoe 출력 자동 번호 복구·항상 종료](docs/canoe_fixes_0_9_6.md), [메인 기록 버튼 상태 표시](docs/capture_button_0_9_5.md), [CAN 종료 지연·연속 기록·네트워크 선택 수정](docs/capture_fixes_0_9_4.md), 이전 [수동 기록 후 파일명 변경 차단 수정](docs/canoe_fixes_0_9_3.md), [CANoe 기록 시작 오류 수정](docs/canoe_fixes_0_9_2.md), [준비 오류 수정](docs/canoe_fixes_0_9_1.md), [사용성·채널 확인·캡처 분리 변경](docs/usability_update_0_9_0.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md)를 확인하세요. CAN과 Diag의 **연결 확인**은 각 .cfg를 별도 CANoe 창에 연결하고 구성 열기·측정 대기·구간 기록 준비를 구분합니다. 로컬 Vector 장치의 채널을 조회할 수 있으면 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교합니다. 조회 불가와 실제 수신 성공은 구분합니다. 이전 [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)도 참고하세요.
 
 **기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
 
@@ -26,7 +26,7 @@ AutoLog로 cfg를 연 뒤 해당 CANoe 창에서 채널 매핑과 cfg에 필요�
 
 0.9.3 현장 리포트에서는 CAN+Zipy 시작에 성공했으나 CAN 파일이 잠겨 28초 뒤 정지가 실패하고 다음 기록도 차단됐습니다. 0.9.4는 trigger 비활성 확인 후 원래 출력 경로를 먼저 복구하고 작업 BLF 닫힘을 검사합니다. 파일 핸들을 유지하는 대역에서 연속 3회 기록을 통과했으며 실제 CANoe 재시험은 남아 있습니다. 네트워크 드롭다운은 Qt 선택 확정 뒤 목록을 갱신하도록 고쳐 클릭 선택·저장을 확인했습니다.
 
-X 종료 시 이전 실행의 미완료 이력만 있으면 파일·이력을 보존하고 종료합니다. 현재 기록 정리에 실패하면 이유와 X 재시도 안내를 표시합니다. 0.9.4에서 정지 예외 이후 X가 더 이상 응답하지 않는 경로도 수정했습니다.
+X는 언제든 종료합니다. 정상 정리가 실패하거나 약 3초가 지나면 강제 종료하고, X를 다시 누르면 즉시 종료합니다. 파일·다음 번호·미완료 이력은 보존하며 외부 CANoe 창·측정은 유지합니다.
 
 ## 폴더와 Git 관리 범위
 

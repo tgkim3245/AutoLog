@@ -4,7 +4,9 @@ SQLite and worker pipes belong to one executor thread. UI callbacks only submit
 requests and consume bounded notifications; they never wait for tool operations.
 """
 
+import json
 import logging
+import os
 import queue
 import threading
 import time
@@ -225,6 +227,17 @@ class Runtime:
 
         self._ready = True
         self._event("APP_READY", demo=self.demo, data_dir=str(self.data_dir))
+        marker = self.data_dir / "AutoLog_force_exit.json"
+        if marker.is_file():
+            try:
+                if marker.stat().st_size > 65536:
+                    raise ValueError("Forced exit notice is unexpectedly large")
+                notice = json.loads(marker.read_text(encoding="utf-8"))
+                self._event("PREVIOUS_FORCED_EXIT", level="WARNING", details=notice)
+                if not self._storage_failed:
+                    marker.unlink()
+            except (OSError, ValueError):
+                log.exception("application.force_exit_notice_unreadable")
 
     def refresh_file_history(self) -> Future:
         return self._submit(self._refresh_file_history)
@@ -1243,6 +1256,26 @@ class Runtime:
             self._cancel.set()
         return self._submit(self._exit)
 
+    def force_abort(self, reason):
+        """Watchdog path: never wait for the coordinator, COM, DB or file checks."""
+        plan = self._plan
+        notice = {"reason": reason, "time_utc": utc_now(), "phase": self._phase.value,
+                  "session_id": plan.session_id if plan else None,
+                  "files": [str(file.temp_path) for file in plan.files] if plan else []}
+        try:
+            self._pool.force_abort()
+        except Exception as error:
+            notice["worker_abort_error"] = str(error)
+        try:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            path = self.data_dir / "AutoLog_force_exit.json"
+            temporary = path.with_suffix(".json.new")
+            temporary.write_text(json.dumps(notice, ensure_ascii=False), encoding="utf-8")
+            os.replace(temporary, path)
+        except OSError:
+            pass
+        log.warning("application.force_exit", extra={"fields": notice})
+
     def _exit(self) -> bool:
         ready = False
         try:
@@ -1253,7 +1286,7 @@ class Runtime:
             # Historical recovery records do not belong to this process. Keep
             # them and their files intact; they block new capture, not app exit.
             if self.phase in ACTIVE or (self.phase == SessionPhase.INCOMPLETE and self._plan is not None):
-                self._event("SESSION_INCOMPLETE", level="WARNING", original="Exit postponed; unresolved current capture")
+                self._event("SESSION_INCOMPLETE", level="WARNING", original="Orderly cleanup incomplete; forced exit may follow")
                 return False
             self._close_owned_resources()
             ready = True

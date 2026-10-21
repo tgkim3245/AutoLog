@@ -11,6 +11,7 @@ TEXT = {
     "capture_completed": "开始下次记录", "capture_failed": "重试", "capture_incomplete": "检查未完成记录",
     "capture_review_help": "打开恢复窗口，重试停止当前记录或检查之前未完成的文件。",
     "capture_no_targets": "请选择记录对象", "capture_exiting": "正在准备退出…", "capture_demo": "模拟 · {text}",
+    "capture_exiting_help": "清理超过约 3 秒将强制退出。再次按 X 可立即退出。",
     "exit_deferred_title": "暂缓退出",
     "exit_deferred_help": "未能完成当前记录的停止或文件/输出设置清理。\n请查看最近活动中的错误，然后再次按 X 重试退出。\n如果持续失败，请发送错误报告。未完成的文件将被保留。",
     "disconnected_short": "未连接", "measurement_waiting_short": "等待测量",
@@ -63,7 +64,7 @@ TEXT = {
     "debug_off": "开发者日志路径不可用", "debug_on": "开发者日志保存中",
     "demo": "模拟运行 · 不创建采集文件", "demo_files": "模拟文件名 / 结果 · 不创建文件",
     "demo_completed": "模拟已结束 · 未创建文件", "demo_recording": "模拟运行中 · 点击停止",
-    "demo_partial": "部分模拟运行中 · 点击停止", "real": "点击 X 将整理记录并退出程序",
+    "demo_partial": "部分模拟运行中 · 点击停止", "real": "X：退出 · 再次按 X 立即退出",
     "output": "保存位置", "unset": "未设置", "prefix": "文件名前缀", "next_index": "下次记录编号",
     "format": "Ethernet 保存格式", "tshark": "TShark 程序文件", "nic": "网卡标识", "browse": "浏览",
     "prepare": "准备连接", "apply": "应用", "close": "关闭", "quality": "记录质量",
@@ -143,6 +144,7 @@ SETTINGS = {
 }
 
 EVENTS = {
+    "PREVIOUS_FORCED_EXIT": "上次运行被强制关闭。请在恢复窗口检查剩余记录。",
     "HISTORY_ARCHIVED": "较早历史已压缩归档，采集文件保留。",
     "HISTORY_ARCHIVE_FAILED": "历史导出失败，原始历史已保留。",
     "DISK_SPACE_LOW": "可用空间 ≤1 GiB · 请检查保存位置", "DISK_SPACE_RESTORED": "可用空间已恢复",
