@@ -25,7 +25,11 @@ class CaptureWorkerPool(FakeWorkerPool):
     def _log_progress(self, reply):
         FakeWorkerPool._log_progress(reply)
         if reply.fields.get("event") == "canoe.independent_instance_created":
-            self._owned_canoe.remember(reply.fields["canoe_pid"])
+            try:
+                self._owned_canoe.remember(reply.fields["canoe_pid"])
+            except Exception:
+                log.exception("canoe.process_ownership_failed", extra={"fields": reply.fields})
+                raise RuntimeError("Dedicated CANoe exit ownership could not be registered; see developer log")
 
     def request(self, roles, action, session_id, **kwargs):
         results = super().request(roles, action, session_id, **kwargs)
@@ -106,9 +110,14 @@ class CaptureWorkerPool(FakeWorkerPool):
                 self._jobs.pop(role).Close()
             raise
 
+    def signal_canoe_exit(self):
+        if owned := getattr(self, "_owned_canoe", None):
+            owned.terminate()
+
     def force_abort(self):
         # The job owns dumpcap/decoder descendants, even if their parent is hung.
         # Dedicated CANoe windows are tracked separately by verified process handles.
+        self.signal_canoe_exit()  # Send before worker shutdown; no COM call or exit wait.
         if os.name == "nt":
             import win32job
             for job in tuple(self._jobs.values()):
@@ -117,8 +126,6 @@ class CaptureWorkerPool(FakeWorkerPool):
                 except Exception:
                     pass
         super().force_abort()
-        if owned := getattr(self, "_owned_canoe", None):
-            owned.terminate()
 
     def close(self, *, abnormal=False):
         if getattr(self, "_resources_closed", False):

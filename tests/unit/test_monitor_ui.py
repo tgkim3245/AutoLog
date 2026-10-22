@@ -27,10 +27,19 @@ def test_rule_fields_start_empty_and_partial_criteria_cannot_save(qtbot):
     assert dialog.error_label.text()
 
 
-def test_user_supplied_rule_saved_and_removable_with_no_capture_filter(qtbot):
+def test_default_zipy_criteria_are_visible_and_editable_on_first_open(qtbot):
     dialog = MonitorDialog()
     qtbot.addWidget(dialog)
     dialog.set_settings(AppSettings())
+    assert dialog.fields["source_mac_prefix"].text() == "02:00:00"
+    assert dialog.fields["minimum_pps"].text() == "100"
+    assert dialog.fields["grace_ms"].text() == "5000"
+
+
+def test_user_supplied_rule_saved_and_removable_with_no_capture_filter(qtbot):
+    dialog = MonitorDialog()
+    qtbot.addWidget(dialog)
+    dialog.set_settings(AppSettings(monitor_rules_json=""))
     values = {"name": "ECU", "destination_ip": "192.0.2.100", "expected_ip": "192.0.2.1",
               "timeout_ms": "1000", "grace_ms": "0", "max_delay_ms": "250", "recovery_count": "2"}
     for key, value in values.items():

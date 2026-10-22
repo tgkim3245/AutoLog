@@ -6,6 +6,7 @@ use a monotonic clock; captured wall time detects delayed/backlogged input.
 
 import math
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -34,6 +35,8 @@ class RuleState:
     issue: str = ""
     clock_changed: bool = False
     previous_status: str = ""
+    rate_buckets: deque = field(default_factory=lambda: deque(maxlen=21))
+    low_rate_since: float | None = None
     counters: dict = field(default_factory=lambda: {"missing": 0, "source": 0, "recovered": 0, "unknown": 0})
 
 
@@ -65,6 +68,8 @@ class MonitorEngine:
             state.baseline = now
             state.last_flow = None
             state.good = 0
+            state.rate_buckets.clear()
+            state.low_rate_since = None
 
     def _health(self, state, now, wall, reader_ok):
         if abs((wall - now) - self.offset) > state.rule.max_delay_ms / 1000:
@@ -82,6 +87,7 @@ class MonitorEngine:
     def _evaluate(self, state, now, wall, reader_ok):
         reason = self._health(state, now, wall, reader_ok)
         if reason:
+            state.low_rate_since = None
             status, reasons = "unknown", [reason]
         else:
             age = now - (state.last_flow if state.last_flow is not None else state.baseline)
@@ -92,7 +98,13 @@ class MonitorEngine:
                 state.good = 0
                 state.counters["missing"] += 1
                 state.missing_started_utc = datetime.fromtimestamp(wall, UTC).isoformat(timespec="milliseconds")
+            low_rate = (state.rule.minimum_pps and now - state.baseline >= max(2, state.rule.grace_ms / 1000)
+                        and self._rate(state, now) < state.rule.minimum_pps)
+            state.low_rate_since = (now if state.low_rate_since is None else state.low_rate_since) if low_rate else None
+            rate_failed = state.low_rate_since is not None and now - state.low_rate_since >= state.rule.timeout_ms / 1000
             reasons = (["missing_flow"] if state.missing else []) + (["unexpected_source"] if state.source_warning else [])
+            if rate_failed:
+                reasons.append("low_receive_rate")
             status = "warning" if reasons else ("normal" if state.good >= state.rule.recovery_count else "unknown")
             if not reasons and status == "unknown":
                 reasons = ["waiting_samples"]
@@ -100,6 +112,12 @@ class MonitorEngine:
             state.counters["unknown"] += 1
         state.previous_status = status
         return status, reasons
+
+    @staticmethod
+    def _rate(state, now):
+        # Twenty completed 100 ms buckets; bounded memory even at very high PPS.
+        bucket = int(now * 10)
+        return sum(count for slot, count in state.rate_buckets if bucket - 20 <= slot < bucket) / 2
 
     def feed(self, packet):
         if not self.active or packet.session_id != self.session_id:
@@ -117,6 +135,8 @@ class MonitorEngine:
             if was_lagged:
                 state.baseline = now
                 state.last_flow = None
+                state.rate_buckets.clear()
+                state.low_rate_since = None
             self._evaluate(state, now, wall, True)
             if self._health(state, now, wall, True) or not state.rule.in_flow(packet):
                 continue
@@ -124,6 +144,12 @@ class MonitorEngine:
             state.last_capture_utc = packet.timestamp
             state.last_source, state.last_source_mac = packet.source, packet.source_mac
             state.matched += 1
+            bucket = int(now * 10)
+            if state.rate_buckets and state.rate_buckets[-1][0] == bucket:
+                slot, count = state.rate_buckets.pop()
+                state.rate_buckets.append((slot, count + 1))
+            else:
+                state.rate_buckets.append((bucket, 1))
             if not state.rule.expected_source(packet):
                 state.good = 0
                 state.mismatches += 1
@@ -154,6 +180,7 @@ class MonitorEngine:
                          "last_recovery_utc": state.last_recovery_utc,
                          "age_ms": round((now - state.last_flow) * 1000) if state.last_flow is not None else None,
                          "matched_packets": state.matched, "mismatched_packets": state.mismatches,
+                         "receive_pps": round(self._rate(state, now), 1), "minimum_pps": state.rule.minimum_pps,
                          "max_delay_ms": state.rule.max_delay_ms,
                          "recovery_samples": min(state.good, state.rule.recovery_count),
                          "counters": dict(state.counters)})

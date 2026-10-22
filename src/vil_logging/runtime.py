@@ -68,6 +68,7 @@ class Runtime:
         self._observation_loss_reported = False
         self._monitor_reports = {}
         self._monitor_counts = {}
+        self._monitor_unverified_since = None
         self._monitor_last_persist = 0
         self._quality_report = {}
         self._disk_warning = False
@@ -175,6 +176,10 @@ class Runtime:
         default_output.mkdir(exist_ok=True)
         self._repo = Repository(self.data_dir / "state.sqlite3")
         self._settings = self._repo.load_settings(str(default_output))
+        if not self._settings.monitor_rules_json:
+            from vil_logging.monitors.rules import default_rules_json
+            self._settings = self._repo.save_preferences({"monitor_rules_json": default_rules_json()})
+            log.info("monitor.zipy_default_added")
         from vil_logging.diagnostics.capture_tools import replaces_legacy_managed_tool
         if replaces_legacy_managed_tool(self._settings.tshark_path):
             self._settings = self._repo.save_preferences({"tshark_path": ""})
@@ -684,6 +689,7 @@ class Runtime:
             return self._submit(self._start, roles)
 
     def _start(self, roles: tuple[Role, ...]) -> None:
+        self._monitor_unverified_since = None
         self._plan = None
         self._issued_roles = ()
         self._published_files = {}
@@ -779,6 +785,8 @@ class Runtime:
                 self._set_phase(SessionPhase.FAILED)
 
     def _stop(self, roles: tuple[Role, ...] | None = None) -> bool:
+        if self.phase in {SessionPhase.COMPLETED, SessionPhase.FAILED}:
+            return True  # A user Stop may already have been queued before automatic stop.
         if self._plan is None:
             self._set_phase(SessionPhase.IDLE)
             return True
@@ -830,21 +838,39 @@ class Runtime:
             return
         results = self._pool.request(self._plan.roles, "query", self._plan.session_id,
                                       timeout=1.5 if any(role != Role.ETHERNET for role in self._plan.roles) else 0.6)
-        any_recording = False
+        faults = {}
         for role, result in results.items():
             if result.success and result.state == "recording":
-                any_recording = True
                 if not self.demo:
                     details = result.details
                     self._accept_monitor(role, details)
                     if role == Role.ETHERNET:
                         self._accept_quality(details)
+                        if details.get("link", {}).get("state") == "disconnected":
+                            faults[role] = "Ethernet link disconnected"
+                        elif any(row.get("status") == "warning" for row in self._monitor_reports.get(role.value, {}).get("rules", [])):
+                            faults[role] = "Required Ethernet receive criteria failed"
+                        report = self._monitor_reports.get(role.value, {})
+                        unverified = report.get("status") == "unknown" and any(
+                            reason != "waiting_samples" for reason in report.get("reasons", []) +
+                            [reason for row in report.get("rules", []) for reason in row.get("reasons", [])])
+                        if unverified:
+                            since = getattr(self, "_monitor_unverified_since", None)
+                            self._monitor_unverified_since = time.monotonic() if since is None else since
+                            if time.monotonic() - self._monitor_unverified_since >= 5:
+                                faults[role] = "Ethernet receive monitoring unavailable for 5 seconds"
+                        else:
+                            self._monitor_unverified_since = None
+                        if role in faults:
+                            self._event("CAPTURE_AUTO_STOP", level="ERROR", target=role.label,
+                                        original=faults[role], link=details.get("link"), monitor=self._monitor_reports.get(role.value))
                     if details.get("summary_drops", 0) and not self._observation_loss_reported:
                         self._observation_loss_reported = True
                         self._event("DISPLAY_SUMMARY_LOSS", level="WARNING", target=role.label,
                                     count=details["summary_drops"])
                 continue
             previous = self._snapshots[role].recording
+            faults[role] = result.evidence
             state = RecordingState.ERROR if result.state in {"error", "stopped"} else RecordingState.UNKNOWN
             self._target(role, recording=state, observation=ObservationState.UNKNOWN,
                          evidence=result.evidence, observation_details={"status": "unknown", "reasons": ["recorder_unavailable"]})
@@ -856,13 +882,17 @@ class Runtime:
                 self._failure_latched = True
                 self._target_failures[role] = result.evidence
                 self._event("TARGET_ERROR", level="ERROR", target=role.label, original=result.evidence)
+        if faults:
+            self._failure_latched = True
+            self._target_failures.update(faults)
         if self._failure_latched:
             # A UI Stop may already be queued; never overwrite its STOPPING phase.
             if self.phase in {SessionPhase.RECORDING, SessionPhase.PARTIAL}:
                 self._set_phase(SessionPhase.PARTIAL)
                 self._repo.update_session(self._plan.session_id, SessionPhase.PARTIAL)
-            if not any_recording and all(result.state in {"error", "stopped"} for result in results.values()):
-                self._stop()
+            # End all selected targets together and preserve normally closed files.
+            # A warning must not leave the rest of the session recording unattended.
+            self._stop()
         self._persist_monitors()
 
     def _accept_monitor(self, role, details, *, stopped=False):
@@ -1085,6 +1115,7 @@ class Runtime:
             parameters = {file.role: {"temp_path": str(file.temp_path)} for file in plan.files}
             if Role.ETHERNET in group:
                 parameters[Role.ETHERNET]["monitor_rules_json"] = self._settings.monitor_rules_json
+                parameters[Role.ETHERNET]["emit_summaries"] = bool(self._verification_filter)
             if self._verification_filter and Role.ETHERNET in group:
                 parameters[Role.ETHERNET]["verification_filter"] = self._verification_filter
             results = self._request_real(group, "start", plan.session_id, timeout=18, cancel=self._cancel,
@@ -1287,6 +1318,10 @@ class Runtime:
         with self._lock:
             self._exit_pending = True
             self._cancel.set()
+        # Send immediately even when the coordinator is busy with COM or file I/O.
+        # TerminateProcess is asynchronous; never wait for CANoe here.
+        if signal := getattr(self._pool, "signal_canoe_exit", None):
+            signal()
         return self._submit(self._exit)
 
     def force_abort(self, reason):

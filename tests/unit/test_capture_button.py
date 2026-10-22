@@ -15,14 +15,14 @@ def window(qtbot):
 
 
 @pytest.mark.parametrize("phase,text,enabled,tone", [
-    (SessionPhase.IDLE, "기록 시작", True, "primary"),
+    (SessionPhase.IDLE, "기록 시작", True, "success"),
     (SessionPhase.PREPARING, "준비 중 · 취소", True, "attention"),
     (SessionPhase.STARTING, "시작 중 · 취소", True, "attention"),
     (SessionPhase.RECORDING, "기록 중 · 정지", True, "stop"),
     (SessionPhase.PARTIAL, "일부 기록 중 · 정지", True, "attention"),
     (SessionPhase.STOPPING, "정지 · 파일 정리 중…", False, "progress"),
     (SessionPhase.COMPLETED, "다음 기록 시작", True, "success"),
-    (SessionPhase.FAILED, "새 기록 시작", True, "attention"),
+    (SessionPhase.FAILED, "새 기록 시작", True, "success"),
     (SessionPhase.INCOMPLETE, "기록 마무리 확인", False, "attention"),
 ])
 def test_phase_describes_action_and_click_availability(window, phase, text, enabled, tone):

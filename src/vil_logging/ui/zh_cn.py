@@ -245,3 +245,17 @@ PHRASES = {
     "Choose logging block": "选择记录块", " · unavailable": " · 不可选", "Connected configuration": "已连接配置",
     "Choose block after connection": "连接后选择记录块",
 }
+
+TEXT.update({
+    "monitor_help": "记录期间发现网络断开、接收规则不满足或记录工具故障时，将停止所有选中目标并保存已关闭文件。目前不支持 CAN/Diag 接收监测。",
+    "monitor_rules_help": "Zipy 默认：来源 MAC 以 02:00:00 开头，2 秒平均至少 100pps。启动宽限 5 秒，3 秒无接收或持续低速则停止本次记录。其他来源仍全部保存，规则可修改或删除，不是采集过滤器。",
+    "monitor_field_source_mac_prefix": "接收来源 MAC 前缀",
+    "monitor_field_minimum_pps": "最低接收 pps（0=关闭）",
+    "monitor_reason_low_receive_rate": "接收速率持续低于最低值",
+    "monitor_rate": "2 秒平均 {rate}pps · 最低 {minimum}pps",
+})
+EVENTS.update({
+    "CAPTURE_AUTO_STOP": "连接或接收异常 · 停止所有选中目标并保存文件",
+    "MONITOR_MISSING": "未收到所选数据流",
+    "MONITOR_SOURCE": "所选数据流来源异常",
+})

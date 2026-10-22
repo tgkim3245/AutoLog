@@ -22,6 +22,7 @@ from vil_logging.diagnostics.connections import (
     _run_query,
 )
 from vil_logging.diagnostics.environment import _version_response
+from vil_logging.diagnostics.network_activity import capture_link_state
 from vil_logging.monitors.engine import MonitorEngine
 from vil_logging.monitors.rules import address, parse_rules
 from vil_logging.storage.pcapng_stats import capture_loss_report
@@ -92,6 +93,7 @@ class TSharkCapture:
         self._stdout_eof = False
         self._metrics = CaptureMetrics()
         self._last_delay = self._max_delay = None
+        self._emit_summaries = True
 
     def prepare(self, params: dict) -> dict:
         if self.process and self.process.poll() is None:
@@ -150,6 +152,7 @@ class TSharkCapture:
         if path.suffix != "." + self.binding["file_format"]:
             raise ValueError("Capture format and filename disagree")
         self.session_id, self.path = session_id, path
+        self._emit_summaries = params.get("emit_summaries", True)
         self._stderr.clear()
         self._notice.clear()
         self._parsed = self._dropped = self._parse_errors = 0
@@ -232,11 +235,12 @@ class TSharkCapture:
                     if self._last_delay is not None:
                         self._max_delay = max(self._max_delay or 0, self._last_delay)
                     self._monitor_call("feed", packet)
-                try:
-                    self.packets.put_nowait(packet)
-                except queue.Full:
-                    with self._stats_lock:
-                        self._dropped += 1
+                if self._emit_summaries:
+                    try:
+                        self.packets.put_nowait(packet)
+                    except queue.Full:
+                        with self._stats_lock:
+                            self._dropped += 1
         except (OSError, ValueError) as error:
             with self._stats_lock:
                 self._read_errors.append(str(error))
@@ -301,7 +305,9 @@ class TSharkCapture:
         if not self.process:
             return "ready" if self.binding else "idle", self.stats()
         if self.process.poll() is None:
-            return "recording" if self._started else "starting", self.stats()
+            details = self.stats()
+            details["link"] = capture_link_state(self.binding["nic_id"])
+            return "recording" if self._started else "starting", details
         return "stopped" if self._stop_requested else "error", self.stats()
 
     def stop(self, session_id: str, timeout: float = 30) -> dict:

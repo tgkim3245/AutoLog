@@ -25,7 +25,7 @@ for package_name in ('PySide6', 'PySide6_Essentials', 'shiboken6', 'pywin32', 'p
 a = Analysis(
     [str(project_root / 'src' / 'vil_logging' / '__main__.py')],
     pathex=[str(project_root / 'src')],
-    binaries=[], datas=license_data, hiddenimports=['pythoncom', 'win32com.client'],
+    binaries=[], datas=license_data, hiddenimports=['pythoncom', 'win32com.client', 'win32timezone'],
     hookspath=[], hooksconfig={}, runtime_hooks=[],
     excludes=['PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets', 'PySide6.QtPdf',
               'PySide6.QtQml', 'PySide6.QtQuick', 'PySide6.Qt3DCore'],

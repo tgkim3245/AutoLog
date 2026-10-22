@@ -1,4 +1,4 @@
-"""Receive evidence and explicit Ethernet monitor criteria; no preset thresholds."""
+"""Receive evidence and editable Ethernet monitor criteria."""
 
 from dataclasses import asdict
 from uuid import uuid4
@@ -28,7 +28,7 @@ from .i18n import tr
 from .theme import ThemedComboBox, apply_theme
 
 FIELDS = ("name", "protocol", "destination_ip", "destination_mac", "expected_ip", "expected_mac",
-          "timeout_ms", "grace_ms", "max_delay_ms", "recovery_count")
+          "source_mac_prefix", "minimum_pps", "timeout_ms", "grace_ms", "max_delay_ms", "recovery_count")
 
 
 def monitor_description(report, language):
@@ -42,6 +42,8 @@ def monitor_description(report, language):
             lines.append(tr("monitor_last", language) + ": " + row["last_capture_utc"])
         lines.append(tr("monitor_counts", language).format(
             matched=row.get("matched_packets", 0), mismatched=row.get("mismatched_packets", 0)))
+        if row.get("minimum_pps"):
+            lines.append(tr("monitor_rate", language).format(rate=row.get("receive_pps", 0), minimum=row["minimum_pps"]))
         if row.get("last_mismatch_utc"):
             lines.append(tr("monitor_last_mismatch", language) + ": " + row["last_mismatch_utc"] +
                          " · " + row.get("last_mismatch_source", "") + " / " + row.get("last_mismatch_mac", ""))
@@ -150,7 +152,7 @@ class MonitorDialog(QDialog):
         for key, label in self.labels.items():
             label.setText(tr("monitor_field_" + key, language))
             self.fields[key].setPlaceholderText(tr("monitor_optional" if key in {
-                "protocol", "destination_ip", "destination_mac", "expected_ip", "expected_mac"}
+                "protocol", "destination_ip", "destination_mac", "expected_ip", "expected_mac", "source_mac_prefix", "minimum_pps"}
                 else "monitor_required", language))
         for button, key in ((self.new_button, "monitor_new"), (self.delete_button, "monitor_delete"),
                             (self.save_button, "monitor_save"), (self.close_button, "close")):
@@ -160,6 +162,7 @@ class MonitorDialog(QDialog):
     def set_settings(self, settings):
         if settings.monitor_rules_json == self._document:
             return
+        first_load = self._document is None
         self._document = settings.monitor_rules_json
         try:
             self._rules = list(parse_rules(self._document))
@@ -168,6 +171,8 @@ class MonitorDialog(QDialog):
             self._rules = []
             self.set_error(str(error))
         self._drafts.clear()
+        if first_load and self._rules:
+            self._editing_id = self._rules[0].id
         self._render_rules()
 
     def _render_rules(self):
@@ -203,7 +208,8 @@ class MonitorDialog(QDialog):
             return
         try:
             values = {key: field.text().strip() for key, field in self.fields.items()}
-            for key in ("timeout_ms", "grace_ms", "max_delay_ms", "recovery_count"):
+            values["minimum_pps"] = values["minimum_pps"] or "0"
+            for key in ("timeout_ms", "grace_ms", "max_delay_ms", "recovery_count", "minimum_pps"):
                 if not values[key] or not values[key].isascii() or not values[key].isdecimal() or len(values[key]) > 9:
                     raise ValueError(tr("monitor_field_" + key, self._language) + ": " + tr("monitor_integer", self._language))
                 values[key] = int(values[key])

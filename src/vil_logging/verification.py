@@ -181,67 +181,68 @@ def verify_monitoring(data_dir: Path, *, tshark_path: str = "") -> dict:
             runtime.initialize().result(10)
             runtime.save_preferences({"tshark_path": tool["path"], "nic_id": r"\Device\NPF_Loopback"}).result(10)
 
-            def wait_status(status, timeout=6, min_packets=0):
+            def wait_phase(expected, timeout=8):
                 deadline = time.monotonic() + timeout
                 while time.monotonic() < deadline:
                     runtime._submit(runtime._query).result(5)
-                    snapshot = runtime._snapshots[Role.ETHERNET]
-                    if runtime.phase != SessionPhase.RECORDING:
-                        raise AssertionError("Monitor warning interrupted capture: " + str(runtime.phase))
-                    count = sum(row.get("matched_packets", 0) for row in snapshot.observation_details.get("rules", []))
-                    if snapshot.observation.value == status and count >= min_packets:
-                        return snapshot.observation_details
+                    if runtime.phase == expected:
+                        return
                     time.sleep(.1)
-                raise AssertionError(f"Expected {status}, got {snapshot.observation_details}")
+                raise AssertionError(f"Expected {expected}, got {runtime.phase}")
 
             def send(count, delay):
                 for number in range(count):
                     sender.sendto(f"AutoLog-monitor-fixture-{number}".encode(), ("127.0.0.1", port))
                     time.sleep(delay)
 
+            def wait_normal(min_packets):
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    runtime._submit(runtime._query).result(5)
+                    observed = runtime._snapshots[Role.ETHERNET].observation_details
+                    if (runtime.phase == SessionPhase.RECORDING and observed["status"] == "normal"
+                            and observed["rules"][0]["matched_packets"] >= min_packets):
+                        return observed
+                    time.sleep(.02)
+                raise AssertionError("Generated receive traffic was not confirmed")
+
             configured = EthernetRule("generated", "Localhost generated traffic", 1500, 2500, 750, 2,
                                       protocol="UDP", destination_ip="127.0.0.1", expected_ip="127.0.0.1")
             runtime.save_preferences({"monitor_rules_json": encode_rules([configured])}).result(10)
             runtime.toggle((Role.ETHERNET,)).result(30)
-            wait_status("warning")
-            report["cases"].append({"case": "initial_missing_without_stopping_capture", "passed": True})
-            # Deliberately leave the UI queue undrained; the monitor consumes before it.
+            wait_phase(SessionPhase.FAILED)
+            report["cases"].append({"case": "initial_missing_auto_stops", "passed": True})
+            runtime.toggle((Role.ETHERNET,)).result(30)
             send(1200, .001)
-            observed = wait_status("normal", min_packets=1200)
-            if observed["display_drops"] <= 0 or observed["rules"][0]["matched_packets"] < 1200:
-                raise AssertionError("Display overflow was not isolated from complete monitor input")
-            report["cases"].append({"case": "receive_recovery_and_display_overflow_isolation", "passed": True,
-                                    "monitor_packets": observed["rules"][0]["matched_packets"],
-                                    "display_drops": observed["display_drops"]})
-            wait_status("warning")
-            send(10, .02)
-            wait_status("normal", min_packets=1210)
-            report["cases"].append({"case": "second_missing_and_recovery", "passed": True})
+            observed = wait_normal(1200)
+            if observed["display_drops"] <= 0:
+                raise AssertionError("Display overflow was not exercised")
             runtime.toggle((Role.ETHERNET,)).result(100)
             if runtime.phase != SessionPhase.COMPLETED:
-                raise AssertionError("Monitored capture did not finish normally")
+                raise AssertionError("Healthy monitored capture did not finish normally")
+            report["cases"].append({"case": "restart_and_independent_monitor_input", "passed": True})
+            runtime.toggle((Role.ETHERNET,)).result(30)
+            send(10, .02)
+            wait_normal(10)
+            wait_phase(SessionPhase.FAILED)
+            report["cases"].append({"case": "required_receive_stops_mid_capture", "passed": True})
             unexpected = EthernetRule("generated", "Deliberately different expected source", 1500, 2500, 750, 2,
                                       protocol="UDP", destination_ip="127.0.0.1", expected_ip="192.0.2.99")
             runtime.save_preferences({"monitor_rules_json": encode_rules([unexpected])}).result(10)
             runtime.toggle((Role.ETHERNET,)).result(30)
             send(10, .02)
-            observed = wait_status("warning", min_packets=10)
-            if "unexpected_source" not in observed["rules"][0]["reasons"]:
-                raise AssertionError("Different source was conflated with missing traffic")
-            report["cases"].append({"case": "wrong_source_inside_selected_flow", "passed": True})
-            runtime.toggle((Role.ETHERNET,)).result(100)
+            wait_phase(SessionPhase.FAILED)
+            report["cases"].append({"case": "unexpected_source_auto_stops", "passed": True})
             stored = runtime._submit(runtime._repo.captures).result(10)
-            if len(stored) != 2 or any(item["phase"] != "completed" for item in stored):
-                raise AssertionError("Monitor warnings changed capture results")
+            if len(stored) != 4 or sum(item["phase"] == "failed" for item in stored) != 3:
+                raise AssertionError("Auto-stop sessions were not distinguished from healthy completion")
             if sum(item["details"]["inspection"]["packet_count"] for item in stored) != 1220:
                 raise AssertionError("Generated packet count differs from fully read capture files")
             saved_events = runtime._submit(runtime._repo.recent_events).result(10)
             codes = [event.code for event in saved_events]
-            if not {"MONITOR_MISSING", "MONITOR_SOURCE", "MONITOR_RECOVERED", "DISPLAY_SUMMARY_LOSS"} <= set(codes):
-                raise AssertionError("Monitor events were not persisted")
-            report["cases"].append({"case": "archive_and_persistent_monitor_evidence", "passed": True,
-                                    "packets": 1220, "missing_events": codes.count("MONITOR_MISSING"),
-                                    "source_events": codes.count("MONITOR_SOURCE")})
+            if codes.count("CAPTURE_AUTO_STOP") != 3 or "MONITOR_SOURCE" not in codes:
+                raise AssertionError("Auto-stop evidence was not persisted")
+            report["cases"].append({"case": "archive_and_persistent_fault_evidence", "passed": True, "packets": 1220})
         if not runtime.request_exit().result(10):
             raise AssertionError("Orderly exit failed")
         report["passed"] = True
@@ -276,7 +277,8 @@ def verify_ethernet(data_dir: Path, *, tshark_path: str = "") -> dict:
             port = receiver.getsockname()[1]
             runtime = Runtime(root, _verification_filter=f"udp dst port {port}")
             runtime.initialize().result(timeout=10)
-            runtime.save_preferences({"tshark_path": tool["path"], "nic_id": r"\Device\NPF_Loopback"}).result(timeout=10)
+            runtime.save_preferences({"tshark_path": tool["path"], "nic_id": r"\Device\NPF_Loopback",
+                                      "monitor_rules_json": encode_rules([])}).result(timeout=10)
             for file_format in ("pcap", "pcapng"):
                 runtime.save_preferences({"ethernet_format": file_format}).result(timeout=10)
                 for mode in ("zero-packet", "packets", "restart"):

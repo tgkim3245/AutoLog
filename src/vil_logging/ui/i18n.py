@@ -242,8 +242,8 @@ TEXT = {
 TEXT.update({
     "unsupported": ("감시 미지원", "Monitor unsupported"),
     "monitor_title": ("통신 감시", "Monitoring"),
-    "monitor_help": ("선택한 대상의 실제 기록 중에만 감시합니다. 감시 경고로 기록을 정지하지 않습니다. CAN·Diag의 수신 감시는 현재 미지원입니다.",
-                     "Monitoring runs only during selected targets' recording. Warnings do not stop capture. CAN/Diag receive monitoring is currently unsupported."),
+    "monitor_help": ("기록 중 네트워크 단절·감시 기준 위반 또는 기록 도구 오류가 확인되면 선택한 기록을 함께 정지하고 파일을 저장합니다. CAN·Diag 수신 감시는 현재 미지원입니다.",
+                     "A disconnected network, failed receive rule or recorder error stops all selected targets and saves closed files. CAN/Diag receive monitoring is currently unsupported."),
     "monitor_rules_help": ("Zipy 감시 기준은 직접 입력해야 적용됩니다. 목적지·프로토콜로 흐름을 고르고 기대 출처를 비교합니다. 출처 비교 시 목적지가 필요하며, 조건을 모두 비우면 해당 NIC의 모든 트래픽을 관측합니다. 이 조건은 저장할 패킷을 제한하지 않습니다. 최대 16개 규칙.",
                            "Enter explicit Zipy criteria. Destination and protocol select a flow; expected source is checked within it. Source checks require a destination. Empty selectors observe all NIC traffic. These criteria never filter saved packets. Up to 16 rules."),
     "monitor_status": ("수신 상태", "Receive status"),
@@ -314,7 +314,17 @@ TEXT.update({
     "file_item_acknowledged_unconfirmed": ("결과 미확인 · 파일 유지", "Unconfirmed · files preserved"),
 })
 
+TEXT.update({
+    "monitor_rules_help": ("기본 Zipy 기준: Source MAC 02:00:00 시작, 2초 평균 100pps 이상. 시작 유예 5초, 3초 미수신 또는 저속 지속 시 함께 정지합니다. 다른 Source도 저장하며 이 조건은 캡처 필터가 아닙니다. 기준은 수정·삭제할 수 있습니다.",
+                           "Default Zipy rule: Source MAC begins 02:00:00, at least 100pps averaged over 2 seconds. After 5s grace, 3s silence or sustained low rate stops the session. Other sources are saved too. Rules are editable and are not capture filters."),
+    "monitor_field_source_mac_prefix": ("수신 Source MAC 접두사", "Receive source MAC prefix"),
+    "monitor_field_minimum_pps": ("최소 수신 pps (0=사용 안 함)", "Minimum receive pps (0=off)"),
+    "monitor_reason_low_receive_rate": ("기준보다 낮은 수신량 지속", "Receive rate remains below the minimum"),
+    "monitor_rate": ("2초 평균 {rate}pps · 최소 {minimum}pps", "2s average {rate}pps · Minimum {minimum}pps"),
+})
+
 EVENTS = {
+    "CAPTURE_AUTO_STOP": ("연결·통신 이상 확인 · 선택한 기록을 모두 정지하고 저장합니다", "Connection or receive failure · Stopping all selected targets and saving files"),
     "PREVIOUS_FORCED_EXIT": ("이전 실행이 강제 종료됐습니다. 중단 구간은 정리하고 새 기록을 시작할 수 있습니다.",
                              "Previous run was forced to close. Interrupted work is discarded; new recording is available."),
     "INTERRUPTED_DISCARDED": ("이전 중단 구간 정리 완료 · 새 기록을 시작할 수 있습니다",
@@ -325,8 +335,8 @@ EVENTS = {
     "DISK_SPACE_RESTORED": ("저장 공간 여유 회복", "Free disk space recovered"),
     "CAPTURE_DROP_REPORTED": ("종료 파일에서 원본 패킷 누락 통계 확인 · 기록 품질 확인", "Closed file reports packet drops · review capture quality"),
     "CAPTURE_SUMMARY_MISMATCH": ("파일·해석 패킷 수 차이 · 기록 품질 확인", "File and decoded counts differ · review capture quality"),
-    "MONITOR_MISSING": ("감시 흐름 미수신 · 기록 유지", "Selected flow missing · capture continues"),
-    "MONITOR_SOURCE": ("감시 흐름 출처 불일치 · 기록 유지", "Unexpected flow source · capture continues"),
+    "MONITOR_MISSING": ("감시 흐름 미수신", "Selected flow missing"),
+    "MONITOR_SOURCE": ("감시 흐름 출처 불일치", "Unexpected flow source"),
     "MONITOR_RECOVERED": ("감시 흐름 수신 복귀 확인", "Selected flow reception restored"),
     "MONITOR_UNCONFIRMED": ("통신 관측 확인 불가 · 기록 유지", "Communication observation unconfirmed · capture continues"),
     "MONITOR_OBSERVATION_RESTORED": ("통신 관측 경로 재개", "Communication observation resumed"),

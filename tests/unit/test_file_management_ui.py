@@ -56,7 +56,7 @@ def test_capture_and_file_operations_lock_mutating_controls(window):
     assert window.rename_button.isEnabled()
     window.set_phase(SessionPhase.RECORDING)
     assert not window.rename_button.isEnabled()
-    assert not window.file_manager.table.isEnabled()
+    assert window.file_manager.text.isReadOnly()
     assert window.logging_button.isEnabled()
 
 
@@ -87,20 +87,6 @@ def test_previous_delete_only_emits_after_confirmation(window, monkeypatch, acce
     assert spy.count() == int(accepted)
 
 
-def test_file_manager_requires_checked_eligible_files_and_confirmation(window, monkeypatch):
-    manager = window.file_manager
-    spy = QSignalSpy(manager.delete_requested)
-    assert not manager.delete_button.isEnabled()
-    manager.table.item(0, 0).setCheckState(Qt.CheckState.Checked)
-    assert manager.delete_button.isEnabled()
-    monkeypatch.setattr("vil_logging.ui.file_manager_dialog.confirm_delete", lambda *_: True)
-    manager.delete_button.click()
-    assert spy.count() == 1
-    assert spy.at(0)[0][0]["path"] == "C:/generated/old_123.pcap"
-    manager.set_locked(True)
-    assert not manager.delete_button.isEnabled()
-
-
 def test_result_survives_busy_completion_and_language_change(window):
     result = {"status": "partial", "kind": "delete", "items": [
         {"source": "C:/generated/old_123.pcap", "status": "failed", "error": "sharing violation"}]}
@@ -111,15 +97,23 @@ def test_result_survives_busy_completion_and_language_change(window):
     assert "sharing violation" in window.file_manager.result_details.toPlainText()
     window.set_language("en")
     assert "Partial" in window.file_feedback.text()
-    assert window.file_manager.windowTitle() == "Capture files"
+    assert window.file_manager.windowTitle() == "Operation history"
 
 
-def test_file_list_refresh_preserves_selection_only_for_the_same_file(window):
-    manager = window.file_manager
-    manager.table.item(0, 0).setCheckState(Qt.CheckState.Checked)
-    manager.set_history(window._capture_history)
-    assert manager.selected_files()
-    changed = [{**window._capture_history[0], "files": [
-        {**window._capture_history[0]["files"][0], "identity": {"inode": 99}}]}]
-    manager.set_history(changed)
-    assert not manager.selected_files()
+def test_main_history_opens_read_only_operations_and_keeps_folder_adjacent(window):
+    from PySide6.QtWidgets import QPushButton
+    history = [{"created_utc": "2026-10-22T10:00:00Z", "kind": "rename", "status": "completed",
+                "document": {"items": [{"source": "C:/generated/before.blf", "destination": "C:/generated/after.blf",
+                                        "status": "renamed"}]}}]
+    window.file_manager.set_operations(history)
+    spy = QSignalSpy(window.files_refresh_requested)
+    window.file_manager_button.click()
+    assert spy.count() == 1 and window.file_manager.isVisible()
+    text = window.file_manager.text.toPlainText()
+    assert "before.blf" in text and "after.blf" in text
+    assert window.file_manager.text.isReadOnly()
+    assert not hasattr(window.file_manager, "delete_button")
+    assert not hasattr(window, "packet_window")
+    assert not hasattr(window, "environment_button")
+    assert window.debug_folder_button.parent() == window.file_manager_button.parent()
+    assert not window.findChild(QPushButton, "openPacketsButton")

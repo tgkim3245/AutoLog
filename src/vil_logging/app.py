@@ -368,8 +368,6 @@ def main(argv: list[str] | None = None) -> int:
                 window.set_recovery(value)
             elif kind == "recovery_result":
                 window.recovery_dialog.set_result(value)
-            elif kind == "packets_clear":
-                window.packet_window.clear_session()
             elif kind == "connections":
                 window.set_connection_discovery(value)
                 environment_state["connections"] = value
@@ -401,8 +399,7 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     exit_guard.force("cleanup_failed")
                     return
-        for packet in runtime.drain_packets():
-            window.add_packet(packet)
+        runtime.drain_packets()  # Discard legacy display summaries; receive monitoring runs in the worker.
         window.check_monitor_freshness()
         if debug.enabled:
             try:

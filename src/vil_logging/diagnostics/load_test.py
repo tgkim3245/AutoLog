@@ -14,6 +14,7 @@ from vil_logging.adapters.external import configure_worker_environment
 from vil_logging.contracts.models import Role, SessionPhase
 from vil_logging.diagnostics.connections import _find_tshark
 from vil_logging.diagnostics.debug_log import DebugLogService
+from vil_logging.monitors.rules import encode_rules
 from vil_logging.runtime import Runtime
 
 MAGIC = b"AutoLog!"
@@ -111,7 +112,8 @@ def verify_load(data_dir, *, duration=10, pps=1000, payload_size=512, tshark_pat
                 runtime = Runtime(root, _verification_filter=f"udp dst port {port}")
                 runtime.initialize().result(10)
                 runtime.save_preferences({"tshark_path": tool["path"], "nic_id": r"\Device\NPF_Loopback",
-                                          "ethernet_format": "pcap", "ethernet_buffer_mib": "64"}).result(10)
+                                          "ethernet_format": "pcap", "ethernet_buffer_mib": "64",
+                                          "monitor_rules_json": encode_rules([])}).result(10)
                 runtime.toggle((Role.ETHERNET,)).result(30)
                 if runtime.phase != SessionPhase.RECORDING:
                     raise RuntimeError("Capture did not start normally")

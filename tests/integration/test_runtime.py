@@ -135,15 +135,12 @@ def test_initial_start_failure_stops_only_issued_targets_and_keeps_number(runtim
     assert Role.DIAG not in runtime._pool._processes
 
 
-def test_recording_failure_keeps_healthy_target_recording(runtime_factory):
+def test_recording_failure_stops_healthy_target_too(runtime_factory):
     runtime = runtime_factory(behaviors={Role.CAN: FakeBehavior(fail_after=0.15)})
     roles = (Role.CAN, Role.ETHERNET)
     runtime.toggle(roles).result(timeout=12)
     time.sleep(0.25)
     runtime._submit(runtime._query).result(timeout=5)
-    assert runtime.phase == SessionPhase.PARTIAL
-    assert runtime._snapshots[Role.ETHERNET].recording.value == "recording"
-    runtime.toggle(roles).result(timeout=8)
     assert runtime.phase == SessionPhase.FAILED  # Past failure cannot become whole-session success.
     assert runtime._snapshots[Role.CAN].recording.value == "error"
     assert "Previous error:" in runtime._snapshots[Role.CAN].evidence

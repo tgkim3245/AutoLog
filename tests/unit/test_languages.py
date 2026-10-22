@@ -29,7 +29,7 @@ def test_one_language_button_cycles_all_views_and_emits_persisted_choice(qtbot, 
     spy = QSignalSpy(window.preferences_changed)
     assert window.selected_roles() == (Role.CAN, Role.ETHERNET)
     window.language_button.click()
-    assert window.packet_button.text() == "Packets"
+    assert window.file_manager_button.text() == "Operation history"
     window.language_button.click()
     assert window._language == "zh"
     assert spy.at(1)[0] == {"language": "zh"}

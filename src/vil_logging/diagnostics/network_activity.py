@@ -74,6 +74,18 @@ def read_receive_counters():
         api.FreeMibTable(table)
 
 
+def capture_link_state(nic_id):
+    """Read only the selected capture interface; silence alone is not link-down."""
+    try:
+        _, counters = read_receive_counters()
+        value = counters.get(_nic_key(nic_id))
+        return {"state": "disconnected" if value is None or value.status in {2, 6, 7} else
+                        "connected" if value.status == 1 else "unknown",
+                "oper_status": value.status if value else None, "sampled_epoch": time.time()}
+    except (OSError, ValueError) as error:
+        return {"state": "unknown", "error": str(error), "sampled_epoch": time.time()}
+
+
 class ActivityHistory:
     """Bounded receive pps history; gaps/resets are unknown, never a fake zero/spike."""
     def __init__(self, length=24):

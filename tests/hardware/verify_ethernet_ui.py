@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import QApplication
 
@@ -15,6 +15,7 @@ from vil_logging import runtime as runtime_module
 from vil_logging import ui
 from vil_logging.app import main
 from vil_logging.contracts.models import Role, SessionPhase
+from vil_logging.monitors.rules import encode_rules
 from vil_logging.ui.file_manager_dialog import DeleteFilesDialog
 
 
@@ -29,6 +30,11 @@ def verify():
     outcome = {"passed": False, "profile": str(root), "physical_nic_opened": False}
 
     class VerificationRuntime(original_runtime):
+        def _initialize(self):
+            super()._initialize()
+            self._save_preferences({"monitor_rules_json": encode_rules([]),
+                                    "tshark_path": os.environ.get("AUTOLOG_VERIFY_TSHARK", "")})
+
         def __init__(self, *args, **kwargs):
             super().__init__(*args, _verification_filter=f"udp dst port {port}", **kwargs)
 
@@ -36,6 +42,7 @@ def verify():
         def __init__(self, *args, **kwargs):
             QFontDatabase.addApplicationFont(r"C:\Windows\Fonts\malgun.ttf")
             super().__init__(*args, **kwargs)
+            self.role_checks[Role.CAN].setChecked(False)
             self.step = 0
             self.tick = QTimer(self)
             self.tick.setInterval(50)
@@ -49,8 +56,8 @@ def verify():
 
         def advance(self):
             try:
-                dialog, packets = self.settings_dialog, self.packet_window
-                if self.step == 0 and self._discovery_report and self._settings.tshark_path:
+                dialog = self.settings_dialog
+                if self.step == 0 and self._discovery_report.get("tshark", {}).get("status") == "ready":
                     assert self.bug_report_button.isEnabled()
                     dialog.open_section("ethernet")
                     index = dialog.nic_input.findData(r"\Device\NPF_Loopback")
@@ -65,26 +72,16 @@ def verify():
                     self.logging_button.click()
                     self.step = 3
                 elif self.step == 3 and self._phase == SessionPhase.RECORDING:
-                    packets.show()
-                    packets.pause_check.setChecked(True)
-                    self.send(5)
+                    self.send(8)
+                    self.sent_at = time.monotonic()
                     self.step = 4
-                elif self.step == 4 and len(packets.packets) == 5:
-                    assert packets.model.rowCount() == 0
-                    packets.hide()
-                    self.send(3)
-                    self.step = 5
-                elif self.step == 5 and len(packets.packets) == 8:
-                    packets.show()
-                    packets.pause_check.setChecked(False)
-                    packets.refresh()
-                    assert packets.model.rowCount() == 8
+                elif self.step == 4 and time.monotonic() - self.sent_at > 1:
                     self.logging_button.click()
                     self.step = 6
                 elif self.step == 6 and self._phase == SessionPhase.COMPLETED and self.rename_button.isEnabled():
                     assert len(self._files) == 1 and Path(self._files[0]).is_file()
                     assert self._settings.next_index == 2
-                    packets.grab().save(str(root / "packets.png"))
+                    assert self.quality_dialog.report["packet_count"] == 8
                     self.initial_height = self.height()
                     self.previous_name.setText("UI_renamed")
                     self.rename_button.click()
@@ -95,7 +92,6 @@ def verify():
                     self.grab().save(str(root / "main.png"))
                     self.file_manager_button.click()
                     self.file_manager.grab().save(str(root / "files.png"))
-                    self.file_manager.table.item(0, 0).setCheckState(Qt.CheckState.Checked)
                     # Reject the real confirmation dialog, then accept a fresh one.
                     # The only candidate is the localhost capture this test just made.
                     def cancel():
@@ -107,22 +103,22 @@ def verify():
                     self.step = 8
                     self.tick.stop()
                     QTimer.singleShot(50, cancel)
-                    self.file_manager.delete_button.click()
+                    self.delete_button.click()
                     assert Path(self._files[0]).is_file()
                     def accept():
                         active = QApplication.activeModalWidget()
                         assert isinstance(active, DeleteFilesDialog)
                         active.confirm_button.click()
                     QTimer.singleShot(50, accept)
-                    self.file_manager.delete_button.click()
+                    self.delete_button.click()
                     self.tick.start()
                 elif self.step == 8 and self._capture_history and self._capture_history[0]["files"][0]["status"] == "deleted" and not self._file_busy:
                     assert self._settings.next_index == 2
                     assert not self.rename_button.isEnabled()
                     self.file_manager.grab().save(str(root / "deleted.png"))
-                    outcome.update(passed=True, packets_in_view=len(packets.packets),
+                    outcome.update(passed=True, generated_packets=8,
                                    deleted_generated_file=self._capture_history[0]["files"][0]["path"],
-                                   pause_and_hidden_capture_continued=True,
+                                   history_read_only=self.file_manager.text.isReadOnly(),
                                    renamed_without_resize=True, cancelled_delete_preserved=True,
                                    confirmed_delete=True, next_index=self._settings.next_index)
                     self.tick.stop()

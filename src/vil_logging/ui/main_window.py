@@ -34,7 +34,6 @@ from vil_logging.contracts.models import (
     AppEvent,
     AppSettings,
     ObservationState,
-    PacketSummary,
     Role,
     SessionPhase,
     TargetSnapshot,
@@ -44,11 +43,10 @@ from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.naming import capture_prefix
 
 from .capture_button import CaptureButton
-from .file_manager_dialog import FileManagerDialog, confirm_delete
+from .file_manager_dialog import FileHistoryDialog, confirm_delete
 from .i18n import render_event, report_text, tr
 from .language_button import LanguageButton
 from .monitor_dialog import MonitorDialog, monitor_description
-from .packet_window import PacketWindow
 from .quality_dialog import QualityDialog
 from .recovery_dialog import RecoveryDialog
 from .settings_dialog import SettingsDialog
@@ -287,10 +285,18 @@ class MainWindow(QMainWindow):
         self.file_heading = _label(variant="section")
         self.file_heading.setWordWrap(True)
         file_top.addWidget(self.file_heading, 1)
+        file_actions = QHBoxLayout()
         self.file_manager_button = QPushButton()
         self.file_manager_button.setProperty("compact", True)
         self.file_manager_button.clicked.connect(self._show_file_manager)
-        file_top.addWidget(self.file_manager_button)
+        file_actions.addWidget(self.file_manager_button)
+        self.debug_folder_button = QPushButton()
+        self.debug_folder_button.setObjectName("openLogFolderButton")
+        self.debug_folder_button.setProperty("compact", True)
+        self.debug_folder_button.clicked.connect(self.open_debug_folder_requested)
+        self.debug_folder_button.setEnabled(False)
+        file_actions.addWidget(self.debug_folder_button)
+        file_actions.addStretch()
         self.delete_button = QPushButton()
         self.delete_button.setObjectName("deletePreviousButton")
         self.delete_button.setProperty("variant", "ghost")
@@ -299,6 +305,7 @@ class MainWindow(QMainWindow):
         self.delete_button.clicked.connect(self._delete_previous)
         file_top.addWidget(self.delete_button)
         file_layout.addLayout(file_top)
+        file_layout.addLayout(file_actions)
         self.file_names = QLabel()
         self.file_names.setObjectName("captureFilenames")
         self.file_names.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -355,20 +362,6 @@ class MainWindow(QMainWindow):
         self.event_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.event_empty.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         outer.addWidget(self.event_list)
-        footer_controls = QHBoxLayout()
-        self.packet_button = QPushButton()
-        self.packet_button.setObjectName("openPacketsButton")
-        self.packet_button.clicked.connect(self._show_packets)
-        self.debug_folder_button = QPushButton()
-        self.debug_folder_button.setObjectName("openLogFolderButton")
-        self.debug_folder_button.clicked.connect(self.open_debug_folder_requested)
-        self.debug_folder_button.setEnabled(False)
-        self.environment_button = QPushButton()
-        self.environment_button.clicked.connect(self.environment_requested)
-        for button in (self.packet_button, self.debug_folder_button, self.environment_button):
-            button.setProperty("compact", True)
-            footer_controls.addWidget(button)
-        outer.addLayout(footer_controls)
         self.debug_status = _label(variant="helper")
         self.debug_status.setObjectName("debugStatusLabel")
         self.debug_status.setWordWrap(True)
@@ -385,14 +378,11 @@ class MainWindow(QMainWindow):
             self.settings_dialog.discovery_requested.connect(self.discovery_requested)
         self.settings_dialog.prepare_requested.connect(self.prepare_requested)
         self.settings_dialog.environment_requested.connect(self.environment_requested)
-        self.packet_window = PacketWindow(self)
         self.quality_dialog = QualityDialog(self)
         self.monitor_dialog = MonitorDialog(self)
         self.monitor_dialog.preferences_changed.connect(self.preferences_changed)
-        self.file_manager = FileManagerDialog(self)
-        self.file_manager.delete_requested.connect(self.delete_files_requested)
+        self.file_manager = FileHistoryDialog(self)
         self.file_manager.refresh_requested.connect(self.files_refresh_requested)
-        self.file_manager.recovery_requested.connect(self._show_recovery)
         self.recovery_dialog = RecoveryDialog(self)
         self.recovery_dialog.requested.connect(self.recovery_requested)
         self.tray: QSystemTrayIcon | None = None
@@ -415,11 +405,6 @@ class MainWindow(QMainWindow):
         self.settings_dialog.raise_()
         self.settings_dialog.activateWindow()
 
-    def _show_packets(self):
-        logger.debug("Opening packet display; retained_packets=%s", len(self.packet_window.packets))
-        self.packet_window.show()
-        self.packet_window.raise_()
-
     def _change_language(self, language: str):
         logger.debug("Display language requested: %s", language)
         self.set_language(language)
@@ -434,7 +419,7 @@ class MainWindow(QMainWindow):
         self.settings_button.setToolTip(tr("settings", language))
         self.settings_button.setAccessibleName(tr("settings", language))
         self.delete_button.setText(tr("delete", language))
-        self.file_manager_button.setText(tr("file_manager", language))
+        self.file_manager_button.setText(tr("file_operations", language))
         help_key = "demo_file_ops" if self.demo else "file_ops_help"
         self.delete_button.setToolTip(tr(help_key, language))
         self.rename_button.setText(tr("rename", language))
@@ -452,13 +437,10 @@ class MainWindow(QMainWindow):
         self.event_empty.setText(tr("events_empty", language))
         self.target_heading.setText(tr("capture_targets", language))
         self.bug_report_button.setText(tr("bug_report", language))
-        self.packet_button.setText(tr("packets", language))
         self.debug_folder_button.setText(tr("debug_folder", language))
-        self.environment_button.setText(tr("environment", language))
         self.footer.setText(tr("demo", language) if self.demo else
                             tr("ethernet_stage", language) + "\n" + tr("real", language))
         self.settings_dialog.set_language(language)
-        self.packet_window.set_language(language)
         self.monitor_dialog.set_language(language)
         self.monitor_button.setText(tr("monitor_title", language))
         self.quality_button.setText(tr("quality", language))
@@ -564,7 +546,7 @@ class MainWindow(QMainWindow):
 
     def _render_capture_button(self):
         phase = self._phase
-        key, tone, enabled, busy, action = "ready", "primary", True, False, "start"
+        key, tone, enabled, busy, action = "ready", "success", True, False, "start"
         targets = ""
         if self._exiting:
             key, tone, enabled, busy, action = "exiting", "progress", False, True, ""
@@ -600,7 +582,7 @@ class MainWindow(QMainWindow):
             elif phase == SessionPhase.COMPLETED:
                 key, tone = "completed", "success"
             elif phase == SessionPhase.FAILED:
-                key, tone = "failed", "attention"
+                key, tone = "failed", "success"
         text = tr("capture_" + key, self._language).format(targets=targets)
         if self.demo:
             text = tr("capture_demo", self._language).format(text=text)
@@ -731,7 +713,6 @@ class MainWindow(QMainWindow):
         old = self._capture_history[0] if self._capture_history else {}
         latest = history[0] if history else {}
         self._capture_history = history
-        self.file_manager.set_history(history)
         if ((old.get("session_id"), old.get("current_name")) !=
                 (latest.get("session_id"), latest.get("current_name"))):
             self.previous_name.setText(latest.get("current_name", ""))
@@ -753,7 +734,6 @@ class MainWindow(QMainWindow):
         self.previous_name.setEnabled(ready)
         self.rename_button.setEnabled(ready)
         self.delete_button.setEnabled(ready)
-        self.file_manager.set_locked(locked)
 
     def _rename_previous(self):
         if self.rename_button.isEnabled() and self._capture_history:
@@ -872,8 +852,6 @@ class MainWindow(QMainWindow):
         self.debug_status.setProperty("tone", "error" if self._debug_error else "neutral")
         refresh_style(self.debug_status)
 
-    def add_packet(self, packet: PacketSummary):
-        self.packet_window.add_packet(packet)
 
     def closeEvent(self, event):
         event.ignore()

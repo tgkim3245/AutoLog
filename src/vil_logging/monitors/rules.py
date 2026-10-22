@@ -1,4 +1,4 @@
-"""Explicit, versioned rules. No vehicle timing or source is assumed."""
+"""Versioned receive rules, including the user-requested Zipy default."""
 
 import ipaddress
 import json
@@ -34,6 +34,8 @@ class EthernetRule:
     destination_mac: str = ""
     expected_ip: str = ""
     expected_mac: str = ""
+    source_mac_prefix: str = ""
+    minimum_pps: int = 0
 
     def __post_init__(self):
         for key in ("id", "name"):
@@ -54,9 +56,18 @@ class EthernetRule:
         if (self.expected_ip or self.expected_mac) and not (self.destination_ip or self.destination_mac):
             raise ValueError("출처 비교에는 대상 목적지 IP 또는 MAC이 필요합니다. / "
                              "Source checks require an independent destination IP or MAC selector.")
+        if not isinstance(self.source_mac_prefix, str):
+            raise ValueError("Source MAC prefix must be text")
+        prefix = self.source_mac_prefix.replace("-", ":").lower().rstrip(":")
+        if prefix and not re.fullmatch(r"[0-9a-f]{2}(?::[0-9a-f]{2}){0,5}", prefix):
+            raise ValueError("Invalid source MAC prefix (example: 02:00:00)")
+        object.__setattr__(self, "source_mac_prefix", prefix)
+        if type(self.minimum_pps) is not int or not 0 <= self.minimum_pps <= 10000000:
+            raise ValueError("minimum_pps: 0~10000000 integer required")
 
     def in_flow(self, packet):
         return ((not self.protocol or packet.protocol.upper() == self.protocol) and
+                (not self.source_mac_prefix or (packet.source_mac.lower() + ":").startswith(self.source_mac_prefix + ":")) and
                 (not self.destination_ip or packet.destination_ip == self.destination_ip) and
                 (not self.destination_mac or packet.destination_mac.lower() == self.destination_mac))
 
@@ -89,3 +100,9 @@ def encode_rules(rules) -> str:
                           ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     parse_rules(document)
     return document
+
+
+def default_rules_json():
+    # A presence/rate selector, not an exclusive source allow-list or capture filter.
+    return encode_rules([EthernetRule("zipy-source-020000", "Zipy · 02:00:00", 3000, 5000, 1500, 10,
+                                     source_mac_prefix="02:00:00", minimum_pps=100)])

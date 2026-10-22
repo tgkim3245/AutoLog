@@ -20,7 +20,6 @@ class OwnedCanoe:
 
     def remember(self, pid):
         import win32api
-        import win32process
 
         if not isinstance(pid, int) or pid <= 0 or pid == os.getpid():
             raise ValueError("Invalid created CANoe PID")
@@ -35,7 +34,13 @@ class OwnedCanoe:
             buffer, length = ctypes.create_unicode_buffer(32768), wintypes.DWORD(32768)
             if not api.QueryFullProcessImageNameW(int(handle), 0, buffer, ctypes.byref(length)):
                 raise ctypes.WinError(ctypes.get_last_error())
-            created = win32process.GetProcessTimes(handle)["CreationTime"].timestamp()
+            # GetProcessTimes via pywin32 constructs datetime objects and imports
+            # win32timezone lazily. Native FILETIME avoids that packaging dependency.
+            api.GetProcessTimes.argtypes = (wintypes.HANDLE,) + (ctypes.POINTER(wintypes.FILETIME),) * 4
+            times = [wintypes.FILETIME() for _ in range(4)]
+            if not api.GetProcessTimes(int(handle), *(ctypes.byref(item) for item in times)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            created = ((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime) / 10000000 - 11644473600
             if Path(buffer.value).name.casefold() not in {"canoe.exe", "canoe32.exe", "canoe64.exe"} or created < self.started - 1:
                 raise ValueError("Refusing a process not created for this AutoLog run")
             with self._lock:
@@ -60,7 +65,7 @@ class OwnedCanoe:
             try:
                 if win32process.GetExitCodeProcess(handle) == 259:
                     win32api.TerminateProcess(handle, 0)
-                log.info("canoe.owned_process_closed", extra={"fields": {"pid": pid}})
+                log.info("canoe.owned_process_termination_sent", extra={"fields": {"pid": pid}})
             except Exception:
                 log.exception("canoe.owned_process_close_failed", extra={"fields": {"pid": pid}})
             finally:

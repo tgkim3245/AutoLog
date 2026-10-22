@@ -140,9 +140,9 @@ def test_quality_rejects_old_session_and_failed_stop_never_looks_archived(real):
     assert runtime._plan.files[0].temp_path.is_file()
 
 
-def test_monitor_criteria_persist_without_schema_change_or_invented_defaults(tmp_path):
+def test_monitor_criteria_persist_with_default_zipy_rule_without_schema_change(tmp_path):
     repo = Repository(tmp_path / "state.sqlite3")
-    assert repo.load_settings().monitor_rules_json == ""
+    assert "02:00:00" in repo.load_settings().monitor_rules_json
     saved = repo.save_preferences({"monitor_rules_json": criteria()})
     repo.close()
     reopened = Repository(tmp_path / "state.sqlite3")
@@ -156,26 +156,26 @@ def test_monitor_criteria_persist_without_schema_change_or_invented_defaults(tmp
         reopened.close()
 
 
-def test_source_episode_is_merged_and_warning_never_stops_capture(real):
+def test_receive_warning_stops_once_archives_and_allows_next_recording(real):
     runtime, tools = real
-    runtime.toggle((Role.ETHERNET,)).result(5)
-    assert runtime._snapshots[Role.ETHERNET].observation == ObservationState.NORMAL
+    runtime.toggle((Role.CAN, Role.ETHERNET)).result(5)
     tools.monitor = report("warning", source=1)
-    for _ in range(12):
+    for _ in range(3):
         runtime._submit(runtime._query).result(5)
-    assert runtime.phase == SessionPhase.RECORDING
-    assert runtime._snapshots[Role.ETHERNET].observation == ObservationState.WARNING
-    assert len([event for event in events(runtime) if event.code == "MONITOR_SOURCE"]) == 1
-    assert not any(action == "stop" for _, action, _ in tools.calls)
-    tools.monitor = report("normal", source=1, recovered=1)
-    runtime._submit(runtime._query).result(5)
-    assert len([event for event in events(runtime) if event.code == "MONITOR_RECOVERED"]) == 1
-    started = next(kwargs for _, action, kwargs in tools.calls if action == "start")
-    assert started["params"]["monitor_rules_json"] == criteria()
-    runtime.toggle((Role.ETHERNET,)).result(5)
-    assert runtime._snapshots[Role.ETHERNET].observation == ObservationState.NOT_MONITORED
+    assert runtime.phase == SessionPhase.FAILED
+    stops = [roles for roles, action, _ in tools.calls if action == "stop"]
+    assert len(stops) == 1 and set(stops[0]) == {Role.CAN, Role.ETHERNET}
+    runtime._submit(runtime._stop).result(5)
+    assert len([action for _, action, _ in tools.calls if action == "stop"]) == 1
+    assert len([event for event in events(runtime) if event.code == "CAPTURE_AUTO_STOP"]) == 1
     capture = runtime._submit(runtime._repo.captures).result(5)[0]
     assert capture["details"]["monitoring"]["ethernet"]["rules"][0]["counters"]["source"] == 1
+    assert all(file.final_path.is_file() for file in runtime._plan.files)
+    tools.monitor = report()
+    runtime.toggle((Role.CAN, Role.ETHERNET)).result(5)
+    assert runtime.phase == SessionPhase.RECORDING
+    runtime.toggle((Role.CAN, Role.ETHERNET)).result(5)
+    assert runtime.phase == SessionPhase.COMPLETED
 
 
 def test_display_overflow_does_not_taint_independent_monitor(real):
@@ -214,10 +214,26 @@ def test_canoe_receive_unsupported_and_recorder_failure_remain_distinct(real):
     assert runtime._snapshots[Role.CAN].observation == ObservationState.UNSUPPORTED
     tools.query_error = Role.ETHERNET
     runtime._submit(runtime._query).result(5)
-    assert runtime.phase == SessionPhase.PARTIAL
-    assert runtime._snapshots[Role.CAN].recording.value == "recording"
-    assert runtime._snapshots[Role.ETHERNET].observation == ObservationState.UNKNOWN
+    assert runtime.phase == SessionPhase.FAILED
+    assert runtime._snapshots[Role.CAN].recording.value == "stopped"
+    assert runtime._snapshots[Role.ETHERNET].observation == ObservationState.NOT_MONITORED
     assert not any(event.code == "MONITOR_MISSING" for event in events(runtime))
+
+
+def test_cable_unplug_stops_every_target_and_preserves_files_once(real):
+    runtime, tools = real
+    runtime.toggle((Role.CAN, Role.ETHERNET)).result(5)
+    tools.quality = {"link": {"state": "disconnected"}}
+    runtime._submit(runtime._query).result(5)
+    assert runtime.phase == SessionPhase.FAILED
+    assert all(file.final_path.is_file() for file in runtime._plan.files)
+    stops = [roles for roles, action, _ in tools.calls if action == "stop"]
+    assert len(stops) == 1 and set(stops[0]) == {Role.CAN, Role.ETHERNET}
+    tools.quality = {"link": {"state": "connected"}}
+    runtime.toggle((Role.CAN, Role.ETHERNET)).result(5)
+    assert runtime.phase == SessionPhase.RECORDING
+    runtime.toggle((Role.CAN, Role.ETHERNET)).result(5)
+    assert runtime.phase == SessionPhase.COMPLETED
 
 
 def test_delayed_ipc_report_cannot_leave_a_stale_normal_status(real):
@@ -230,3 +246,51 @@ def test_delayed_ipc_report_cannot_leave_a_stale_normal_status(real):
     assert target.observation_details["rules"][0]["reasons"] == ["report_delayed"]
     assert runtime.phase == SessionPhase.RECORDING
     assert not any(event.code == "MONITOR_MISSING" for event in events(runtime))
+
+
+def test_sustained_unavailable_receive_monitor_stops_instead_of_claiming_health(real):
+    runtime, tools = real
+    runtime.toggle((Role.ETHERNET,)).result(5)
+    tools.monitor = {"status": "unknown", "rules": [], "reasons": ["reader_unavailable"]}
+    runtime._monitor_unverified_since = time.monotonic() - 6
+    runtime._submit(runtime._query).result(5)
+    assert runtime.phase == SessionPhase.FAILED
+    assert any(event.code == "CAPTURE_AUTO_STOP" for event in events(runtime))
+
+
+def test_x_sends_canoe_exit_signal_before_busy_coordinator_finishes(real):
+    import threading
+    runtime, tools = real
+    entered, release = threading.Event(), threading.Event()
+    signals = []
+    tools.signal_canoe_exit = lambda: signals.append("sent")
+    tools.force_abort = lambda: None
+    def busy():
+        entered.set()
+        release.wait(3)
+    runtime._submit(busy)
+    assert entered.wait(1)
+    try:
+        future = runtime.request_exit()
+        assert signals == ["sent"] and not future.done()
+    finally:
+        release.set()
+    assert future.result(5)
+
+
+@pytest.mark.parametrize("document", ["", encode_rules([]), criteria()])
+def test_upgrade_only_adds_zipy_default_to_legacy_blank_settings(tmp_path, document):
+    first = Runtime(tmp_path)
+    first.initialize().result(5)
+    first.save_preferences({"monitor_rules_json": document, "nic_id": "remembered", "language": "en"}).result(5)
+    first.close_for_test()
+    second = Runtime(tmp_path)
+    try:
+        second.initialize().result(5)
+        assert second._settings.nic_id == "remembered" and second._settings.language == "en"
+        if document:
+            assert second._settings.monitor_rules_json == document
+        else:
+            assert "02:00:00" in second._settings.monitor_rules_json
+    finally:
+        second.close_for_test()

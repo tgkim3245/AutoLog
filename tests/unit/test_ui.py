@@ -8,7 +8,6 @@ from vil_logging.contracts.models import (
     AppEvent,
     AppSettings,
     ConnectionState,
-    PacketSummary,
     Role,
     SessionPhase,
     TargetSnapshot,
@@ -115,31 +114,6 @@ def test_event_list_has_a_hard_500_item_bound(window):
     assert "event-506" in window.event_list.item(499).text()
 
 
-def test_packet_display_is_bounded_and_pause_filter_do_not_drop_input(window, qtbot):
-    packets = window.packet_window
-    for index in range(1005):
-        window.add_packet(PacketSummary(str(index), "10.0.0.1", "10.0.0.2", "TCP", 64))
-    assert len(packets.packets) == 1000
-    assert packets.packets[0].timestamp == "5"
-    packets.show()
-    packets.refresh()
-    assert packets.model.rowCount() == 1000
-    packets.pause_check.setChecked(True)
-    window.add_packet(PacketSummary("latest", "10.1.1.1", "10.1.1.2", "UDP", 42))
-    packets.refresh()
-    assert packets.model.data(packets.model.index(999, 0)) == "1004"
-    assert packets.packets[-1].timestamp == "latest"
-    packets.pause_check.setChecked(False)
-    packets.filter_input.setText("UDP")
-    packets.refresh()
-    assert packets.model.rowCount() == 1
-    assert packets.model.data(packets.model.index(0, 0)) == "latest"
-    assert len(packets.packets) == 1000
-    packets.hide()
-    window.add_packet(PacketSummary("while-hidden", "", "", "ARP", 60))
-    assert packets.packets[-1].timestamp == "while-hidden"
-
-
 def test_demo_file_actions_explain_that_no_files_are_created(qtbot, monkeypatch):
     monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", lambda: False)
     window = MainWindow(demo=True)
@@ -172,10 +146,9 @@ def test_x_close_requests_orderly_exit_even_when_tray_is_available(qtbot, monkey
 
 def test_settings_applied_language_is_reflected_in_all_views(window):
     window.set_settings(AppSettings(language="en", ethernet_format="pcapng"))
-    assert window.packet_button.text() == "Packets"
+    assert window.file_manager_button.text() == "Operation history"
     assert window.target_formats[Role.ETHERNET].text() == ".pcapng"
     assert "AutoLog_1.pcapng" in window.file_names.text()
-    assert window.packet_window.pause_check.text() == "Pause display"
 
 
 def test_capture_preview_adds_delimiter_to_user_entered_prefix(window):

@@ -46,31 +46,32 @@ def test_bug_report_button_exports_logs_and_shows_email_instructions(tmp_path):
                 assert Path(opened_folders[0]).resolve() == expected_output
                 assert "developer_logs" not in opened_folders[0]
                 self.bug_report_button.click()
+                assert len(dialogs) == 1, dialogs
+                title, message = dialogs[0]
+                assert title == "버그리포트"
+                assert "Taegon.Kim" in message
+                assert "@" not in message
+                assert "AutoLog_BugReport_" in message
+                reports = list(desktop.glob("AutoLog_BugReport_*.zip"))
+                assert len(reports) == 1
+                assert reports[0].name in message
+                with zipfile.ZipFile(reports[0]) as archive:
+                    assert "AutoLog_developer.jsonl" in archive.namelist()
+                    content = archive.read("AutoLog_developer.jsonl").decode("utf-8")
+                    assert "bug_report.export_requested" in content
+                    manifest = json.loads(archive.read("manifest.json"))
+                    assert manifest["send_to"] == "Taegon.Kim"
+                    for item in manifest["files"]:
+                        data = archive.read(item["name"])
+                        assert hashlib.sha256(data).hexdigest() == item["sha256"]
+                        assert len(data) == item["bytes"]
+                print("BUG_REPORT_BUTTON_PASSED", reports[0].name, flush=True)
                 QTimer.singleShot(0, self.exit_requested.emit)
 
         ui.MainWindow = ExercisedWindow
         result = main(["--data-dir", str(root / "app-data")])
         assert result == 0
-        assert len(dialogs) == 1, dialogs
-        title, message = dialogs[0]
-        assert title == "버그리포트"
-        assert "Taegon.Kim" in message
-        assert "@" not in message
-        assert "AutoLog_BugReport_" in message
-        reports = list(desktop.glob("AutoLog_BugReport_*.zip"))
-        assert len(reports) == 1
-        assert reports[0].name in message
-        with zipfile.ZipFile(reports[0]) as archive:
-            assert "AutoLog_developer.jsonl" in archive.namelist()
-            content = archive.read("AutoLog_developer.jsonl").decode("utf-8")
-            assert "bug_report.export_requested" in content
-            manifest = json.loads(archive.read("manifest.json"))
-            assert manifest["send_to"] == "Taegon.Kim"
-            for item in manifest["files"]:
-                data = archive.read(item["name"])
-                assert hashlib.sha256(data).hexdigest() == item["sha256"]
-                assert len(data) == item["bytes"]
-        print("BUG_REPORT_BUTTON_PASSED", reports[0].name)
+
     ''')
     environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "PYTHONDONTWRITEBYTECODE": "1",
                    "PYTHONPATH": str(Path(__file__).resolve().parents[2] / "src")}

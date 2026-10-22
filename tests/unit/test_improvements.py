@@ -162,9 +162,9 @@ def test_small_screen_keeps_footer_reachable(qtbot, monkeypatch, product_fonts):
     qtbot.wait(30)
     assert window.height() <= 492
     assert window.main_scroll.verticalScrollBar().maximum() > 0
-    window.main_scroll.ensureWidgetVisible(window.environment_button)
+    window.main_scroll.ensureWidgetVisible(window.debug_status)
     qtbot.wait(20)
-    point = window.environment_button.mapTo(window.main_scroll.viewport(), window.environment_button.rect().center())
+    point = window.debug_status.mapTo(window.main_scroll.viewport(), window.debug_status.rect().center())
     assert window.main_scroll.viewport().rect().contains(point)
     window.set_language("en")
     window.set_preparation_report({"role": "can", "status": "attention", "readiness_stage": "measurement_waiting"})

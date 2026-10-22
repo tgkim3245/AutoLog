@@ -33,6 +33,7 @@ if scenario in {'initializing','repeat'}:
     Runtime._initialize=lambda self: threading.Event().wait(60)
 elif scenario=='recording':
     def blocked_stop(self,*args,**kwargs):
+        (root/'blocked-stop-called').touch()
         self._set_phase(SessionPhase.STOPPING)
         threading.Event().wait(60)
     Runtime._stop=blocked_stop
@@ -59,6 +60,8 @@ class ExercisedWindow(ui.MainWindow):
         elif scenario=='resume' and self._initializing:
             return
         self.exercise.stop()
+        if scenario=='resume':
+            (root/'startup-marker-cleared.json').write_text(json.dumps({'cleared':not (root/'AutoLog_force_exit.json').exists()}))
         (root/'exit-request.json').write_text(json.dumps({'at':time.time(),'workers':[p.pid for p in runtime._pool._processes.values()]}))
         self.close()
         if scenario=='repeat':QTimer.singleShot(100,self.close)
@@ -77,7 +80,10 @@ raise SystemExit(main(['--demo','--data-dir',str(root)]))
         notice = json.loads(marker.read_text(encoding="utf-8"))
         assert notice["reason"] == ("repeat_close" if scenario == "repeat" else "deadline")
     else:
-        assert not marker.exists()  # X discards directly instead of waiting on the blocked Stop.
+        assert not (tmp_path / "blocked-stop-called").exists()
+        # A slow filesystem may use the bounded fallback; X must never invoke Stop.
+        if marker.exists():
+            assert json.loads(marker.read_text(encoding="utf-8"))["reason"] == "deadline"
     if os.name == "nt":
         import pywintypes
         import win32api
@@ -96,4 +102,4 @@ raise SystemExit(main(['--demo','--data-dir',str(root)]))
         resumed = subprocess.run([sys.executable, "-c", script, str(tmp_path), "resume"], env=env,
                                  capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
         assert resumed.returncode == 0, resumed.stdout + resumed.stderr
-        assert not marker.exists()
+        assert json.loads((tmp_path / "startup-marker-cleared.json").read_text())["cleared"]

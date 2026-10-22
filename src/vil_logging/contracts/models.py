@@ -6,6 +6,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from vil_logging.monitors.rules import default_rules_json
+
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="milliseconds")
@@ -76,7 +78,7 @@ class AppSettings:
     nic_id: str = ""
     tshark_path: str = ""
     language: str = "ko"
-    monitor_rules_json: str = ""
+    monitor_rules_json: str = field(default_factory=default_rules_json)
     version: int = 1
 
 

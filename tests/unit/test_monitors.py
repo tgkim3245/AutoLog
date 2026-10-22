@@ -54,6 +54,44 @@ def test_no_criteria_never_invents_normal_or_missing():
     assert monitor.snapshot()["status"] == "not_monitored"
 
 
+def test_zipy_default_accepts_mixed_sources_but_requires_sustained_prefix_traffic():
+    from vil_logging.monitors.rules import default_rules_json
+    clock = Clock()
+    monitor = engine(clock, parse_rules(default_rules_json()))
+    for _ in range(700):
+        for _ in range(2):
+            monitor.feed(clock.packet(source_mac="02:00:00:00:14:04"))
+        monitor.feed(clock.packet(source_mac="a0:bb:cc:dd:ee:ff"))
+        clock.advance(.01)
+    assert row(monitor)["status"] == "normal"
+    assert 190 < row(monitor)["receive_pps"] <= 201
+    assert row(monitor)["mismatched_packets"] == 0
+    assert len(monitor.rules[0].rate_buckets) <= 21
+    # Unrelated traffic is allowed, but must not conceal required-source silence.
+    for _ in range(320):
+        monitor.feed(clock.packet(source_mac="a0:bb:cc:dd:ee:ff"))
+        clock.advance(.01)
+    assert "missing_flow" in row(monitor)["reasons"]
+
+
+def test_zipy_sparse_prefix_packets_fail_rate_without_a_silence_false_positive():
+    from vil_logging.monitors.rules import default_rules_json
+    clock = Clock()
+    monitor = engine(clock, parse_rules(default_rules_json()))
+    for _ in range(100):
+        monitor.feed(clock.packet())
+        clock.advance(.1)
+    result = row(monitor)
+    assert "low_receive_rate" in result["reasons"]
+    assert "missing_flow" not in result["reasons"]
+
+
+@pytest.mark.parametrize("prefix", ["02:00:00:00:00:01:00", "020000", None])
+def test_invalid_prefix_rejected(prefix):
+    with pytest.raises(ValueError):
+        rule(source_mac_prefix=prefix)
+
+
 def test_real_receive_events_count_even_when_values_and_payload_are_unchanged():
     clock = Clock()
     monitor = engine(clock)
