@@ -150,7 +150,7 @@ def test_recording_failure_keeps_healthy_target_recording(runtime_factory):
     assert runtime._snapshots[Role.ETHERNET].recording.value == "stopped"
 
 
-def test_stop_unknown_blocks_new_session_and_orderly_exit(runtime_factory):
+def test_stop_unknown_blocks_new_session_until_x_discards_it(runtime_factory):
     runtime = runtime_factory(behaviors={Role.ETHERNET: FakeBehavior(fail_stop=True)})
     roles = (Role.ETHERNET,)
     runtime.toggle(roles).result(timeout=10)
@@ -158,7 +158,8 @@ def test_stop_unknown_blocks_new_session_and_orderly_exit(runtime_factory):
     assert runtime.phase == SessionPhase.INCOMPLETE
     assert runtime.toggle(roles) is None
     assert read_next(runtime) == 2
-    assert runtime.request_exit().result(timeout=5) is False
+    assert runtime.request_exit().result(timeout=5) is True
+    assert runtime.phase == SessionPhase.FAILED and runtime._closed
 
 
 def test_cancel_while_final_db_commit_pending_never_leaves_recording(runtime_factory, monkeypatch):

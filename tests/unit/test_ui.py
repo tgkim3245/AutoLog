@@ -123,17 +123,17 @@ def test_packet_display_is_bounded_and_pause_filter_do_not_drop_input(window, qt
     assert packets.packets[0].timestamp == "5"
     packets.show()
     packets.refresh()
-    assert packets.table.rowCount() == 1000
+    assert packets.model.rowCount() == 1000
     packets.pause_check.setChecked(True)
     window.add_packet(PacketSummary("latest", "10.1.1.1", "10.1.1.2", "UDP", 42))
     packets.refresh()
-    assert packets.table.item(999, 0).text() == "1004"
+    assert packets.model.data(packets.model.index(999, 0)) == "1004"
     assert packets.packets[-1].timestamp == "latest"
     packets.pause_check.setChecked(False)
     packets.filter_input.setText("UDP")
     packets.refresh()
-    assert packets.table.rowCount() == 1
-    assert packets.table.item(0, 0).text() == "latest"
+    assert packets.model.rowCount() == 1
+    assert packets.model.data(packets.model.index(0, 0)) == "latest"
     assert len(packets.packets) == 1000
     packets.hide()
     window.add_packet(PacketSummary("while-hidden", "", "", "ARP", 60))

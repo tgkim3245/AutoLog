@@ -44,8 +44,8 @@ TEXT = {
                             "Files are preserved. Stop or archival confirmation is unfinished; review the cause and actual files in recovery."),
     "capture_no_targets": ("대상을 선택하세요", "Select a target"),
     "capture_exiting": ("종료 준비 중…", "Preparing to exit…"),
-    "capture_exiting_help": ("약 3초 안에 정리가 끝나지 않으면 강제 종료합니다. X를 다시 누르면 즉시 종료합니다.",
-                             "Force-exits if cleanup takes more than about 3 seconds. Press X again to exit immediately."),
+    "capture_exiting_help": ("전용 CANoe도 종료하며 중단 구간은 버립니다. 정리가 지연되면 약 1초 뒤 강제 종료합니다.",
+                             "Closes dedicated CANoe instances and discards unfinished work. Forces exit after about one second."),
     "capture_demo": ("모의 · {text}", "Demo · {text}"),
     "disconnected_short": ("미연결", "Offline"),
     "measurement_waiting_short": ("측정 대기", "Start meas."),
@@ -315,8 +315,10 @@ TEXT.update({
 })
 
 EVENTS = {
-    "PREVIOUS_FORCED_EXIT": ("이전 실행이 강제 종료됐습니다. 남은 기록은 미완료 확인에서 검토하세요.",
-                             "The previous run was force-closed. Review remaining captures in recovery."),
+    "PREVIOUS_FORCED_EXIT": ("이전 실행이 강제 종료됐습니다. 중단 구간은 정리하고 새 기록을 시작할 수 있습니다.",
+                             "Previous run was forced to close. Interrupted work is discarded; new recording is available."),
+    "INTERRUPTED_DISCARDED": ("이전 중단 구간 정리 완료 · 새 기록을 시작할 수 있습니다",
+                              "Interrupted work cleared · New recording is available"),
     "HISTORY_ARCHIVED": ("오래된 이력을 압축 보관했습니다. 캡처 파일은 유지됩니다.", "Older history archived. Capture files are retained."),
     "HISTORY_ARCHIVE_FAILED": ("이력 내보내기에 실패해 원래 이력을 유지했습니다.", "History export failed; original history was retained."),
     "DISK_SPACE_LOW": ("저장 공간 1 GiB 이하 · 저장 위치 확인 필요", "Free disk space ≤1 GiB · check output location"),

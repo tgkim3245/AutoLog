@@ -73,8 +73,11 @@ raise SystemExit(main(['--demo','--data-dir',str(root)]))
     request = json.loads((tmp_path / "exit-request.json").read_text())
     assert time.time() - request["at"] < (2 if scenario == "repeat" else 5)
     marker = tmp_path / "AutoLog_force_exit.json"
-    notice = json.loads(marker.read_text(encoding="utf-8"))
-    assert notice["reason"] == ("repeat_close" if scenario == "repeat" else "deadline")
+    if scenario != "recording":
+        notice = json.loads(marker.read_text(encoding="utf-8"))
+        assert notice["reason"] == ("repeat_close" if scenario == "repeat" else "deadline")
+    else:
+        assert not marker.exists()  # X discards directly instead of waiting on the blocked Stop.
     if os.name == "nt":
         import pywintypes
         import win32api

@@ -70,7 +70,7 @@ def verify():
                     self.send(5)
                     self.step = 4
                 elif self.step == 4 and len(packets.packets) == 5:
-                    assert packets.table.rowCount() == 0
+                    assert packets.model.rowCount() == 0
                     packets.hide()
                     self.send(3)
                     self.step = 5
@@ -78,7 +78,7 @@ def verify():
                     packets.show()
                     packets.pause_check.setChecked(False)
                     packets.refresh()
-                    assert packets.table.rowCount() == 8
+                    assert packets.model.rowCount() == 8
                     self.logging_button.click()
                     self.step = 6
                 elif self.step == 6 and self._phase == SessionPhase.COMPLETED and self.rename_button.isEnabled():

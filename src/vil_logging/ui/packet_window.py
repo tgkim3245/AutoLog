@@ -3,15 +3,14 @@
 import logging
 from collections import deque
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QVBoxLayout,
 )
 
@@ -21,6 +20,33 @@ from .i18n import tr
 from .theme import ThemedCheckBox, apply_theme
 
 logger = logging.getLogger(__name__)
+
+
+class PacketTableModel(QAbstractTableModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.rows, self.headers = [], []
+
+    def rowCount(self, parent=QModelIndex()):
+        return 0 if parent.isValid() else len(self.rows)
+
+    def columnCount(self, parent=QModelIndex()):
+        return 0 if parent.isValid() else 5
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if index.isValid() and role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
+            return self.rows[index.row()][index.column()]
+        return None
+
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
+            return self.headers[section] if section < len(self.headers) else ""
+        return None
+
+    def set_rows(self, rows):
+        self.beginResetModel()
+        self.rows = rows
+        self.endResetModel()
 
 
 class PacketWindow(QDialog):
@@ -63,15 +89,18 @@ class PacketWindow(QDialog):
         self.hint.setProperty("variant", "helper")
         self.hint.setWordWrap(True)
         layout.addWidget(self.hint)
-        self.table = QTableWidget(0, 5)
+        self.table = QTableView()
+        self.model = PacketTableModel(self.table)
+        self.table.setModel(self.model)
         self.table.setObjectName("packetTable")
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        for column, width in ((0, 170), (3, 90), (4, 75)):
+            self.table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+            self.table.setColumnWidth(column, width)
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setDefaultSectionSize(34)
         layout.addWidget(self.table, 1)
@@ -93,7 +122,7 @@ class PacketWindow(QDialog):
 
     def clear_session(self):
         self.packets.clear()
-        self.table.setRowCount(0)
+        self.model.set_rows([])
         self.count_label.setText(tr("packet_counts", self._language).format(count=0))
         self._dirty = True
 
@@ -106,9 +135,8 @@ class PacketWindow(QDialog):
         self.hint.setText(tr("packet_hint", language))
         self.filter_input.setPlaceholderText(tr("packet_filter_placeholder", language))
         self.count_label.setText(tr("packet_counts", language).format(count=len(self.packets)))
-        self.table.setHorizontalHeaderLabels(
-            [tr(key, language) for key in ("time", "source", "destination", "protocol", "length")]
-        )
+        self.model.headers = [tr(key, language) for key in ("time", "source", "destination", "protocol", "length")]
+        self.model.headerDataChanged.emit(Qt.Orientation.Horizontal, 0, 4)
 
     def refresh(self):
         if not self._dirty or self.pause_check.isChecked() or not self.isVisible():
@@ -125,19 +153,12 @@ class PacketWindow(QDialog):
             )
             if not query or query in " ".join(row).casefold():
                 rows.append(row)
-        self.table.setUpdatesEnabled(False)
         self.count_label.setText(tr("packet_counts", self._language).format(count=len(self.packets)))
-        self.table.setRowCount(len(rows))
-        for row_index, row in enumerate(rows):
-            for column, value in enumerate(row):
-                item = QTableWidgetItem(value)
-                item.setToolTip(value)
-                self.table.setItem(row_index, column, item)
-        self.table.setUpdatesEnabled(True)
+        self.model.set_rows(rows)
         self.table.scrollToBottom()
         self._dirty = False
 
     def showEvent(self, event):
         super().showEvent(event)
         self._dirty = True
-        self.refresh()
+        QTimer.singleShot(0, self.refresh)

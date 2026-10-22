@@ -11,7 +11,7 @@ TEXT = {
     "capture_completed": "开始下次记录", "capture_failed": "开始新记录", "capture_incomplete": "检查记录状态",
     "capture_review_help": "文件已保留，停止或归档尚未确认。请在恢复窗口检查原因和实际文件。",
     "capture_no_targets": "请选择记录对象", "capture_exiting": "正在准备退出…", "capture_demo": "模拟 · {text}",
-    "capture_exiting_help": "清理超过约 3 秒将强制退出。再次按 X 可立即退出。",
+    "capture_exiting_help": "关闭专用 CANoe 并丢弃未完成记录。清理超过约 1 秒将强制退出。",
     "exit_deferred_title": "暂缓退出",
     "exit_deferred_help": "未能完成当前记录的停止或文件/输出设置清理。\n请查看最近活动中的错误，然后再次按 X 重试退出。\n如果持续失败，请发送错误报告。未完成的文件将被保留。",
     "disconnected_short": "未连接", "measurement_waiting_short": "等待测量",
@@ -144,7 +144,8 @@ SETTINGS = {
 }
 
 EVENTS = {
-    "PREVIOUS_FORCED_EXIT": "上次运行被强制关闭。请在恢复窗口检查剩余记录。",
+    "PREVIOUS_FORCED_EXIT": "上次运行被强制关闭。已清理中断记录，可开始新记录。",
+    "INTERRUPTED_DISCARDED": "中断记录已清理 · 可开始新记录",
     "HISTORY_ARCHIVED": "较早历史已压缩归档，采集文件保留。",
     "HISTORY_ARCHIVE_FAILED": "历史导出失败，原始历史已保留。",
     "DISK_SPACE_LOW": "可用空间 ≤1 GiB · 请检查保存位置", "DISK_SPACE_RESTORED": "可用空间已恢复",

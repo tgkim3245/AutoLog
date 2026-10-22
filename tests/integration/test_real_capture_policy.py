@@ -48,6 +48,9 @@ class StubCapturePool:
     def close(self, **_kwargs):
         pass
 
+    def force_abort(self):
+        self.aborted = True
+
     def drain_packets(self):
         return []
 
@@ -113,7 +116,7 @@ def test_existing_output_blocks_capture_before_prepare(real):
     assert existing.read_bytes() == b"precious original"
 
 
-def test_unconfirmed_stop_keeps_working_file_and_blocks_restart_and_exit(real):
+def test_unconfirmed_stop_can_be_discarded_by_x_without_blocking_exit(real):
     runtime, pool = real
     runtime.toggle((Role.ETHERNET,)).result(timeout=5)
     pool.fault = "stop"
@@ -123,9 +126,8 @@ def test_unconfirmed_stop_keeps_working_file_and_blocks_restart_and_exit(real):
     assert runtime._plan.files[0].temp_path.parent.is_dir()
     assert not runtime._plan.files[0].final_path.exists()
     assert runtime.toggle((Role.ETHERNET,)) is None
-    assert runtime.request_exit().result(timeout=5) is False
-    pool.fault = ""
-    assert runtime.request_exit().result(timeout=5) is True  # Explicit exit retries owned stop.
+    assert runtime.request_exit().result(timeout=5) is True
+    assert not runtime._plan.files[0].temp_path.exists() and runtime._closed
 
 
 @pytest.mark.parametrize("fault", ["inspect", "collision", "changed"])
@@ -181,7 +183,7 @@ def test_cancellation_after_reservation_sends_no_start_and_keeps_reserved_index(
     assert "start" not in pool.calls
 
 
-def test_unexpected_stop_exception_releases_exit_latch_and_allows_retry(real, monkeypatch):
+def test_x_does_not_call_the_stop_transport_or_publish_in_progress_capture(real, monkeypatch):
     runtime, pool = real
     runtime.toggle((Role.ETHERNET,)).result(5)
     original = pool.request
@@ -192,13 +194,9 @@ def test_unexpected_stop_exception_releases_exit_latch_and_allows_retry(real, mo
         return original(roles, action, session_id, **kwargs)
 
     monkeypatch.setattr(pool, "request", fail_stop)
-    assert runtime.request_exit().result(5) is False
-    assert not runtime._exit_pending and not runtime._closed
-    assert runtime.phase == SessionPhase.INCOMPLETE
-    assert ("exit_ready", False) in list(runtime.messages.queue)
-    monkeypatch.setattr(pool, "request", original)
     assert runtime.request_exit().result(5) is True
-    assert runtime._plan.files[0].final_path.is_file()
+    assert runtime._closed and runtime.phase == SessionPhase.FAILED
+    assert not runtime._plan.files[0].final_path.exists() and not runtime._plan.files[0].temp_path.exists()
 
 
 def test_pool_shutdown_failure_reports_exit_not_ready_instead_of_hanging_ui(real, monkeypatch):

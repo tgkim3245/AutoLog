@@ -8,7 +8,7 @@ from math import cos, pi, sin
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPainterPath, QPixmap
+from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
-    QMenu,
     QPushButton,
     QScrollArea,
     QStyle,
@@ -397,26 +396,9 @@ class MainWindow(QMainWindow):
         self.recovery_dialog = RecoveryDialog(self)
         self.recovery_dialog.requested.connect(self.recovery_requested)
         self.tray: QSystemTrayIcon | None = None
-        if QSystemTrayIcon.isSystemTrayAvailable():
-            self.tray = QSystemTrayIcon(self.windowIcon(), self)
-            self.tray_menu = QMenu(self)
-            self.show_action = QAction(self)
-            self.show_action.triggered.connect(self._restore)
-            self.exit_action = QAction(self)
-            self.exit_action.triggered.connect(self.exit_requested)
-            self.tray_menu.addAction(self.show_action)
-            self.tray_menu.addSeparator()
-            self.tray_menu.addAction(self.exit_action)
-            self.tray.setContextMenu(self.tray_menu)
-            self.tray.activated.connect(self._tray_activated)
-            self.tray.show()
         self.set_settings(self._settings)
         self.set_phase(SessionPhase.IDLE)
         self.set_debug_status()
-
-    def _tray_activated(self, reason):
-        if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
-            self._restore()
 
     def _restore(self):
         self.showNormal()
@@ -484,10 +466,6 @@ class MainWindow(QMainWindow):
         self.file_manager.set_language(language)
         self.recovery_dialog.set_language(language)
         self.set_recovery(self._recovery_report)
-        if self.tray:
-            self.show_action.setText(tr("show", language))
-            self.exit_action.setText(tr("exit", language))
-            self.tray.setToolTip(self.windowTitle())
         self._render_files()
         self._render_events()
         self._render_debug()

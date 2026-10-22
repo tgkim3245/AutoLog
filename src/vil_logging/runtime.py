@@ -33,6 +33,7 @@ from vil_logging.diagnostics.capture_quality import LOW_SPACE_BYTES, SPACE_RECOV
 from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.blf_snapshot import cleanup_finalization_files, cleanup_retained_source
 from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
+from vil_logging.storage.discard import discard_interrupted
 from vil_logging.storage.file_access import matches, observe
 from vil_logging.storage.file_service import FileResultStorageError, FileService
 from vil_logging.storage.naming import build_plan, find_collisions, validate_settings
@@ -177,7 +178,7 @@ class Runtime:
         self._file_service = FileService(self._repo)
         self._recovery = RecoveryService(self._repo)
         file_recovery = self._file_service.recover()
-        recovered = self._repo.recover_incomplete()
+        discarded = discard_interrupted(self._repo, reason="previous_run_interrupted")
         self._cleanup_retained_blf_sources()
         from vil_logging.storage.retention import maintain
         retention_notice = None
@@ -199,24 +200,9 @@ class Runtime:
             self._publish("target", snapshot)
         if self.demo:
             self._event("DEMO_NOTICE")
-        if recovered:
-            self._set_phase(SessionPhase.INCOMPLETE)
-            recovered_paths = []
-            for session in recovered:
-                for file in session["files"]:
-                    observed = []
-                    for key in ("temp_path", "final_path"):
-                        try:
-                            if Path(file[key]).exists():
-                                observed.append(file[key])
-                        except OSError:
-                            observed.append(file[key])
-                    recovered_paths.extend(observed or [file["temp_path"]])
-            self._publish("files", (recovered_paths, "incomplete"))
-            self._event("SESSION_INCOMPLETE", level="WARNING", original=str(recovered),
-                        count=len(recovered))
-        else:
-            self._set_phase(SessionPhase.IDLE)
+        self._set_phase(SessionPhase.IDLE)
+        if discarded:
+            self._event("INTERRUPTED_DISCARDED", count=len(discarded), details=discarded)
         if file_recovery:
             self._event("FILE_OPERATIONS_RECOVERED", level="WARNING", results=file_recovery)
         self._refresh_file_history()
@@ -1300,6 +1286,7 @@ class Runtime:
         """Watchdog path: never wait for the coordinator, COM, DB or file checks."""
         plan = self._plan
         notice = {"reason": reason, "time_utc": utc_now(), "phase": self._phase.value,
+                  "policy": "discard_interrupted", "close_dedicated_canoe": True,
                   "session_id": plan.session_id if plan else None,
                   "files": [str(file.temp_path) for file in plan.files] if plan else []}
         try:
@@ -1319,15 +1306,14 @@ class Runtime:
     def _exit(self) -> bool:
         ready = False
         try:
-            if self.phase in {SessionPhase.RECORDING, SessionPhase.PARTIAL} or (
-                self.phase == SessionPhase.INCOMPLETE and not self.demo and self._plan and not self._storage_failed
-            ):
-                self._stop()
-            # Historical recovery records do not belong to this process. Keep
-            # them and their files intact; they block new capture, not app exit.
-            if self.phase in ACTIVE or (self.phase == SessionPhase.INCOMPLETE and self._plan is not None):
-                self._event("SESSION_INCOMPLETE", level="WARNING", original="Orderly cleanup incomplete; forced exit may follow")
-                return False
+            # X ends this run. An unfinished segment is discarded, rather than
+            # published/recovered or made a prerequisite for the next launch.
+            if self._pool:
+                self._pool.force_abort()
+            if self._repo:
+                discard_interrupted(self._repo, reason="user_closed_application")
+            if self.phase in ACTIVE | {SessionPhase.INCOMPLETE}:
+                self._set_phase(SessionPhase.FAILED)
             self._close_owned_resources()
             ready = True
             return True
@@ -1351,8 +1337,8 @@ class Runtime:
             else:
                 if abnormal and self._plan and self.phase in ACTIVE | {SessionPhase.INCOMPLETE}:
                     try:
-                        self._repo.update_session(self._plan.session_id, SessionPhase.INCOMPLETE,
-                                                  abnormal_owned_cleanup=True)
+                        self._repo.update_session(self._plan.session_id, SessionPhase.FAILED,
+                            interrupted_discard={"pending": True, "reason": "abnormal_owned_cleanup"})
                     except Exception:
                         log.exception("capture.abnormal_state_save_failed")
                 self._pool.close(abnormal=abnormal)

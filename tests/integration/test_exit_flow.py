@@ -9,7 +9,7 @@ import pytest
 
 
 @pytest.mark.parametrize("scenario", ["history", "stop_exception", "completed"])
-def test_x_closes_with_old_history_or_after_a_failed_stop_retry(tmp_path, scenario):
+def test_x_closes_without_recovery_and_preserves_completed_outputs(tmp_path, scenario):
     script = r'''
 import sys
 from pathlib import Path
@@ -83,7 +83,7 @@ class ExercisedWindow(ui.MainWindow):
             self.stage = 1
             if scenario == 'history':
                 self.check.stop()
-                assert runtime.phase == SessionPhase.INCOMPLETE
+                assert runtime.phase == SessionPhase.IDLE
                 self.close()
             else:
                 runtime.toggle((Role.ETHERNET,))
@@ -100,12 +100,13 @@ class ExercisedWindow(ui.MainWindow):
 ui.MainWindow = ExercisedWindow
 result = main(['--data-dir', str(root)])
 assert result == 0 and instances[0]._closed, (result, instances[0].phase)
-assert len(warnings) == (1 if scenario == 'stop_exception' else 0)
+assert not warnings
 if scenario == 'stop_exception':
-    assert len(attempts) == 2
-    assert instances[0]._plan.files[0].final_path.is_file()
+    assert not attempts
+    assert not instances[0]._plan.files[0].temp_path.exists()
+    assert not instances[0]._plan.files[0].final_path.exists()
 elif scenario == 'history':
-    assert plan.files[0].temp_path.is_file()
+    assert not plan.files[0].temp_path.exists()
 else:
     assert instances[0].phase == SessionPhase.COMPLETED
     previous = instances[0]._plan.files[0].final_path
@@ -129,10 +130,4 @@ print('X_EXIT_PASSED')
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    if scenario in {"history", "completed"}:
-        assert "X_EXIT_PASSED" in result.stdout
-    else:
-        import json
-        notice = json.loads((tmp_path / "AutoLog_force_exit.json").read_text(encoding="utf-8"))
-        assert notice["reason"] == "cleanup_failed"
-        assert notice["phase"] == "incomplete"
+    assert "X_EXIT_PASSED" in result.stdout

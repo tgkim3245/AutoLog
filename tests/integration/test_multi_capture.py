@@ -51,6 +51,9 @@ class Tools:
     def close(self, **kwargs):
         pass
 
+    def force_abort(self):
+        self.aborted = True
+
     def drain_packets(self):
         return []
 
@@ -199,7 +202,7 @@ def test_retry_stop_keeps_already_published_files_and_inspections(real, retry):
         assert runtime.recover({"action": "retry_stop"}).result(5)["success"]
     else:
         assert runtime.request_exit().result(5)
-    assert runtime.phase == SessionPhase.COMPLETED
+    assert runtime.phase == (SessionPhase.COMPLETED if retry == "recovery" else SessionPhase.FAILED)
     assert all(path.read_bytes() == content for path, content in before.items())
     assert tools.calls.count(((Role.DIAG,), "inspect")) == 1
     assert tools.calls.count(((Role.ETHERNET,), "inspect")) == 1
@@ -207,8 +210,10 @@ def test_retry_stop_keeps_already_published_files_and_inspections(real, retry):
     repo = Repository(runtime.data_dir / "state.sqlite3")
     try:
         session = repo.captures()[0]
-        assert {file["state"] for file in session["files"]} == {"published"}
-        assert set(session["details"]["inspections"]) == {role.value for role in roles}
+        assert {file["state"] for file in session["files"]} == ({"published"} if retry == "recovery"
+                                                               else {"published", "deleted"})
+        assert set(session["details"]["inspections"]) == ({role.value for role in roles} if retry == "recovery"
+                                                         else {"diag", "ethernet"})
         assert repo.load_settings().next_index == 2
     finally:
         repo.close()

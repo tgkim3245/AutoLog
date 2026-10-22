@@ -5,7 +5,7 @@ import threading
 
 
 class ExitGuard:
-    def __init__(self, abort, *, timeout=3.0, abort_timeout=.5, terminate=os._exit):
+    def __init__(self, abort, *, timeout=1.0, abort_timeout=.25, terminate=os._exit):
         self.abort = abort
         self.timeout = timeout
         self.abort_timeout = abort_timeout

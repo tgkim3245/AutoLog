@@ -6,10 +6,10 @@ import time
 from dataclasses import replace
 from uuid import uuid4
 
-from vil_logging.contracts.commands import Command
 from vil_logging.contracts.models import Role
 from vil_logging.workers.canoe_worker import canoe_worker_main
 from vil_logging.workers.ethernet_worker import ethernet_worker_main
+from vil_logging.workers.owned_canoe import OwnedCanoe
 from vil_logging.workers.pool import FakeWorkerPool
 
 log = logging.getLogger(__name__)
@@ -19,6 +19,13 @@ class CaptureWorkerPool(FakeWorkerPool):
     def __init__(self):
         super().__init__()
         self._jobs = {}
+        self._owned_canoe = OwnedCanoe()
+        self._resources_closed = False
+
+    def _log_progress(self, reply):
+        FakeWorkerPool._log_progress(reply)
+        if reply.fields.get("event") == "canoe.independent_instance_created":
+            self._owned_canoe.remember(reply.fields["canoe_pid"])
 
     def request(self, roles, action, session_id, **kwargs):
         results = super().request(roles, action, session_id, **kwargs)
@@ -101,7 +108,7 @@ class CaptureWorkerPool(FakeWorkerPool):
 
     def force_abort(self):
         # The job owns dumpcap/decoder descendants, even if their parent is hung.
-        # CANoe is deliberately outside this job: its user-visible project stays.
+        # Dedicated CANoe windows are tracked separately by verified process handles.
         if os.name == "nt":
             import win32job
             for job in tuple(self._jobs.values()):
@@ -110,54 +117,29 @@ class CaptureWorkerPool(FakeWorkerPool):
                 except Exception:
                     pass
         super().force_abort()
+        if owned := getattr(self, "_owned_canoe", None):
+            owned.terminate()
 
     def close(self, *, abnormal=False):
-        if self._closed:
+        if getattr(self, "_resources_closed", False):
             return
-        if not abnormal and self._processes:
-            observed = self.request(tuple(self._processes), "query", "shutdown-check", timeout=2)
-            for result in observed.values():
-                if not result.success or result.state not in {"idle", "stopped", "ready"}:
-                    raise RuntimeError("Real capture shutdown is unconfirmed; keep the application open")
-            # Validate restoration OR the adapter's strictly verified stopped
-            # owned output before teardown. A pending original filename alone
-            # must not undo release()'s deferred-restoration policy.
-            for role, result in observed.items():
-                if role != Role.ETHERNET and result.details.get("output_restore_pending"):
-                    restored = self.request((role,), "release", result.details["session_id"], timeout=2)[role]
-                    if not restored.success or (restored.details.get("output_restore_pending")
-                                                and not restored.details.get("output_restore_deferred")):
-                        raise RuntimeError("CANoe output restoration is unconfirmed; keep the application open: "
-                                           + restored.evidence)
-            # Consume progress/results while workers exit. Joining first can
-            # strand a CANoe worker writing its diagnostic reply to a full pipe.
-            stopped = self.request(tuple(self._processes), "shutdown", "shutdown", timeout=1)
-            if any(not result.success or result.state != "stopped" for result in stopped.values()):
-                raise RuntimeError("Worker shutdown acknowledgement is unconfirmed")
-            log.info("worker.shutdown_confirmed", extra={"fields": {"roles": [role.value for role in stopped]}})
-        self._closed = True
-        if abnormal:
-            for role, pipe in self._pipes.items():
-                try:
-                    pipe.send(Command("shutdown", role, "shutdown"))
-                except (OSError, EOFError, BrokenPipeError):
-                    pass
+        # X ends this run and its dedicated CANoe windows without waiting for COM.
+        self.force_abort()
         for role, process in self._processes.items():
-            process.join(timeout=1)
-            if process.is_alive() and abnormal:
-                log.error("worker.abnormal_owned_job_cleanup", extra={"worker_pid": process.pid})
+            process.join(timeout=.2)
             if role in self._jobs:
                 self._jobs.pop(role).Close()  # Active descendants only on abnormal app termination.
             if process.is_alive():
-                process.join(timeout=1)
-            if process.is_alive():
-                process.terminate()  # Abnormal teardown, or idle worker after confirmed recorder exit.
-                process.join(timeout=1)
+                process.kill()
+                process.join(timeout=.2)
             self._pipes[role].close()
-            process.close()
+            if not process.is_alive():
+                process.close()
         self._display.close()
         self._packets.cancel_join_thread()
         self._packets.close()
+        self._resources_closed = True
+        log.info("worker.owned_resources_closed")
 
 
 EthernetWorkerPool = CaptureWorkerPool  # Compatibility for previous verification scripts.

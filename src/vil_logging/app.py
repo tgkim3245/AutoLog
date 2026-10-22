@@ -232,7 +232,8 @@ def main(argv: list[str] | None = None) -> int:
             exiting = True
             debug.log("app.exit_requested", phase=runtime.phase.value)
             window.set_exiting(True)
-            window.set_phase(SessionPhase.STOPPING)
+            for widget in app.topLevelWidgets():
+                widget.hide()
             runtime.request_exit()
 
     def open_log_folder():

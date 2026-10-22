@@ -258,7 +258,7 @@ def test_recovery_is_not_limited_to_latest_hundred_captures(recovery):
     assert selected(service, plan)["session_id"] == plan.session_id
 
 
-def test_restart_requires_manual_review_before_new_capture_then_allows_orderly_exit(tmp_path):
+def test_restart_discards_interrupted_work_without_manual_review(tmp_path):
     output = tmp_path / "captures"
     output.mkdir()
     repo = Repository(tmp_path / "state.sqlite3")
@@ -267,39 +267,34 @@ def test_restart_requires_manual_review_before_new_capture_then_allows_orderly_e
     runtime = Runtime(tmp_path)
     try:
         runtime.initialize().result(5)
-        assert runtime.phase == SessionPhase.INCOMPLETE
-        assert runtime.toggle((Role.CAN,)) is None
+        assert runtime.phase == SessionPhase.IDLE
         report = runtime._submit(runtime._refresh_recovery).result(5)
-        row = report["sessions"][0]
-        result = runtime.recover({"action": "finish", "session_id": plan.session_id,
-                                  "token": row["token"], "stopped": True}).result(5)
-        assert result["success"] and runtime.phase == SessionPhase.IDLE
+        assert not report["sessions"]
         assert runtime._settings.next_index == 2
         assert runtime.request_exit().result(5)
-        assert plan.files[0].temp_path.exists()
+        assert not plan.files[0].temp_path.exists()
     finally:
         runtime.close_for_test()
 
 
-def test_old_incomplete_record_does_not_trap_exit_and_remains_recoverable(tmp_path):
+def test_deleted_work_and_repeated_restart_do_not_block_new_capture(tmp_path):
     output = tmp_path / "captures"
     output.mkdir()
     repo = Repository(tmp_path / "state.sqlite3")
     plan = seed(repo, output)
-    before = plan.files[0].temp_path.read_bytes()
+    plan.files[0].temp_path.unlink()
     repo.close()
     for _ in range(2):
         runtime = Runtime(tmp_path)
         try:
             runtime.initialize().result(5)
-            assert runtime.phase == SessionPhase.INCOMPLETE and runtime._plan is None
-            assert runtime.toggle((Role.CAN,)) is None
+            assert runtime.phase == SessionPhase.IDLE and runtime._plan is None
             report = runtime._submit(runtime._refresh_recovery).result(5)
-            assert report["sessions"][0]["session_id"] == plan.session_id
+            assert not report["sessions"]
             assert runtime._settings.next_index == 2
             assert runtime.request_exit().result(5) is True
             assert runtime._closed
-            assert plan.files[0].temp_path.read_bytes() == before
+            assert not plan.files[0].temp_path.exists()
         finally:
             runtime.close_for_test()
 
