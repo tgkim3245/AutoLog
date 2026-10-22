@@ -3,9 +3,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from PySide6.QtCore import QRect
+from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QFont, QFontDatabase
-from PySide6.QtWidgets import QApplication, QDialog, QPushButton, QSystemTrayIcon, QVBoxLayout
+from PySide6.QtWidgets import QDialog, QPushButton, QSystemTrayIcon, QVBoxLayout
 
 from vil_logging.contracts.models import AppEvent, Role
 from vil_logging.diagnostics.canoe_hardware import inspect_hardware, parse_baseline
@@ -132,7 +132,7 @@ def test_readiness_has_specific_stage_and_three_languages(change, stage):
     assert all(stage_text(stage, language) for language in ("ko", "en", "zh"))
 
 
-def test_activity_filter_copies_original_and_keeps_500_rows(qtbot, monkeypatch):
+def test_activity_filter_preserves_details_and_500_rows_without_copy_or_count(qtbot, monkeypatch):
     monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", lambda: False)
     window = MainWindow()
     qtbot.addWidget(window)
@@ -142,10 +142,9 @@ def test_activity_filter_copies_original_and_keeps_500_rows(qtbot, monkeypatch):
         window.add_event(AppEvent("INFO", params={"index": index}))
     window.add_event(AppEvent("TEST_ERROR", "ERROR", original="original traceback", params={"code": "0x123"}))
     assert len(window._events) == 500 and window.event_list.count() == 1
-    window.event_list.setCurrentRow(0)
-    window.event_copy.click()
-    assert "original traceback" in QApplication.clipboard().text()
-    assert "0x123" in QApplication.clipboard().text()
+    assert "original traceback" in window.event_list.item(0).toolTip()
+    assert window.event_list.item(0).data(Qt.ItemDataRole.UserRole).params["code"] == "0x123"
+    assert not hasattr(window, "event_copy") and not hasattr(window, "event_count")
     window.set_language("zh")
     assert window.event_list.count() == 1
     window.event_filter.setCurrentIndex(0)

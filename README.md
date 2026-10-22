@@ -4,7 +4,7 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 
 배포받은 사용자는 EXE 옆 **START_HERE.txt**와 **One Click Log_User_Guide.html**을 먼저 읽으세요. Defender의 `CAPLcompExec.exe`·`CANoe64.exe` 허용 앱 등록과 최초 연결·기록·복구 절차를 안내합니다. [공식 사용자 가이드 관리 원본·변경 이력](user_guide/README.md)은 소프트웨어 변경과 함께 갱신하며 빌드/ZIP에 자동 포함합니다.
 
-현재 소스 버전은 **0.9.15**입니다. [CAN·Diag 중단 팝업과 감지 범위](docs/canoe_failure_alerts_0_9_15.md)를 반영했습니다. [설정·유효성검사 팝업·이름/아이콘 변경](docs/ui_validation_0_9_14.md)과 [단절·수신 감시·메인 화면·CANoe 종료 수정](docs/capture_safety_0_9_13.md)을 유지합니다. [Wireshark CLI 동봉 배포](docs/bundled_tshark_0_9_12.md)로 TShark·dumpcap·capinfos와 필요한 DLL·프로토콜 자료를 ZIP 안에 넣고 기본 도구로 사용합니다. Wireshark 별도 설치는 필요 없으며 Npcap 드라이버는 별도로 설치합니다. 기존 [X 완전 종료·중단 구간 폐기](docs/shutdown_policy_0_9_11.md) 정책은 유지합니다.
+현재 소스 버전은 **0.9.16**입니다. [메인 파일/최근 활동 배치](docs/main_layout_0_9_16.md)를 반영했습니다. [CAN·Diag 중단 팝업과 감지 범위](docs/canoe_failure_alerts_0_9_15.md), [설정·유효성검사 팝업·이름/아이콘 변경](docs/ui_validation_0_9_14.md), [단절·수신 감시·메인 화면·CANoe 종료 수정](docs/capture_safety_0_9_13.md)을 유지합니다. [Wireshark CLI 동봉 배포](docs/bundled_tshark_0_9_12.md)로 TShark·dumpcap·capinfos와 필요한 DLL·프로토콜 자료를 ZIP 안에 넣고 기본 도구로 사용합니다. Wireshark 별도 설치는 필요 없으며 Npcap 드라이버는 별도로 설치합니다. 기존 [X 완전 종료·중단 구간 폐기](docs/shutdown_policy_0_9_11.md) 정책은 유지합니다.
 
 CAN과 Diag의 **연결 확인**은 서로 다른 cfg를 별도 CANoe 창에 연결합니다. 조회 가능한 로컬 Vector 장치의 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교하며, 실제 차량 수신 성공과 구분합니다. [Diag 반복 시작 수정](docs/canoe_fixes_0_9_9.md), [BLF 마지막 버퍼 완성](docs/canoe_fixes_0_9_8.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md), [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
@@ -12,7 +12,7 @@ CAN과 Diag의 **연결 확인**은 서로 다른 cfg를 별도 CANoe 창에 연
 
 기본 선택은 **CAN·Zipy**입니다. `한 | EN | 中` 버튼은 클릭할 때마다 표시 언어를 바꾸고 기억합니다. Ethernet은 동봉된 도구를 기본으로 사용하며 다른 설치본만 직접 지정합니다. 네트워크 목록 오른쪽 그래프는 해당 어댑터 전체의 초당 수신 패킷 수입니다. **로그 폴더**는 사용자가 지정한 캡처 저장 폴더를 엽니다.
 
-dumpcap이 원본 파일을 직접 기록하고 TShark는 저장 중인 파일을 읽어 화면·감시용 정보를 만듭니다. 해석이 중단되면 감시는 확인 불가로 표시하며 원본 기록은 유지합니다. 메인 창은 화면 높이에 맞춰 스크롤할 수 있고 최근 활동은 전체/경고·오류/오류로 걸러 선택한 항목의 상세를 복사할 수 있습니다.
+dumpcap이 원본 파일을 직접 기록하고 TShark는 저장 중인 파일을 읽어 화면·감시용 정보를 만듭니다. 해석이 중단되면 감시는 확인 불가로 표시하며 원본 기록은 유지합니다. 메인 창은 화면 높이에 맞춰 스크롤할 수 있습니다. 최근 활동은 약 4~5줄 높이로 고정하고 최근 500건을 스크롤/필터로 확인합니다. 항목의 원문·상세는 마우스를 올려 확인하며 복사 버튼과 건수 표시는 제거했습니다.
 
 **통신 감시 → 감시 기준**에서 Zipy의 목적지·프로토콜·기대 출처와 시간/복귀 기준을 직접 저장하면 다음 기록부터 감시합니다. 기준값은 기본으로 비어 있으며, 미수신·다른 출처·복귀·관측 지연을 구분합니다. 패킷 표시 필터·일시 정지·화면 큐 누락과 감시는 독립적이며, 경고로 기록을 자동 정지하지 않습니다. CAN·Diag의 실제 수신 감시는 현재 미지원입니다.
 

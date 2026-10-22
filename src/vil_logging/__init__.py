@@ -1,6 +1,6 @@
 """One Click Log capture control panel."""
 
-__version__ = "0.9.15"
+__version__ = "0.9.16"
 APP_NAME = "One Click Log"
 APP_ID = "OneClickLog"
 FILE_PREFIX = "One_Click_Log"

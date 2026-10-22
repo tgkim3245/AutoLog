@@ -74,13 +74,15 @@ def test_main_file_controls_are_adjacent_and_redundant_features_are_removed(qtbo
     for width in (480, 360):
         window.resize(width, 760)
         qtbot.wait(20)
-        assert window.file_manager_button.y() == window.delete_button.y()
+        assert (window.file_heading.geometry().center().y() == window.file_manager_button.geometry().center().y()
+                == window.delete_button.geometry().center().y())
         assert window.file_manager_button.x() < window.delete_button.x()
         folder_position = window.debug_folder_button.mapTo(window, QPoint(0, 0))
         history_position = window.file_manager_button.mapTo(window, QPoint(0, 0))
         assert folder_position.y() < history_position.y()
         assert window.debug_folder_button.geometry().center().y() == window.selection_count.geometry().center().y()
         assert window.main_scroll.horizontalScrollBar().maximum() == 0
+        assert window.event_list.height() == 120
     assert not any(hasattr(window, attr) for attr in ("quality_button", "monitor_button", "phase_label", "footer"))
     assert window.file_feedback.isHidden()
     assert not window.windowIcon().isNull()

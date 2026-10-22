@@ -1,6 +1,5 @@
 """Compact control panel with request-only signals to application services."""
 
-import json
 import logging
 from collections import deque
 from dataclasses import replace
@@ -10,7 +9,6 @@ from pathlib import Path
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (
-    QApplication,
     QCheckBox,
     QComboBox,
     QFrame,
@@ -161,7 +159,7 @@ class MainWindow(QMainWindow):
         self._preparation_reports: dict = {}
         self._discovery_report: dict = {}
         self.setObjectName("mainWindow")
-        self.resize(480, 760)
+        self.resize(480, 660)
         self.setMinimumWidth(360)
         apply_theme(self)
         self.setStyleSheet(STYLE + MAIN_STYLE)
@@ -278,21 +276,18 @@ class MainWindow(QMainWindow):
         self.file_heading = _label(variant="section")
         self.file_heading.setWordWrap(True)
         file_top.addWidget(self.file_heading, 1)
-        file_actions = QHBoxLayout()
         self.file_manager_button = QPushButton()
         self.file_manager_button.setProperty("compact", True)
         self.file_manager_button.clicked.connect(self._show_file_manager)
-        file_actions.addWidget(self.file_manager_button)
-        file_actions.insertStretch(0)
+        file_top.addWidget(self.file_manager_button)
         self.delete_button = QPushButton()
         self.delete_button.setObjectName("deletePreviousButton")
         self.delete_button.setProperty("variant", "ghost")
         self.delete_button.setProperty("compact", True)
         self.delete_button.setEnabled(False)
         self.delete_button.clicked.connect(self._delete_previous)
-        file_actions.addWidget(self.delete_button)
+        file_top.addWidget(self.delete_button)
         file_layout.addLayout(file_top)
-        file_layout.addLayout(file_actions)
         self.file_names = QLabel()
         self.file_names.setObjectName("captureFilenames")
         self.file_names.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -320,7 +315,6 @@ class MainWindow(QMainWindow):
         outer.addWidget(file_frame)
         event_row = QHBoxLayout()
         self.event_heading = _label(variant="section")
-        self.event_count = _label(variant="helper")
         event_row.addWidget(self.event_heading, 1)
         self.event_filter = QComboBox()
         self.event_filter.setObjectName("eventFilter")
@@ -328,21 +322,12 @@ class MainWindow(QMainWindow):
             self.event_filter.addItem("", key)
         self.event_filter.currentIndexChanged.connect(self._render_events)
         event_row.addWidget(self.event_filter)
-        self.event_copy = QPushButton()
-        self.event_copy.setObjectName("copyEventButton")
-        self.event_copy.setProperty("compact", True)
-        self.event_copy.setEnabled(False)
-        self.event_copy.clicked.connect(self._copy_event)
-        event_row.addWidget(self.event_copy)
-        event_row.addWidget(self.event_count)
         outer.addLayout(event_row)
         self.event_list = QListWidget()
         self.event_list.setObjectName("eventList")
         self.event_list.setWordWrap(True)
-        self.event_list.setMinimumHeight(108)
+        self.event_list.setFixedHeight(120)
         self.event_list.setAccessibleName("Notifications and capture events")
-        self.event_list.itemSelectionChanged.connect(
-            lambda: self.event_copy.setEnabled(bool(self.event_list.selectedItems())))
         self.event_empty = _label(variant="helper")
         self.event_empty.setParent(self.event_list.viewport())
         self.event_empty.setGeometry(8, 31, 410, 24)
@@ -353,6 +338,7 @@ class MainWindow(QMainWindow):
         self.debug_status.setObjectName("debugStatusLabel")
         self.debug_status.setWordWrap(True)
         outer.addWidget(self.debug_status)
+        outer.addStretch(1)
         self.settings_dialog = SettingsDialog(self)
         self.settings_dialog.settings_applied.connect(self.settings_applied)
         if hasattr(self.settings_dialog, "preferences_changed"):
@@ -456,8 +442,6 @@ class MainWindow(QMainWindow):
         self.event_heading.setText(tr("events", language))
         for index, key in enumerate(("all", "warning", "error")):
             self.event_filter.setItemText(index, tr("events_" + key, language))
-        self.event_copy.setText(tr("copy", language))
-        self.event_copy.setToolTip(tr("event_copy", language))
         self.event_empty.setText(tr("events_empty", language))
         self.target_heading.setText(tr("capture_targets", language))
         self.bug_report_button.setText(tr("bug_report", language))
@@ -769,7 +753,7 @@ class MainWindow(QMainWindow):
         if self._event_visible(event):
             self._append_event_item(event)
         self.event_list.scrollToBottom()
-        self._event_counter()
+        self._update_event_empty()
         if event.code == "SETTINGS_ERROR":
             self.settings_dialog.set_error(render_event(event, self._language))
             self.settings_dialog.validation_panel.set_error(render_event(event, self._language, include_details=False))
@@ -793,27 +777,15 @@ class MainWindow(QMainWindow):
                 self._append_event_item(event)
         if self.event_list.count():
             self.event_list.scrollToBottom()
-        self._event_counter()
+        self._update_event_empty()
 
     def _event_visible(self, event):
         mode = self.event_filter.currentData()
         return mode == "all" or event.level.upper() in (
             {"WARNING", "ERROR", "CRITICAL"} if mode == "warning" else {"ERROR", "CRITICAL"})
 
-    def _event_counter(self):
-        self.event_count.setText(f"{self.event_list.count()} / {len(self._events)} / 500"
-                                if self.event_filter.currentData() != "all" else
-                                tr("event_count", self._language).format(count=len(self._events)))
+    def _update_event_empty(self):
         self.event_empty.setVisible(not self.event_list.count())
-
-    def _copy_event(self):
-        items = self.event_list.selectedItems()
-        if items:
-            event = items[0].data(Qt.ItemDataRole.UserRole)
-            QApplication.clipboard().setText(
-                f"{event.timestamp}\n{event.level} {event.target} {event.code}\n"
-                f"{render_event(event, self._language)}\n{event.original}\n"
-                + json.dumps(event.params, ensure_ascii=False, indent=2, default=str))
 
     def set_debug_status(self, path: str = "", error: str = ""):
         self._debug_path = path
