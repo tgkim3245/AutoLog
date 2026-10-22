@@ -25,3 +25,14 @@ AutoLog/dumpcap/TShark가 실행 중이지 않은 것을 확인하고 SQLite를 
 폴더가 남음/없음·잠김 재시도·잘못된 경로·이미 보관된 부분 결과와 외부 파일 보호, 재실행 대기·번호 유지, 실제 Qt X/중단 폐기/완료 보존, 초기화·진단 정체 중 프로세스 종료를 검사한다. 실제 Windows 테스트 프로세스 핸들 종료와 무관한 프로세스 유지, 비-CANoe 프로세스 등록 거부를 검사한다. 1,000건 패킷 창 반복 표시/닫기와 메인 X도 검사한다. 실제 CANoe 창의 종료/장비 재연결과 차량 고부하·장시간 검증은 새 버전 현장 재시험으로 남아 있다.
 
 전체 자동 검사 584개(56.23초), Ruff·의존성·diff·문서 링크 290개를 통과했다. 공식 가이드 개정 2026-10-22.3의 12개 PC/작은 폭 뷰포트에서 내용과 배치를 확인했다. 렌더링 근거는 로컬 빌드 저장소 `user-guide-2026-10-22.3/visual-qa/`에 보관한다.
+
+## 배포 검증
+
+깨끗한 소스 `bce968c4ae70d43e7b66fa23fff89608b878a353`으로 `AutoLog-0.9.11_20261022_132118`을 빌드했다. ZIP CRC·EXE 제품/파일 버전과 해시를 대조했다. Python이 PATH에 없는 환경에서 압축 해제한 EXE의 중국어 설정 복원·실제 메인 버튼 모의 시작/정지/완료/X·읽기 전용 NIC 조회를 통과했으며 첫 smoke의 개발자로그 104건에 ERROR/CRITICAL은 없었다.
+
+배포 EXE에서 추출한 `vil_logging` 코드를 개발 Python에서 실행한 142개 검사도 통과했다. 소유 프로세스 핸들·중단 이력 폐기·표 모델·BLF 보관/외부 변경 보호를 포함하며 실제 CANoe 장비 기록 성공을 의미하지 않는다. 실제 EXE에 별도 시험용 DB를 주입해 이전 임시 파일이 있는 경우와 폴더 자체가 없는 경우 모두 폐기 후 새 모의 기록/정상 X를 완료하고 다음 번호가 증가하는 것을 확인했다. 원래 사용자 DB나 cfg를 이 시험에 사용하지 않았다.
+
+- ZIP SHA256: `e4d8cae0f3365a3cca7c44fbfddc8d06c3a9d99b178fd22a2109fe037a53ea17`
+- EXE SHA256: `bac95a0430940d692c3e6d880249d3cbed1cce9e7259b966faadfbbb64dc2de0`
+- 공식 HTML 30,072바이트·START_HERE 5,405바이트의 개정/해시는 미리보기·패키지·ZIP·압축 해제본이 같았다.
+- 로컬 빌드 폴더의 `verification/result.json`, `verification/capture_button_result.json`, `verification/interrupted_restart_result.json`, `frozen-core/result.json`, `documentation_verification.json`에 근거를 보관한다. 소스와 기술 요약만 Git으로 관리한다.
