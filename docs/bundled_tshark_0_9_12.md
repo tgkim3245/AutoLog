@@ -24,3 +24,22 @@
 기본 도구 탐색·명시 경로 유지·폴더 이동·UI 표시/저장 분리·이전 관리 경로 전환·캐시 해시/다운로드 실패·DLL 실행 실패를 검사한다. 실제 빌드 ZIP의 도구/소스/manifest를 대조하고 압축 해제 EXE의 기본 도구·이동·모의 동작과 localhost 원본 캡처를 확인한다. 새 PC 전체 환경 및 실제 차량에서 새 배포본의 CAN/Diag/Zipy 동시 취득은 별도 현장 범위다.
 
 전체 자동 검사 596개(52.68초), Ruff·의존성·diff·문서 링크 293개를 통과했다. 공식 가이드 개정 2026-10-22.5의 12개 뷰포트에서 가로 넘침/미치환이 없었고 수정된 준비·문제 해결 안내의 실제 렌더링을 검토했다. runtime DB를 사용하는 이전 관리 도구→동봉 도구 전환에서도 NIC·저장 규칙·인덱스 유지 검사를 통과했다.
+
+## 최종 배포 검증
+
+설정 API에 동봉 도구 절대 경로를 직접 전달해도 빈 기본값으로 정규화하도록 공통 처리까지 보강했다. 그 뒤 전체 자동 검사 596개를 53.52초에 통과했다. 깨끗한 소스 `7b82666e5d7c25cd0855fd42a52cc820fc1d4ca1`에서 `AutoLog-0.9.12_20261022_162422`을 빌드했다.
+
+- ZIP 267,756,615바이트. CRC·EXE 파일/제품 버전·해시를 대조했다. runtime/resource 861개(144,471,541바이트)와 source archive 39개(174,406,946바이트)를 ZIP과 압축 해제본에서 각각 크기/SHA256으로 검증했다. 소스 아카이브는 이미 압축돼 있어 ZIP에서 재압축하지 않는다. 드라이버·Wireshark GUI가 없는 것도 검사했다.
+- PATH에서 Python/외부 도구 경로를 제외한 압축 해제 EXE의 모의 버튼 시작→정지→완료→X, 중국어 설정과 NIC 목록을 확인했다. 새 프로필의 `tshark_path`는 빈 값으로 유지되며 실제 실행 도구는 동봉본이었다. 첫 smoke 개발자로그 100건에 ERROR/CRITICAL이 없었다.
+- 같은 ZIP의 EXE를 사용해 PCAP/PCAPNG 각각 0패킷·5패킷·재기록의 여섯 구간을 기록·정지·검사·보관했다. 생성한 localhost UDP의 원본 수와 화면 수가 일치했고, 설정이 빈 도구 기본값인 상태로 취득한 것을 DB에서 확인했다. BPF로 새로 생성한 localhost UDP 포트만 취득했으며 물리 NIC는 열지 않았다. 별도 offline ARP fixture도 해석했다.
+- 압축 해제한 배포 디렉터리를 검증 폴더 안에서 실제 이동해 같은 프로필로 다시 실행했다. 변경된 실행 위치의 도구를 사용하고 빈 도구 설정을 유지했다. 별도의 이전 관리 경로 프로필도 실제 EXE에서 빈 기본값으로 전환했다. 기존 사용자 프로필이나 실행 중인 프로그램을 이 검증에 사용하지 않았다.
+- 같은 EXE의 PYZ에서 추출한 `vil_logging` 코드를 개발 Python에서 실행한 154개 검사를 통과했다. 전체 새 PC 설치·차량/라이선스 CANoe 동시 시험을 의미하지 않는다.
+- 가이드 개정 2026-10-22.5의 HTML 31,452바이트·START_HERE 6,257바이트는 미리보기/패키지/ZIP/압축 해제본의 내용·해시가 같았다. 최종 14개 가이드 뷰포트의 가로 넘침/치환 검사를 통과하고 변경된 준비·Ethernet·문제 해결·범위 안내를 렌더링 검토했다. 한·영·중 설정 화면도 Windows 글꼴을 등록한 offscreen 렌더링으로 확인했다.
+
+해시:
+
+- ZIP SHA256: `6de7b12da39b5c9b822d2c00f2f238c0f85b330c1eb0ff862f6959cddffc9801`
+- EXE SHA256: `5fd1ee463eec2c96577a0c9dc1039fa29aca7f47f91c5aecbcfa6ab13fd7e6f9`
+- 도구 manifest SHA256: `c5d3979488748e81abaf6386e2d23e71e625f552b174fc2b550e6f6711566a4d`
+
+로컬 빌드 폴더의 `verification/result.json`, `verification/bundled_tools_result.json`, `verification/localhost/result.json`, `verification/capture_button_result.json`, `frozen-core/result.json`, `documentation_verification.json`, `verification/ui/`와 가이드 미리보기 `user-guide-2026-10-22.5/visual-qa/`에 근거를 보관한다. 실제 캡처·진단 로그·개인 경로는 Git에 보관하지 않는다.
