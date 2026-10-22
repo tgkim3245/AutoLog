@@ -26,3 +26,10 @@ ZIP CRC, manifest 크기·해시가 일치했다. JSONL 1,078건 / 1,392,774바�
 실제 0.9.9 CANoe 반복 기록은 이 작업에서 수행하지 않았다. 같은 Diag cfg로 측정을 유지한 채 3회 이상 기록→정지→보관→다음 시작을 시험한다. 복구 보류 안내가 있더라도 매번 최종 BLF·프레임·번호를 확인하고, 외부 출력 변경이 없다면 다음 시작이 복구 오류로 막히지 않아야 한다. 고부하·장시간·차량 무손실 검증은 별도다.
 
 전체 자동 검사 567개(57.33초), Ruff·의존성·diff와 문서 로컬 링크 280개를 통과했다. 마지막 내부 파일이 있는 경우와 Stop만으로 닫히는 경우 모두 새 출력 setter 실패 뒤 이전 idle 소유/원래 snapshot 유지와 다음 시작을 확인했다. 공식 가이드 2026-10-22.1을 PC/작은 폭 10개 뷰포트로 소프트웨어 렌더링하고 복구 보류·문제 해결·확인 범위의 내용과 배치를 확인했다.
+
+## 배포 검증
+
+- 깨끗한 소스 `37bbaa3f9f088638b9c995797c995c1305573846`으로 `AutoLog-0.9.9_20261022_100847`을 빌드했다. ZIP 52,979,284바이트·SHA256 `fa4e49dcede9ec43b677101c80d65f24ca9a9506f99088efc8cfb7eea0cc6142`, EXE SHA256 `a9044cd157864fa10b9cd9bd829061b393acbe97e12dc242913c71297469ed03`다.
+- ZIP CRC/해시·Windows 제품/파일 버전, 압축 해제 EXE의 중국어 모의 시작/정지·완료 버튼·X 종료·읽기 전용 NIC 조회를 확인했다. 개발 Python 없는 PATH에서 실행했고 개발자로그 101건에 ERROR/CRITICAL이 없었다.
+- 같은 EXE의 추출 PYZ에 포함된 CAN·Runtime·파일 마무리/정리·복구 코드를 개발 Python에서 실행해 대역 110개를 통과했다. Diag 원래 출력 거부와 세 대상 반복 검사가 포함된다. 실제 CANoe 측정 시험으로 간주하지 않는다.
+- HTML 28,815바이트·START_HERE 4,870바이트의 미리보기·ZIP·EXE 폴더·압축 해제본과 build_info의 문서 개정/해시가 일치한다. 로컬 빌드 폴더의 `verification/result.json`, `verification/capture_button_result.json`, `frozen-core/result.json`, `documentation_verification.json`에 근거를 남겼다.
