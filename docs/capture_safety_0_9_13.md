@@ -25,4 +25,17 @@
 
 실제 VN 및 물리 Ethernet 케이블 분리와 실제 CANoe 종료는 현장 재시험이 필요하다. 모의 성공을 실제 차량 시험 성공으로 표시하지 않는다.
 
+## 최종 배포본 확인
+
+- 빌드: `AutoLog-0.9.13_20261022_211321`, 소스 `a58897873af95842a61e09657dd1a0fd95f953c5` (clean).
+- ZIP 267,774,262 bytes. SHA256 `37856d04efbee2387c6b1249244ca6910784179c6351ff4fc0ccefe7528db8a0`.
+- EXE SHA256 `6736c8afc2488bcb8fb0adb1f861b2c76286e864c2ceaff5dec99eb3d8c6d13f`.
+- ZIP CRC/안전 압축 해제/EXE 버전·해시/중국어 설정 복원/실제 NIC 목록 조회/버튼 시작·정지·X 검사 통과. 100개 진단 기록에서 ERROR/CRITICAL 없음.
+- ZIP에서 꺼낸 EXE의 PYZ 코드를 개발 Python에서 실행한 핵심 검사 227개 통과(11.25초). `win32timezone` 포함과 삭제한 패킷 창 모듈 미포함 확인. 테스트 전용 native 자식 프로세스와 모의 CANoe 객체를 사용했으며 실제 CANoe 창 종료 검증과 구분한다.
+- 실제 EXE의 localhost PCAP/PCAPNG 0·5·재시도 5패킷 총 6개 경우 통과. 통신 기준 시험은 시작 미수신 정지 → 정상 재취득 → 기록 중 수신 중단 정지 → 출처 위반 정지를 수행하고 4개 파일 총 1,211패킷과 실패 원인 이력을 확인했다.
+- 생성 localhost UDP 1,500pps × 5초, 7,500개 번호/내용 검사 통과. 생성 데이터에서 누락·중복·손상·다른 패킷 없음. 차량 NIC 처리량 보장은 아니다.
+- 동봉 TShark와 최종 PYZ 감시 엔진으로 생성한 비IP Ethernet 프레임 4,400개를 해석했다. `02:00:00` 출처 1,400개·200pps 정상, 다른 출처 허용, 해당 출처 중단 시 위반 근거 유지 확인. 패킷 시계를 재현한 오프라인 검사이며 실제 NIC를 열지 않았다.
+- 실제 source UI/localhost 시험에서 8패킷 보관, 이름 변경, 읽기 전용 작업 이력, 삭제 취소/확인과 다음 번호 유지, 종료를 확인했다. 메인 3개 언어·480/360px 배치 검사 통과.
+- 사용자 가이드 `2026-10-22.6` HTML·START_HERE가 미리보기/배포 폴더/ZIP/압축 해제본에서 바이트와 해시까지 일치. 갱신한 가이드는 데스크톱·모바일 14개 화면에서 확인했다.
+
 Windows API 근거: [MIB_IF_ROW2](https://learn.microsoft.com/en-us/windows/win32/api/netioapi/ns-netioapi-mib_if_row2), [TerminateProcess](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess). 종료 요청은 비동기이며 완료 대기는 별도 API다.
