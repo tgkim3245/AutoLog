@@ -100,6 +100,8 @@ def test_runtime_upgrade_keeps_recording_settings_while_switching_managed_tool(m
         assert runtime._settings.nic_id == "remembered-interface"
         assert (runtime._settings.prefix, runtime._settings.next_index, runtime._settings.output_dir) == (
             before.prefix, before.next_index, before.output_dir)
+        runtime.save_preferences({"tshark_path": str(tool)}).result(5)
+        assert runtime._settings.tshark_path == ""  # Non-UI callers also keep the bundled default portable.
         assert runtime.request_exit().result(5)
     finally:
         runtime.close_for_test()

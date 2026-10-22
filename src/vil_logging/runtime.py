@@ -365,6 +365,9 @@ class Runtime:
             self._event("SETTINGS_ERROR", level="WARNING", original="기록 처리 중에는 설정을 바꿀 수 없습니다.")
             return
         try:
+            if isinstance(patch.get("tshark_path"), str):
+                from vil_logging.diagnostics.capture_tools import stored_tshark_path
+                patch = {**patch, "tshark_path": stored_tshark_path(patch["tshark_path"])}
             previous = self._settings
             self._settings = self._repo.save_preferences(patch)
             self._publish("settings", self._settings)
