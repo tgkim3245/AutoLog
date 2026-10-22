@@ -67,7 +67,11 @@ AutoLog-0.4.5_20261018_153000/
 └─ build.log
 ```
 
-폴더명 뒤 날짜·시각은 같은 버전의 재빌드를 구분합니다. 기존 결과는 덮어쓰지 않습니다. EXE와 `_internal/`을 포함한 `AutoLog/` 전체 또는 생성한 ZIP을 배포합니다. `build_info.json`에는 SW 버전, 빌드 시각, Git 커밋·미커밋 변경 여부와 해시를 기록합니다. 오류 원문은 해당 폴더의 `build.log`에서 확인합니다.
+폴더명 뒤 날짜·시각은 같은 버전의 재빌드를 구분합니다. 기존 결과는 덮어쓰지 않습니다. EXE와 `_internal/`·`tools/`·`licenses/`·`third_party_sources/`를 포함한 `AutoLog/` 전체 또는 생성한 ZIP을 배포합니다. `build_info.json`에는 SW 버전, 빌드 시각, Git 커밋·미커밋 변경 여부와 해시를 기록합니다. 오류 원문은 해당 폴더의 `build.log`에서 확인합니다.
+
+0.9.12부터 Wireshark CLI 도구를 빌드에 동봉합니다. 첫 빌드는 `packaging/wireshark.lock.json`의 HTTPS 주소에서 고정 버전의 공식 MSI·소스 아카이브·vendor build recipe를 내려받습니다. 이후에는 산출물 루트의 `tool-cache/`에서 크기/SHA256이 일치하는 파일을 재사용해 오프라인 빌드할 수 있습니다. 캐시 파일이 변했거나 다운로드가 불완전하면 빌드를 실패 처리합니다. 버전 업데이트 시 공식 서명 해시 목록과 소스/의존성을 검토해 lock을 갱신합니다. 외부 바이너리를 Git에 커밋하거나 시스템의 사용자 Wireshark 폴더를 그대로 복사하지 않습니다.
+
+`packaging/wireshark_bundle.py`는 검증한 MSI를 작업 폴더에 관리 추출하고 CLI 3개·필요한 DLL·stock plugin·프로토콜 자료를 선별합니다. Wireshark GUI와 Npcap/USBPcap 설치기·드라이버는 제외합니다. 제한된 PATH로 세 도구의 버전 실행을 확인하고 라이선스/소스와 `bundle_manifest.json`을 패키지에 넣습니다. 이 추출은 제품 설치나 드라이버 설치를 하지 않습니다. 라이브 캡처에는 해당 PC의 Npcap이 별도로 필요합니다.
 
 프로젝트가 사용자 `Documents` 안에 있으면 보호 폴더 쓰기를 시도하지 않고 `%USERPROFILE%\Downloads\AutoLog_Builds\` 아래에 저장합니다. 그 외에는 프로젝트 `outputs/`를 사용하며, 폴더 쓰기 보호가 확인되면 다운로드 위치를 사용합니다. 이 PC에서 확인된 제어된 폴더 액세스 차단도 이 방식으로 처리하며 보안 설정은 변경하지 않습니다. 실제 결과 경로는 실행 화면과 빌드 로그에 표시합니다. 위치를 직접 정하려면 `build.cmd --output-root "D:\AutoLog_Builds"`를 사용합니다.
 

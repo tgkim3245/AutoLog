@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from vil_logging.diagnostics.capture_tools import tshark_candidates
 from vil_logging.diagnostics.environment import (
     _discover_npcap,
     _text,
@@ -156,7 +157,7 @@ def _windows_interfaces() -> tuple[list[dict[str, Any]], str]:
 
 def _find_tshark(tshark_path: str) -> dict[str, Any]:
     specified = tshark_path.strip()
-    candidates = [Path(specified)] if specified else []
+    candidates = tshark_candidates(specified)
     attempted = []
     for candidate in dict.fromkeys(candidates):
         try:
@@ -175,7 +176,7 @@ def _find_tshark(tshark_path: str) -> dict[str, Any]:
                 "message_ko": "TShark를 찾았습니다. 아래에서 사용할 연결을 선택하세요.",
                 "message_en": "TShark was found. Select the connection below.",
                 "detail": "Version command succeeded; live capture has not been tested.",
-                "automatic": False,
+                "automatic": not bool(specified),
             }
         attempted.append(f"{candidate}: " + (
             version.get("original") or version.get("reason") or output or "TShark version was not confirmed"
@@ -185,13 +186,15 @@ def _find_tshark(tshark_path: str) -> dict[str, Any]:
         "status": "invalid" if invalid else "missing", "path": specified, "version": "",
         "message_ko": ("선택한 TShark 경로를 사용할 수 없습니다. tshark.exe를 직접 선택하세요."
                        if specified else ("찾은 TShark를 실행할 수 없습니다. 경로와 설치 상태를 확인하세요."
-                                          if invalid else "사용할 tshark.exe를 직접 선택하세요.")),
+                                          if invalid else "동봉된 캡처 도구가 없습니다. 배포 ZIP 전체를 압축 해제하거나 직접 선택하세요.")),
         "message_en": ("The selected TShark path is unavailable. Choose tshark.exe."
                        if specified else ("The discovered TShark could not be verified. Check its installation."
-                                          if invalid else "Choose the tshark.exe to use.")),
+                                          if invalid else "Bundled capture tools are missing. Extract the entire distribution ZIP or choose a tool.")),
+        "message_zh": ("所选 TShark 无法使用，请重新选择。" if specified else
+                       "无法使用随附的采集工具。请完整解压发行 ZIP，或选择其他工具。"),
         "detail": "\n".join(attempted)[:8192] if attempted else (
             f"Executable not found: {specified}" if specified else
-            "No TShark path selected; automatic executable search is disabled."
+            "Bundled executable not found: " + str(candidates[0])
         ),
         "automatic": False,
     }

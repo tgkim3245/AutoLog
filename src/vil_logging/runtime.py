@@ -175,6 +175,10 @@ class Runtime:
         default_output.mkdir(exist_ok=True)
         self._repo = Repository(self.data_dir / "state.sqlite3")
         self._settings = self._repo.load_settings(str(default_output))
+        from vil_logging.diagnostics.capture_tools import replaces_legacy_managed_tool
+        if replaces_legacy_managed_tool(self._settings.tshark_path):
+            self._settings = self._repo.save_preferences({"tshark_path": ""})
+            log.info("tools.bundled_default_selected", extra={"reason": "legacy_managed_tool_upgrade"})
         self._file_service = FileService(self._repo)
         self._recovery = RecoveryService(self._repo)
         file_recovery = self._file_service.recover()

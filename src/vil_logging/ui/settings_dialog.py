@@ -47,14 +47,15 @@ TEXT = {
     "unknown": ("상태 미확인", "Status unknown"),
     "capture_attention": ("캡처 확인 필요", "Capture access needs checking"),
     "tool": ("Wireshark 캡처 도구", "Wireshark capture tool"),
-    "tool_help": ("직접 선택으로 설치된 tshark.exe를 지정하세요. 선택한 경로를 기억합니다.",
-                  "Choose your installed tshark.exe. The selected path is remembered."),
+    "tool_help": ("배포 폴더의 캡처 도구를 기본으로 사용합니다. 필요할 때만 직접 선택하세요.",
+                  "Capture tools in the distribution folder are used by default. Choose a different tool only if needed."),
     "select": ("직접 선택", "Choose file"),
     "finding": ("캡처 도구와 네트워크를 찾고 있습니다…", "Finding the capture tool and networks…"),
-    "tool_pending": ("tshark.exe를 직접 선택한 뒤 네트워크를 선택하세요.", "Choose tshark.exe, then select a network."),
+    "tool_pending": ("캡처 도구를 확인한 뒤 네트워크를 선택하세요.", "Check the capture tool, then select a network."),
     "tool_found": ("캡처 도구를 찾았습니다", "Capture tool found"),
     "tool_missing": ("Wireshark 캡처 도구를 찾지 못했습니다.", "Wireshark capture tool was not found."),
-    "tool_next": ("직접 선택으로 사용할 tshark.exe를 지정하세요.", "Choose the tshark.exe to use."),
+    "tool_next": ("배포 ZIP 전체를 압축 해제하거나 직접 선택으로 다른 도구를 지정하세요.",
+                  "Extract the complete distribution ZIP or choose another tool."),
     "network_help": ("목록 오른쪽 그래프는 네트워크 전체 수신량(pps)입니다. 장비가 연결된 네트워크를 선택하세요. 선택은 기억합니다.",
                      "Graphs show total received packets per second (pps). Choose the network connected to your device. Your choice is remembered."),
     "can_help": ("각 .cfg를 별도 CANoe 창으로 열어 독립적으로 연결합니다. 해당 카드에서 그 구성의 BLF 기록 블록 하나를 지정하세요.",
@@ -439,6 +440,9 @@ class SettingsDialog(QDialog):
             self._dirty.add(key)
 
     def _current(self, key):
+        if key == "tshark_path":
+            from vil_logging.diagnostics.capture_tools import stored_tshark_path
+            return stored_tshark_path(self.fields[key].text())
         if key in self.block_inputs:
             return self.block_inputs[key].currentData() or ""
         if key == "nic_id":
@@ -546,6 +550,9 @@ class SettingsDialog(QDialog):
                         continue
                     self._dirty.discard(key)
                 with QSignalBlocker(field):
+                    if key == "tshark_path":
+                        from vil_logging.diagnostics.capture_tools import displayed_tshark_path
+                        value = displayed_tshark_path(value)
                     field.setText(value)
                     field.setToolTip(value)
             for key, combo in self.block_inputs.items():

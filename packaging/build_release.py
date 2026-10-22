@@ -3,6 +3,7 @@
 import argparse
 import ast
 import hashlib
+import importlib.util
 import json
 import logging
 import os
@@ -161,6 +162,13 @@ def write_user_documentation(package: Path, metadata: dict, documents: dict[str,
     return {**metadata, "files": files}
 
 
+def bundle_capture_tools(root, package, cache, work, logger):
+    spec = importlib.util.spec_from_file_location("autolog_wireshark_bundle", root / "packaging/wireshark_bundle.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.bundle_wireshark(root, package, cache, work, logger)
+
+
 def new_output_directory(root: Path, name: str) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     for suffix in range(1000):
@@ -243,15 +251,17 @@ def build(
         if not executable.is_file() or not (package / "_internal").is_dir():
             raise RuntimeError("The build did not produce the expected EXE and _internal folder.")
         documentation = write_user_documentation(package, guide_metadata, documents)
+        capture_tools = bundle_capture_tools(root, package, output.parent / "tool-cache", work, logger)
         package_info = dict(info, status="succeeded", exe_sha256=sha256(executable),
-                            documentation=documentation)
+                            documentation=documentation, capture_tools=capture_tools)
         write_json(package / "build_info.json", package_info)
         archive = output / f"{output.name}.zip"
         logger.info("Creating %s", archive.name)
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zip_file:
             for path in sorted(package.rglob("*")):
                 if path.is_file():
-                    zip_file.write(path, path.relative_to(output))
+                    compression = zipfile.ZIP_STORED if path.is_relative_to(package / "third_party_sources") else zipfile.ZIP_DEFLATED
+                    zip_file.write(path, path.relative_to(output), compress_type=compression)
         info.update(package_info, archive=archive.name, archive_sha256=sha256(archive))
         (output / f"{archive.name}.sha256.txt").write_text(
             f"{info['archive_sha256']}  {archive.name}\n", encoding="utf-8"

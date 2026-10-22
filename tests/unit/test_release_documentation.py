@@ -98,6 +98,8 @@ def test_release_zip_contains_guides_with_matching_hashes(project, tmp_path, mon
             return 0
 
     monkeypatch.setattr(release.subprocess, "Popen", Packager)
+    monkeypatch.setattr(release, "bundle_capture_tools", lambda *_args: {
+        "version": "fixture", "directory": "tools/Wireshark", "drivers_included": False})
     monkeypatch.setattr(release, "git_state", lambda _root: {"commit": "fixture", "dirty": False})
     output = release.build(project, "AutoLog", APP_VERSION, {}, tmp_path / "releases")
     info = json.loads((output / "build_info.json").read_text(encoding="utf-8"))
@@ -105,6 +107,7 @@ def test_release_zip_contains_guides_with_matching_hashes(project, tmp_path, mon
         assert archive.testzip() is None
         embedded = json.loads(archive.read("AutoLog/build_info.json"))
         assert embedded["documentation"] == info["documentation"]
+        assert embedded["capture_tools"] == info["capture_tools"]
         files = info["documentation"]["files"]
         assert {item["name"] for item in files} == {"START_HERE.txt", "AutoLog_User_Guide.html"}
         for item in files:

@@ -19,6 +19,7 @@ from typing import Any
 
 from vil_logging import __version__
 from vil_logging.contracts.models import utc_now
+from vil_logging.diagnostics.capture_tools import bundled_tshark
 
 logger = logging.getLogger(__name__)
 _VERSION_TIMEOUT_SECONDS = 3
@@ -42,10 +43,12 @@ def _tool_candidates(name: str, *, specified: str = "", sibling_dir: Path | None
         # Explicit settings never silently switch to a different installation.
         return [Path(specified).expanduser()]
     if name == "tshark":
-        return []  # Capture executable is always chosen explicitly by the user.
+        return [bundled_tshark()]
     candidates = []
     if sibling_dir is not None:
         candidates.append(sibling_dir / f"{name}.exe")
+    else:
+        candidates.append(bundled_tshark().with_name(f"{name}.exe"))
     if found := shutil.which(f"{name}.exe") or shutil.which(name):
         candidates.append(Path(found))
     candidates.extend(folder / "Wireshark" / f"{name}.exe" for folder in _program_folders())
@@ -99,7 +102,7 @@ def _discover_tool(name: str, *, specified: str = "", sibling_dir: Path | None =
         "checked_paths": [str(candidate) for candidate in candidates],
         "discovery_errors": errors,
         "explicit_path": bool(specified),
-        "scope": "User-selected executable; no live capture" if name == "tshark" else
+        "scope": "User-selected or bundled executable; no live capture" if name == "tshark" else
                  "Sibling tools, PATH and known Wireshark folders; no live capture",
         "capture_check": "not_performed",
     }

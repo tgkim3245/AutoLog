@@ -2,12 +2,12 @@
 문서 개정: {{GUIDE_REVISION}} / {{UPDATED_DATE}}
 
 1. ZIP 전체를 쓰기 가능한 로컬 폴더에 압축 해제한 뒤 AutoLog.exe를 실행하세요.
-   EXE와 _internal 폴더를 함께 유지하세요. 사용자 PC에 Python/Git 설치는 필요 없습니다.
+   EXE와 _internal·tools 폴더를 함께 유지하세요. 사용자 PC에 Python/Git 설치는 필요 없습니다.
    현재는 시험용 배포입니다. 사용하는 PC·cfg·장비에서 짧은 기록부터 확인하세요.
 
 2. CAN/Diag 준비: CANoe, 필요한 버스 옵션 라이선스, Vector 장비·드라이버,
-   .cfg와 참조 파일을 준비하세요. Zipy는 Wireshark(TShark/dumpcap/capinfos)와
-   Npcap을 준비하세요. 설치는 별도 설치 안내를 따릅니다.
+   .cfg와 참조 파일을 준비하세요. Zipy 캡처 도구는 동봉돼 있으며 Npcap은
+   별도로 설치합니다. CANoe/장치·드라이버 설치는 별도 안내를 따릅니다.
 
 3. 중요 — Windows Defender 허용 앱
    CAPL 컴파일에서 '.cbf: 액세스가 거부되었습니다'가 나오면 다음을 확인하세요.
@@ -30,7 +30,12 @@
    같은 블록에서 BLF 파일명만 바뀐 경우 연결을 다시 하지 않고 기록 시작을 누르면 됩니다.
    CANoe의 수동 Logging 패널과 AutoLog를 함께 조작하지 마세요.
 
-5. Zipy: tshark.exe 직접 선택 → 장비에 연결된 네트워크 선택·연결 확인
+5. Zipy: 배포에 동봉된 TShark·dumpcap·capinfos를 기본으로 사용합니다.
+   Wireshark를 따로 설치하거나 TShark 경로를 찾을 필요가 없습니다.
+   Npcap 드라이버는 별도 설치가 필요하며 드라이버/설치기는 동봉하지 않습니다.
+   EXE 옆의 _internal·tools 폴더를 함께 유지하고 ZIP 전체를 압축 해제하세요.
+   다른 설치본이 필요할 때만 '직접 선택'을 사용합니다.
+   장비에 연결된 네트워크 선택·연결 확인
    → 저장 위치·파일 prefix·다음 인덱스 확인 → 메인 대상 선택 → 기록 시작/정지.
    메인 버튼은 상태에 따라 문구와 색이 바뀝니다. 준비/시작 중에는 취소,
    기록 중에는 정지, 완료 후에는 다음 기록 시작입니다. 파일 정리 중에는 기다려 주세요.
