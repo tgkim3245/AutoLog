@@ -384,11 +384,21 @@ class MainWindow(QMainWindow):
         self.settings_dialog.raise_()
         self.settings_dialog.activateWindow()
 
+    def show_capture_failure(self, report):
+        targets = report.get("targets", [])
+        if not any(row.get("role") in {Role.CAN.value, Role.DIAG.value} for row in targets):
+            return self.show_validation_failure(report)
+        body = tr("capture_failure_summary", self._language).format(
+            targets=" · ".join(row["name"] for row in targets))
+        reasons = "\n".join(row["name"] + ": " + tr(
+            "capture_failure_" + row.get("reason", "recorder_unavailable"), self._language) for row in targets)
+        body += "\n\n" + reasons + "\n\n" + tr("capture_failure_canoe_help", self._language)
+        for rule in report.get("rules", []):
+            body += "\n\n" + rule["name"] + "\n" + (rule.get("popup_message") or tr("validation_fallback", self._language))
+        self._show_capture_alert(report, tr("capture_failure_title", self._language), body,
+                                 "capture.failure_popup_shown")
+
     def show_validation_failure(self, report):
-        session = report.get("session_id")
-        if self._exiting or session in self._validation_popup_sessions:
-            return
-        self._validation_popup_sessions.append(session)
         rules = report.get("rules", [])
         title = tr("validation_title", self._language)
         body = tr("validation_fallback", self._language)
@@ -398,6 +408,13 @@ class MainWindow(QMainWindow):
                 body = rules[0].get("popup_message") or body
             else:
                 body = "\n\n".join(row["name"] + "\n" + (row.get("popup_message") or body) for row in rules)
+        self._show_capture_alert(report, title, body, "validation.popup_shown")
+
+    def _show_capture_alert(self, report, title, body, event):
+        session = report.get("session_id")
+        if self._exiting or session in self._validation_popup_sessions:
+            return
+        self._validation_popup_sessions.append(session)
         alert = QMessageBox(QMessageBox.Icon.Warning, title, body, QMessageBox.StandardButton.Ok, self)
         alert.setObjectName("zipyValidationAlert")
         alert.setWindowModality(Qt.WindowModality.NonModal)
@@ -407,8 +424,9 @@ class MainWindow(QMainWindow):
         self._validation_alerts.append(alert)
         alert.finished.connect(lambda _result: self._validation_alerts.remove(alert) if alert in self._validation_alerts else None)
         alert.show()
-        logger.info("validation.popup_shown", extra={"fields": {"session_id": session,
-                    "rule_ids": [row.get("id") for row in rules]}})
+        logger.info(event, extra={"fields": {"session_id": session,
+                    "targets": report.get("targets", []),
+                    "rule_ids": [row.get("id") for row in report.get("rules", [])]}})
 
     def _change_language(self, language: str):
         logger.debug("Display language requested: %s", language)

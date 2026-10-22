@@ -330,6 +330,17 @@ TEXT.update({
     "validation_fallback": ("Zipy 유효성검사에 실패하여 기록을 정지했습니다. 연결과 설정을 확인하세요.",
                             "Recording stopped because Zipy validation failed. Check the connection and settings."),
     "monitor_field_popup_message": ("팝업 안내 문구 (선택)", "Popup message (optional)"),
+    "capture_failure_title": ("기록 중단 알림", "Recording interrupted"),
+    "capture_failure_summary": ("{targets} 기록에 이상이 확인되어 선택한 기록을 모두 정지하고 파일 저장을 시도합니다.",
+                                "A problem was detected with {targets}. All selected recordings are stopping and files will be saved where possible."),
+    "capture_failure_measurement_stopped": ("CANoe 측정이 중지되었습니다.", "CANoe measurement stopped."),
+    "capture_failure_logging_stopped": ("선택한 기록 블록이 중지되었습니다.", "The selected logging block stopped."),
+    "capture_failure_recorder_unavailable": ("기록 상태를 확인할 수 없습니다.", "Recording status could not be confirmed."),
+    "capture_failure_link_disconnected": ("네트워크 연결이 끊겼습니다.", "The network connection was lost."),
+    "capture_failure_receive_criteria_failed": ("필수 수신 기준을 만족하지 못했습니다.", "Required receive criteria failed."),
+    "capture_failure_observation_unavailable": ("수신 감시 상태를 5초 동안 확인하지 못했습니다.", "Receive monitoring was unavailable for 5 seconds."),
+    "capture_failure_canoe_help": ("장비의 USB·전원·케이블을 확인하세요. CANoe의 측정(F9)과 Trace 수신을 확인한 뒤 새 기록을 시작하세요. 파일 처리 결과는 최근 활동에서 확인하세요.",
+                                  "Check the device USB, power and cables. Confirm CANoe measurement (F9) and reception in Trace before starting a new recording. Check Recent activity for file processing results."),
 })
 
 EVENTS = {

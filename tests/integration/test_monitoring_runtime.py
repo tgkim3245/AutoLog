@@ -32,6 +32,9 @@ class Tools:
         self.session_override = ""
         self.display_drops = 0
         self.query_error = None
+        self.query_errors = set()
+        self.query_details = {}
+        self.query_states = {}
         self.report_age = 0
         self.quality = None
         self.stop_error = None
@@ -58,7 +61,10 @@ class Tools:
                 info = self.paths[role].stat()
                 details = {"inode": info.st_ino, "bytes": info.st_size, "mtime_ns": info.st_mtime_ns,
                            "actual_format": "pcap", "packet_count": 1}
-            success = not ((action == "query" and role == self.query_error) or
+            if action == "query":
+                details.update(deepcopy(self.query_details.get(role, {})))
+                state = self.query_states.get(role, state)
+            success = not ((action == "query" and (role == self.query_error or role in self.query_errors)) or
                            (action == "stop" and role == self.stop_error))
             if self.quality is not None and role == Role.ETHERNET:
                 details.update(deepcopy(self.quality))
@@ -261,6 +267,76 @@ def test_validation_alert_carries_rule_message_once_while_normal_stop_archives(r
     assert alerts[0]["rules"][0]["popup_message"] == "테스트 안내\n|6 → e1"
     assert runtime.phase == SessionPhase.FAILED
     assert runtime._plan.files[0].final_path.is_file()
+
+
+def failure_alerts(runtime):
+    alerts = []
+    while not runtime.messages.empty():
+        kind, value = runtime.messages.get_nowait()
+        if kind in {"capture_failure", "validation_failure"}:
+            alerts.append((kind, value))
+    return alerts
+
+
+@pytest.mark.parametrize("role,details,reason", [
+    (Role.CAN, {"measurement_running": False}, "measurement_stopped"),
+    (Role.DIAG, {"trigger_active": False}, "logging_stopped"),
+    (Role.DIAG, {}, "recorder_unavailable"),
+])
+def test_canoe_failure_notifies_once_stops_all_and_allows_next_session(real, role, details, reason):
+    runtime, tools = real
+    runtime.save_preferences({"diag_cfg": "C:/generated/diag.cfg"}).result(5)
+    roles = (Role.CAN, Role.DIAG, Role.ETHERNET)
+    runtime.toggle(roles).result(5)
+    if details:  # CANoe query can succeed while reporting that measurement/logging stopped.
+        tools.query_states[role] = "error"
+    else:
+        tools.query_error = role
+    tools.query_details[role] = details
+    runtime._submit(runtime._query).result(5)
+    runtime._submit(runtime._query).result(5)
+    alerts = failure_alerts(runtime)
+    assert len(alerts) == 1 and alerts[0][0] == "capture_failure"
+    assert alerts[0][1]["targets"] == [{"role": role.value, "name": role.label, "reason": reason}]
+    assert alerts[0][1]["rules"] == []  # No unrelated Zipy advice for a CANoe failure.
+    assert runtime.phase == SessionPhase.FAILED
+    assert all(file.final_path.is_file() for file in runtime._plan.files)
+    stops = [selected for selected, action, _ in tools.calls if action == "stop"]
+    assert len(stops) == 1 and set(stops[0]) == set(roles)
+    assert sum(event.code == "CAPTURE_AUTO_STOP" for event in events(runtime)) == 1
+    tools.query_error = None
+    tools.query_details.clear()
+    tools.query_states.clear()
+    runtime.toggle(roles).result(5)
+    assert runtime.phase == SessionPhase.RECORDING
+    runtime.toggle(roles).result(5)
+    assert runtime.phase == SessionPhase.COMPLETED
+
+
+def test_simultaneous_can_diag_zipy_failures_have_one_combined_notification(real):
+    runtime, tools = real
+    runtime.save_preferences({"diag_cfg": "C:/generated/diag.cfg"}).result(5)
+    runtime.toggle((Role.CAN, Role.DIAG, Role.ETHERNET)).result(5)
+    tools.query_errors = {Role.CAN, Role.DIAG}
+    tools.quality = {"link": {"state": "disconnected"}}
+    tools.monitor = report("warning", source=1)
+    tools.monitor["rules"][0]["popup_message"] = "Zipy custom advice"
+    runtime._submit(runtime._query).result(5)
+    alerts = failure_alerts(runtime)
+    assert len(alerts) == 1 and alerts[0][0] == "capture_failure"
+    assert {row["role"] for row in alerts[0][1]["targets"]} == {role.value for role in Role}
+    assert alerts[0][1]["rules"][0]["popup_message"] == "Zipy custom advice"
+    assert runtime.phase == SessionPhase.FAILED
+    assert len([action for _, action, _ in tools.calls if action == "stop"]) == 1
+
+
+def test_canoe_alert_is_published_even_when_normal_stop_cannot_finalize(real):
+    runtime, tools = real
+    runtime.toggle((Role.CAN, Role.ETHERNET)).result(5)
+    tools.query_error = tools.stop_error = Role.CAN
+    runtime._submit(runtime._query).result(5)
+    assert runtime.phase == SessionPhase.INCOMPLETE
+    assert len(failure_alerts(runtime)) == 1
 
 
 def test_delayed_ipc_report_cannot_leave_a_stale_normal_status(real):

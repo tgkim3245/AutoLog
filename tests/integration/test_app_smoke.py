@@ -28,12 +28,14 @@ def test_full_application_starts_simulates_and_exits_cleanly(tmp_path):
     assert "Traceback" not in result.stderr
     report = json.loads(result.stdout.strip().splitlines()[-1])
     assert report["smoke_passed"] is True
+    assert report["canoe_popup_verified"] is True
     assert report["developer_log_default"] is True
     log_file = tmp_path / "developer_logs" / "One_Click_Log_developer.jsonl"
     assert log_file.exists()
     events = {json.loads(line)["event"] for line in log_file.read_text(encoding="utf-8").splitlines()}
     assert "app.startup" in events
     assert "SESSION_COMPLETED" in events
+    assert "capture.failure_popup_shown" in events and "smoke.canoe_popup_verified" in events
 
 
 def test_always_on_diagnostics_flush_and_capture_application_events(tmp_path):

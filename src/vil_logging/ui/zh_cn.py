@@ -261,6 +261,15 @@ EVENTS.update({
 })
 TEXT.update({
     "validation_title": "Zipy 有效性检查",
+    "capture_failure_title": "记录中断通知",
+    "capture_failure_summary": "检测到 {targets} 记录异常。正在停止所有选中的记录，并尝试保存文件。",
+    "capture_failure_measurement_stopped": "CANoe 测量已停止。",
+    "capture_failure_logging_stopped": "选中的记录块已停止。",
+    "capture_failure_recorder_unavailable": "无法确认记录状态。",
+    "capture_failure_link_disconnected": "网络连接已断开。",
+    "capture_failure_receive_criteria_failed": "未满足必要的接收条件。",
+    "capture_failure_observation_unavailable": "已连续 5 秒无法确认接收监测状态。",
+    "capture_failure_canoe_help": "请检查设备的 USB、电源和线缆。确认 CANoe 测量（F9）及 Trace 接收正常后再开始新记录。请在最近活动中查看文件处理结果。",
     "validation_help": "记录期间发现规则违反时，将停止所有选中目标并显示对应提示。其他来源的数据包也会保存。修改的规则和提示从下次记录生效。",
     "validation_fallback": "Zipy 有效性检查失败，记录已停止。请检查连接和设置。",
     "monitor_field_popup_message": "弹窗提示文字（可选）",

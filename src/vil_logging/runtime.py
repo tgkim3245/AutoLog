@@ -844,6 +844,7 @@ class Runtime:
         results = self._pool.request(self._plan.roles, "query", self._plan.session_id,
                                       timeout=1.5 if any(role != Role.ETHERNET for role in self._plan.roles) else 0.6)
         faults = {}
+        fault_reasons = {}
         for role, result in results.items():
             if result.success and result.state == "recording":
                 if not self.demo:
@@ -853,9 +854,11 @@ class Runtime:
                         self._accept_quality(details)
                         if details.get("link", {}).get("state") == "disconnected":
                             faults[role] = "Ethernet link disconnected"
+                            fault_reasons[role] = "link_disconnected"
                         elif any(row.get("status") == "warning" or row.get("violation_reasons")
                                  for row in self._monitor_reports.get(role.value, {}).get("rules", [])):
                             faults[role] = "Required Ethernet receive criteria failed"
+                            fault_reasons[role] = "receive_criteria_failed"
                         report = self._monitor_reports.get(role.value, {})
                         unverified = report.get("status") == "unknown" and any(
                             reason != "waiting_samples" for reason in report.get("reasons", []) +
@@ -865,14 +868,9 @@ class Runtime:
                             self._monitor_unverified_since = time.monotonic() if since is None else since
                             if time.monotonic() - self._monitor_unverified_since >= 5:
                                 faults[role] = "Ethernet receive monitoring unavailable for 5 seconds"
+                                fault_reasons[role] = "observation_unavailable"
                         else:
                             self._monitor_unverified_since = None
-                        if role in faults:
-                            self._event("CAPTURE_AUTO_STOP", level="ERROR", target=role.label,
-                                        original=faults[role], link=details.get("link"), monitor=self._monitor_reports.get(role.value))
-                            self._publish("validation_failure", {"session_id": self._plan.session_id,
-                                "cause": faults[role], "rules": [dict(row) for row in report.get("rules", [])
-                                    if row.get("status") == "warning" or row.get("violation_reasons")]})
                     if details.get("summary_drops", 0) and not self._observation_loss_reported:
                         self._observation_loss_reported = True
                         self._event("DISPLAY_SUMMARY_LOSS", level="WARNING", target=role.label,
@@ -880,6 +878,13 @@ class Runtime:
                 continue
             previous = self._snapshots[role].recording
             faults[role] = result.evidence
+            reason = "recorder_unavailable"
+            if role != Role.ETHERNET:
+                if result.details.get("measurement_running") is False:
+                    reason = "measurement_stopped"
+                elif result.details.get("trigger_active") is False:
+                    reason = "logging_stopped"
+            fault_reasons[role] = reason
             state = RecordingState.ERROR if result.state in {"error", "stopped"} else RecordingState.UNKNOWN
             self._target(role, recording=state, observation=ObservationState.UNKNOWN,
                          evidence=result.evidence, observation_details={"status": "unknown", "reasons": ["recorder_unavailable"]})
@@ -894,6 +899,21 @@ class Runtime:
         if faults:
             self._failure_latched = True
             self._target_failures.update(faults)
+            # One notification per failed session, even if CAN/Diag/Zipy fail
+            # in the same poll. Publish before normal stop/file finalization;
+            # the UI must never block the coordinator waiting for a dialog.
+            for role, evidence in faults.items():
+                self._event("CAPTURE_AUTO_STOP", level="ERROR", target=role.label,
+                            original=evidence, reason=fault_reasons[role],
+                            link=results[role].details.get("link"), monitor=self._monitor_reports.get(role.value))
+            report = self._monitor_reports.get(Role.ETHERNET.value, {}) if Role.ETHERNET in faults else {}
+            self._publish("capture_failure" if any(role != Role.ETHERNET for role in faults)
+                          else "validation_failure", {
+                "session_id": self._plan.session_id, "cause": next(iter(faults.values())),
+                "targets": [{"role": role.value, "name": role.label, "reason": fault_reasons[role]}
+                            for role in faults],
+                "rules": [dict(row) for row in report.get("rules", [])
+                          if row.get("status") == "warning" or row.get("violation_reasons")]})
         if self._failure_latched:
             # A UI Stop may already be queued; never overwrite its STOPPING phase.
             if self.phase in {SessionPhase.RECORDING, SessionPhase.PARTIAL}:

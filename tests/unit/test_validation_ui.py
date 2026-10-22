@@ -105,3 +105,47 @@ def test_legacy_default_rule_gets_message_once_without_resetting_user_criteria()
 def test_invalid_popup_message_is_rejected(message):
     with pytest.raises(ValueError):
         replace(parse_rules(default_rules_json())[0], popup_message=message)
+
+
+@pytest.mark.parametrize("language", ["ko", "en", "zh"])
+@pytest.mark.parametrize("role,name", [("can", "CAN"), ("diag", "Diag")])
+def test_canoe_popup_names_failed_target_and_remains_nonblocking(qtbot, language, role, name):
+    from vil_logging.ui.i18n import tr
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_language(language)
+    window.show()
+    report = {"session_id": "canoe-failure", "targets": [
+        {"role": role, "name": name, "reason": "measurement_stopped"}], "rules": []}
+    window.show_capture_failure(report)
+    window.show_capture_failure(report)
+    alert = window._validation_alerts[0]
+    assert len(window._validation_alerts) == 1 and not alert.isModal()
+    assert name in alert.text() and "F9" in alert.text()
+    assert tr("capture_failure_measurement_stopped", language) in alert.text()
+    assert tr("capture_failure_title", language) == alert.windowTitle()
+    assert "Render" not in alert.text() and "zipy" not in alert.windowTitle().lower()
+    spy = QSignalSpy(window.exit_requested)
+    window.close()
+    assert spy.count() == 1
+    alert.close()
+
+
+def test_mixed_failure_popup_keeps_zipy_custom_advice_and_ignores_late_duplicates(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    report = {"session_id": "mixed", "targets": [
+        {"role": "can", "name": "CAN", "reason": "recorder_unavailable"},
+        {"role": "diag", "name": "Diag", "reason": "logging_stopped"},
+        {"role": "ethernet", "name": "Zipy", "reason": "receive_criteria_failed"}],
+        "rules": [{"id": "custom", "name": "Custom rule", "popup_message": "<literal>\ncustom advice"}]}
+    window.show_capture_failure(report)
+    alert = window._validation_alerts[0]
+    assert all(name in alert.text() for name in ("CAN", "Diag", "Zipy", "<literal>\ncustom advice"))
+    assert alert.textFormat() == Qt.TextFormat.PlainText
+    alert.close()
+    window.show_capture_failure(report)
+    assert not window._validation_alerts
+    window.set_exiting(True)
+    window.show_capture_failure({**report, "session_id": "late"})
+    assert not window._validation_alerts

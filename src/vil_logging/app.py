@@ -308,8 +308,8 @@ def main(argv: list[str] | None = None) -> int:
                 window.set_files(*value)
             elif kind == "capture_history":
                 window.set_capture_history(value)
-            elif kind == "validation_failure":
-                window.show_validation_failure(value)
+            elif kind in {"validation_failure", "capture_failure"}:
+                window.show_capture_failure(value)
             elif kind == "file_operations":
                 window.file_manager.set_operations(value)
             elif kind == "file_busy":
@@ -366,7 +366,8 @@ def main(argv: list[str] | None = None) -> int:
     window.show()
     smoke = {"started": False, "stopped": False, "passed": False, "button_actions": [],
              "discovery_passed": not args.smoke_discovery, "validation_requested": False,
-             "validation_passed": False, "icon_passed": False}
+             "validation_passed": False, "icon_passed": False,
+             "canoe_requested": False, "canoe_passed": False}
     if args.smoke_test:
         smoke_timer = QTimer()
         smoke_timer.setInterval(100)
@@ -415,12 +416,29 @@ def main(argv: list[str] | None = None) -> int:
                     return
                 if not window._validation_alerts:
                     return
-                assert len(window._validation_alerts) == 1
-                alert = window._validation_alerts[0]
-                assert alert.text() == DEFAULT_POPUP_MESSAGE and not alert.isModal()
-                assert not window.windowIcon().isNull()
-                smoke["validation_passed"] = smoke["icon_passed"] = True
-                debug.log("smoke.validation_popup_verified", nonmodal=True, deduplicated=True, icon_present=True)
+                if not smoke["validation_passed"]:
+                    assert len(window._validation_alerts) == 1
+                    alert = window._validation_alerts[0]
+                    assert alert.text() == DEFAULT_POPUP_MESSAGE and not alert.isModal()
+                    assert not window.windowIcon().isNull()
+                    smoke["validation_passed"] = smoke["icon_passed"] = True
+                    debug.log("smoke.validation_popup_verified", nonmodal=True, deduplicated=True, icon_present=True)
+                if not smoke["canoe_requested"]:
+                    smoke["canoe_requested"] = True
+                    payload = {"session_id": "smoke-canoe-failure", "rules": [], "targets": [
+                        {"role": "can", "name": "CAN", "reason": "measurement_stopped"},
+                        {"role": "diag", "name": "Diag", "reason": "recorder_unavailable"}]}
+                    runtime._publish("capture_failure", payload)
+                    runtime._publish("capture_failure", payload)
+                    return
+                if len(window._validation_alerts) < 2:
+                    return
+                assert len(window._validation_alerts) == 2
+                alert = window._validation_alerts[1]
+                assert all(text in alert.text() for text in ("CAN", "Diag", "F9"))
+                assert "Render" not in alert.text() and not alert.isModal()
+                smoke["canoe_passed"] = True
+                debug.log("smoke.canoe_popup_verified", nonmodal=True, deduplicated=True, targets=["CAN", "Diag"])
                 smoke["passed"] = True
                 smoke_timer.stop()
                 window.close()
@@ -451,6 +469,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.smoke_test:
         print(json.dumps({"smoke_passed": smoke["passed"], "data_dir": str(data_dir),
                           "validation_popup_verified": smoke["validation_passed"],
+                          "canoe_popup_verified": smoke["canoe_passed"],
                           "application_icon_verified": smoke["icon_passed"],
                           "capture_button_actions": smoke["button_actions"],
                           "developer_log_default": developer_log_default,
