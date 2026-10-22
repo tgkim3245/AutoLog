@@ -100,7 +100,7 @@ def test_result_survives_busy_completion_and_language_change(window):
     assert window.file_manager.windowTitle() == "Operation history"
 
 
-def test_main_history_opens_read_only_operations_and_keeps_folder_adjacent(window):
+def test_main_history_opens_read_only_operations_beside_previous_delete(window):
     from PySide6.QtWidgets import QPushButton
     history = [{"created_utc": "2026-10-22T10:00:00Z", "kind": "rename", "status": "completed",
                 "document": {"items": [{"source": "C:/generated/before.blf", "destination": "C:/generated/after.blf",
@@ -115,5 +115,5 @@ def test_main_history_opens_read_only_operations_and_keeps_folder_adjacent(windo
     assert not hasattr(window.file_manager, "delete_button")
     assert not hasattr(window, "packet_window")
     assert not hasattr(window, "environment_button")
-    assert window.debug_folder_button.parent() == window.file_manager_button.parent()
+    assert window.file_manager_button.parent() == window.delete_button.parent()
     assert not window.findChild(QPushButton, "openPacketsButton")

@@ -4,7 +4,7 @@ import json
 from dataclasses import asdict, replace
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QMessageBox
@@ -76,7 +76,10 @@ def test_main_file_controls_are_adjacent_and_redundant_features_are_removed(qtbo
         qtbot.wait(20)
         assert window.file_manager_button.y() == window.delete_button.y()
         assert window.file_manager_button.x() < window.delete_button.x()
-        assert window.debug_folder_button.y() < window.file_manager_button.y()
+        folder_position = window.debug_folder_button.mapTo(window, QPoint(0, 0))
+        history_position = window.file_manager_button.mapTo(window, QPoint(0, 0))
+        assert folder_position.y() < history_position.y()
+        assert window.debug_folder_button.geometry().center().y() == window.selection_count.geometry().center().y()
         assert window.main_scroll.horizontalScrollBar().maximum() == 0
     assert not any(hasattr(window, attr) for attr in ("quality_button", "monitor_button", "phase_label", "footer"))
     assert window.file_feedback.isHidden()
