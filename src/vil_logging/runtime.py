@@ -1136,6 +1136,10 @@ class Runtime:
                                          if file.role != Role.ETHERNET and file.role not in selected), plan.session_id)
         for role, result in results.items():
             if result.details.get("output_restore_error"):
+                if result.success and result.details.get("output_restore_deferred"):
+                    self._event("CANOE_OUTPUT_RESTORE_DEFERRED", level="WARNING", target=role.label,
+                                details=result.details)
+                    continue
                 self._event("OPERATION_ERROR", level="WARNING", target=role.label,
                             original="BLF는 닫혔지만 CANoe 출력 설정 복구가 필요합니다: " +
                                      result.details["output_restore_error"], details=result.details)

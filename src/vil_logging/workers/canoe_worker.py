@@ -44,10 +44,9 @@ def canoe_worker_main(role, pipe):
                     state, details = capture.query()
                     evidence = details.get("error", "Owned configuration, measurement and logging trigger observed")
                 elif command.action == "shutdown":
-                    if capture.attempted and not capture.stop_confirmed:
-                        raise RuntimeError("Cannot release CANoe while this segment's normal stop is unconfirmed")
-                    capture.restore_output(capture.session_id)
-                    pipe.send(CommandResult(command, True, "stopped", "COM reference released; CANoe window/measurement remain", os.getpid()))
+                    details = capture.release()
+                    pipe.send(CommandResult(command, True, "stopped", "COM reference released; CANoe window/measurement remain",
+                                            os.getpid(), details=details))
                     break
                 else:
                     raise ValueError("Unsupported CANoe command")

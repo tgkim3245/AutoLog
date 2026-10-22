@@ -168,6 +168,7 @@ EVENTS = {
     "FILE_MANAGEMENT_ERROR": "文件管理错误", "FILE_OPERATIONS_RECOVERED": "已核对中断操作的路径 · 请检查记录",
     "OBSERVATION_LOSS": "数据包摘要缺失 · 需检查观测", "SESSION_COMPLETED": "采集归档完成",
     "SESSION_FAILED": "采集失败", "SESSION_INCOMPLETE": "停止或归档待确认 · 已保留生成的文件", "OPERATION_ERROR": "操作错误",
+    "CANOE_OUTPUT_RESTORE_DEFERRED": "CANoe 原输出路径恢复已推迟 · 可继续下一次记录",
     "ENVIRONMENT_READY": "环境检查完成", "NO_TARGETS": "请至少选择一个记录对象。",
     "REAL_ADAPTER_UNAVAILABLE": "尚未实现实际设备适配器。", "DEMO_NOTICE": "模拟运行 · 不创建采集文件",
 }

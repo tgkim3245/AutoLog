@@ -77,6 +77,8 @@ class CanoeCapture:
         self.file_exclusive = False
         self._inspection = None
         self._handoff = None
+        self._idle_output = None
+        self._restore_deferred = False
 
     def _trace(self, event, **fields):
         entry = {"event": event, "monotonic": time.monotonic(), **fields}
@@ -94,6 +96,8 @@ class CanoeCapture:
                 "finalization_files": [dict(self._handoff)] if self._handoff else [],
                 "output_restore_pending": self._output_snapshot is not None,
                 "output_restore_error": self.output_restore_error,
+                "output_restore_deferred": self._restore_deferred,
+                "owned_idle_output": str(self._idle_output or ""),
                 "block_validation": "logical_selection_owned_output_idle_blf_refresh", "diagnostics": list(self.journal)}
 
     def _validate(self, *, allow_idle_output_refresh=False):
@@ -129,6 +133,8 @@ class CanoeCapture:
                     paths = [self._output_snapshot["full_name"], str(self.path)]
                     if self._handoff:
                         paths.append(self._handoff["path"])
+                    if self._idle_output:
+                        paths.append(self._idle_output)
                 elif (i == self.index and allow_idle_output_refresh
                       and (not self.attempted or self.stop_confirmed)
                       and before["name"] == after["name"]
@@ -188,6 +194,8 @@ class CanoeCapture:
             bases.append(str(self.path))
             if self._handoff:
                 bases.append(self._handoff["path"])
+            if self._idle_output:
+                bases.append(self._idle_output)
         value = Path(value)
         for name in bases:
             if _same_path(value, name):
@@ -240,6 +248,34 @@ class CanoeCapture:
         if any(bool(getattr(options, name)) for name in FILE_OPTIONS):
             raise RuntimeError("Logging filename options changed after preparation; start is blocked.")
 
+    def _can_reuse_owned_idle_output(self):
+        """A rejected original idle name must not strand an already stopped log.
+
+        Only our confirmed stopped output (or its finalization helper) is
+        reusable. Preserve the original snapshot and reject external changes.
+        """
+        if self._output_snapshot is None or self.attempted and not self.stop_confirmed:
+            return False
+        owned = []
+        if self.attempted and self.stop_confirmed:
+            owned.append(self.path)
+            if self._handoff and self._handoff["start_attempted"] and self._handoff["stopped"]:
+                owned.append(self._handoff["path"])
+        elif self._restore_deferred and self._idle_output:
+            owned.append(self._idle_output)  # A failed new setter left the prior verified idle output.
+        if not owned:
+            return False
+        self._validate()
+        current = str(self.block.FullName)
+        own_name = any(_same_path(current, name) or (
+            self._output_snapshot["options"]["IncrementAfterTrigger"]
+            and _same_path(Path(current).parent, Path(name).parent)
+            and re.fullmatch(re.escape(Path(name).stem) + r"(?:_T[0-9]{1,20})+", Path(current).stem, re.IGNORECASE)
+            and Path(current).suffix.casefold() == ".blf") for name in owned)
+        return bool(own_name and not self.block.Trigger.Active and all(
+            bool(getattr(self.block.FileNameOptions, name)) in (False, original)
+            for name, original in self._output_snapshot["options"].items()))
+
     def restore_output(self, session_id):
         """Undo only our idle output changes; keep the snapshot when external edits conflict."""
         snapshot = self._output_snapshot
@@ -256,6 +292,7 @@ class CanoeCapture:
             current_path = str(self.block.FullName)
             if not (_same_path(current_path, self.path) or current_path == snapshot["full_name"]
                     or self._handoff and self._handoff["stopped"] and _same_path(current_path, self._handoff["path"])
+                    or self._idle_output and _same_path(current_path, self._idle_output)
                     or self._restored_path_matches(current_path)):
                 raise RuntimeError("Logging output was edited externally; restoration would overwrite it.")
             options = self.block.FileNameOptions
@@ -273,7 +310,11 @@ class CanoeCapture:
                 if bool(getattr(options, name)) != original:
                     setattr(options, name, original)
             if not self._restored_path_matches(str(self.block.FullName), original_only=True):
-                self.block.FullName = snapshot["full_name"]
+                original = Path(snapshot["full_name"])
+                requested = (str(original.resolve()) if original.is_absolute() and ".." in original.parts
+                             and "{" not in str(original) else snapshot["full_name"])
+                self._trace("canoe.output_restore_path_requested", original=snapshot["full_name"], requested=requested)
+                self.block.FullName = requested
             if not self._restored_path_matches(str(self.block.FullName), original_only=True) or any(
                     bool(getattr(options, name)) != value for name, value in snapshot["options"].items()):
                 raise RuntimeError("CANoe did not confirm restored output settings.")
@@ -284,6 +325,7 @@ class CanoeCapture:
             raise
         self._output_snapshot = None
         self.output_restore_error = ""
+        self._restore_deferred = False
         self._trace("canoe.output_restored")
         return self.stats()
 
@@ -322,8 +364,19 @@ class CanoeCapture:
             raise ValueError("Choose an existing CANoe .cfg file first.")
         if self.attempted and not self.stop_confirmed:
             raise RuntimeError("Resolve the previous recording before reconnecting.")
+        continuing = False
         if self._output_snapshot is not None:
-            self.restore_output(self.session_id)
+            try:
+                self.restore_output(self.session_id)
+            except Exception:
+                selected = str(params.get("logging_block", ""))
+                if (not _same_path(cfg, self.cfg) or selected not in ("", str(self.index))
+                        or not self._can_reuse_owned_idle_output()):
+                    raise
+                continuing = self._restore_deferred = True
+                self._trace("canoe.output_restore_deferred", original=self._output_snapshot,
+                            idle_output=str(self.block.FullName), reason=self.output_restore_error,
+                            next_step="reuse_same_owned_block_for_new_segment")
         if self.app is not None:
             try:
                 current_cfg = self.app.Configuration.FullName
@@ -347,7 +400,8 @@ class CanoeCapture:
             # Explicit Connect may adopt the user's exact chosen project in the owned
             # window, or select a new block, without dropping/recreating its COM handle.
             self.cfg = str(cfg)
-            self.block, self.index = None, 0
+            if not continuing:
+                self.block, self.index = None, 0
         if self.app is None:
             self._trace("canoe.create_requested", cfg=str(cfg))
             try:
@@ -410,11 +464,12 @@ class CanoeCapture:
         self.block = collection.Item(index) if index else None
         self._selection = {"blocks": [{"name": item["name"], "path": item["path"]} for item in blocks]
                            } if self.block is not None else None
-        self.session_id, self.path = "", None
-        self._restore_context = None
-        self.file_exclusive, self._inspection = False, None
-        self._handoff = None
-        self.attempted = self.trigger_stopped = self.stop_confirmed = False
+        if not continuing:
+            self.session_id, self.path = "", None
+            self._restore_context = None
+            self.file_exclusive, self._inspection = False, None
+            self._handoff = self._idle_output = None
+            self.attempted = self.trigger_stopped = self.stop_confirmed = False
         details = {**self.stats(), "blocks": blocks, "selected_block": str(index) if index else "",
                    "measurement_running": bool(self.app.Measurement.Running),
                    "view_only": "view only" in self.version.casefold(),
@@ -467,7 +522,7 @@ class CanoeCapture:
     def configure(self, session_id, params):
         if self.attempted and not self.stop_confirmed:
             raise RuntimeError("Resolve the previous recording before configuring another segment.")
-        if self._output_snapshot is not None:
+        if self._output_snapshot is not None and not self._can_reuse_owned_idle_output():
             raise RuntimeError("Restore the previous output settings before configuring another segment.")
         self._validate(allow_idle_output_refresh=True)
         if self.block is None or not self.app.Measurement.Running or self.block.Trigger.Active:
@@ -475,13 +530,15 @@ class CanoeCapture:
         path = Path(params["temp_path"]).resolve()
         if path.suffix.lower() != ".blf" or path.exists() or not path.parent.is_dir():
             raise ValueError("A new BLF working path is required; existing files are preserved.")
+        previous_snapshot = self._output_snapshot
+        self._idle_output = str(self.block.FullName)
         self.session_id, self.path = session_id, path
         self._restore_context = None
         self.file_exclusive, self._inspection = False, None
         self._handoff = None
         self.attempted = self.trigger_stopped = self.stop_confirmed = False
         options = self.block.FileNameOptions
-        self._output_snapshot = {"full_name": str(self.block.FullName),
+        self._output_snapshot = previous_snapshot or {"full_name": str(self.block.FullName),
                                  "options": {name: bool(getattr(options, name)) for name in FILE_OPTIONS}}
         self._trace("canoe.output_apply_requested", previous=self._output_snapshot, requested=str(path))
         try:
@@ -697,12 +754,28 @@ class CanoeCapture:
                 else:
                     self.file_exclusive = True
                 self.stop_confirmed = True  # Trigger stop; file completeness is checked by inspect_file.
+                self._restore_deferred = self._can_reuse_owned_idle_output()
                 self._trace("canoe.segment_stopped", measurement_running=bool(self.app.Measurement.Running),
                             file_exclusive=self.file_exclusive,
                             elapsed_ms=round((time.monotonic() - started) * 1000))
                 return self.stats()
             time.sleep(.05)
         raise TimeoutError("CANoe logging trigger did not stop within its time limit")
+
+    def release(self):
+        """Release idle ownership even if CANoe rejects its original filename."""
+        if self.attempted and not self.stop_confirmed:
+            raise RuntimeError("Cannot release CANoe while this segment's stop is unconfirmed")
+        try:
+            self.restore_output(self.session_id)
+        except Exception:
+            if not self._can_reuse_owned_idle_output():
+                raise
+            self._restore_deferred = True
+            self._trace("canoe.output_restore_deferred", original=self._output_snapshot,
+                        idle_output=str(self.block.FullName), reason=self.output_restore_error,
+                        next_step="release_idle_com_reference_without_saving_cfg")
+        return self.stats()
 
     def inspect_file(self, session_id):
         if session_id != self.session_id or not self.stop_confirmed:

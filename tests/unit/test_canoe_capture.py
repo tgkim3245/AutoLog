@@ -810,17 +810,56 @@ class NextTriggerFinalizesBlock(Block):
         self.Trigger.Active = False
 
 
-def test_real_runtime_can_zipy_three_segments_publish_with_buffered_tail(fixture):
+class RejectedIdlePathBlock(NextTriggerFinalizesBlock):
+    """CANoe accepts new working outputs but silently rejects its cfg baseline."""
+
+    @property
+    def FullName(self):
+        return self._full_name
+
+    @FullName.setter
+    def FullName(self, value):
+        if value == getattr(self, "fail_output_once", None):
+            self.fail_output_once = None
+            raise RuntimeError("new output setter rejected")
+        if hasattr(self, "original") and self.number and Path(value).resolve() == Path(self.original).resolve():
+            self.restore_requests.append(value)
+            if self.reject_canonical or ".." in Path(value).parts:
+                return
+        self._full_name = value
+
+    def __init__(self, name, *, reject_canonical=True):
+        super().__init__(name)
+        self.original = name
+        self.reject_canonical = reject_canonical
+        self.restore_requests = []
+
+
+@pytest.mark.parametrize("roles", [("can", "ethernet"), ("diag", "ethernet"), ("can", "diag", "ethernet")])
+def test_real_runtime_three_segments_publish_with_buffered_tail(fixture, roles):
     import struct
 
     from vil_logging.contracts.commands import Command, CommandResult
     from vil_logging.contracts.models import Role, SessionPhase
     from vil_logging.runtime import Runtime
 
-    capture, app, params, root = fixture
-    app.blocks[0] = block = NextTriggerFinalizesBlock(str(root / "original.blf"))
-    capture.connect(params)
-    app.Measurement.Running = True
+    _, _, _, root = fixture
+    roles = tuple(Role(role) for role in roles)
+    captures, applications, blocks, preferences = {}, {}, {}, {}
+    for role in roles:
+        if role == Role.ETHERNET:
+            continue
+        cfg = root / f"{role.value}.cfg"
+        cfg.write_bytes(b"cfg must remain unchanged")
+        app = applications[role] = Application()
+        app.fresh_proxies = True
+        baseline = str(root / ".." / root.name / f"original_{role.value}.blf")
+        app.blocks[0] = blocks[role] = (RejectedIdlePathBlock(baseline) if role == Role.DIAG
+                                      else NextTriggerFinalizesBlock(baseline))
+        capture = captures[role] = CanoeCapture(create_application=lambda app=app: app)
+        capture.connect({"cfg_path": str(cfg)})
+        app.Measurement.Running = True
+        preferences.update({f"{role.value}_cfg": str(cfg), f"{role.value}_logging_block": "1"})
     paths = {}
 
     class Tools:
@@ -828,7 +867,8 @@ def test_real_runtime_can_zipy_three_segments_publish_with_buffered_tail(fixture
             results = {}
             for role in roles:
                 p = kwargs.get("role_params", {}).get(role, kwargs.get("params", {}))
-                if role == Role.CAN:
+                if role != Role.ETHERNET:
+                    capture = captures[role]
                     if action in {"connect", "prepare"}:
                         details = getattr(capture, action)(p)
                     elif action in {"configure", "start"}:
@@ -864,28 +904,126 @@ def test_real_runtime_can_zipy_three_segments_publish_with_buffered_tail(fixture
         runtime.initialize().result(timeout=5)
         runtime._pool.close(abnormal=True)
         runtime._pool = Tools()
-        runtime.save_preferences({"can_cfg": params["cfg_path"], "can_logging_block": "1"}).result(timeout=5)
+        runtime.save_preferences(preferences).result(timeout=5)
         for number in range(3):
-            runtime.toggle((Role.CAN, Role.ETHERNET)).result(timeout=5)
+            runtime.toggle(roles).result(timeout=5)
             assert runtime.phase == SessionPhase.RECORDING
-            runtime.toggle((Role.CAN, Role.ETHERNET)).result(timeout=5)
+            runtime.toggle(roles).result(timeout=5)
             assert runtime.phase == SessionPhase.COMPLETED
             assert all(file.final_path.is_file() for file in runtime._plan.files)
-            can_file = next(file for file in runtime._plan.files if file.role == Role.CAN)
-            assert not can_file.temp_path.exists()
-            assert can_file.final_path.read_bytes()[-8:] == (2 * number + 1).to_bytes(8, "little")
-            assert app.Measurement.Running and not block.Trigger.Active
+            for file in runtime._plan.files:
+                if file.role == Role.ETHERNET:
+                    continue
+                assert not file.temp_path.exists()
+                assert file.final_path.read_bytes()[-8:] == (2 * number + 1).to_bytes(8, "little")
+                assert applications[file.role].Measurement.Running and not blocks[file.role].Trigger.Active
+                if file.role == Role.DIAG:
+                    assert captures[file.role].stats()["output_restore_deferred"]
+                    assert captures[file.role]._output_snapshot["full_name"] == blocks[file.role].original
         assert runtime._settings.next_index == 4
-        block.finish()
+        for role, capture in captures.items():
+            assert capture.release()["stop_confirmed"]
+            blocks[role].finish()
+            assert len(applications[role].open_calls) == 1
+            assert Path(preferences[f"{role.value}_cfg"]).read_bytes() == b"cfg must remain unchanged"
         runtime._submit(runtime._cleanup_retained_blf_sources).result(timeout=5)
         assert not (runtime.data_dir / "captures/.vil_work").exists()
         history = runtime._submit(lambda: runtime._repo.captures()).result(timeout=5)
         assert len(history) == 3 and all(row["phase"] == "completed" for row in history)
         assert all(file["metadata"]["inspection"]["finalization_files"][0]["cleaned"]
-                   for row in history for file in row["files"] if file["role"] == "can")
+                   for row in history for file in row["files"] if file["role"] in {"can", "diag"})
+    finally:
+        for block in blocks.values():
+            block.finish()
+        runtime.close_for_test()
+
+
+def test_restore_canonicalizes_cfg_parent_components_without_saving_cfg(fixture):
+    capture, app, params, root = fixture
+    original = str(root / ".." / root.name / "baseline.blf")
+    app.blocks[0] = block = RejectedIdlePathBlock(original, reject_canonical=False)
+    capture, app, path = prepared(fixture)
+    try:
+        capture.start("s1", {"temp_path": str(path)})
+        stopped = capture.stop("s1")
+        assert not stopped["output_restore_pending"]
+        assert block.restore_requests == [str(Path(original).resolve())]
+        assert block.FullName == str(Path(original).resolve()) and app.Measurement.Running
+        assert capture.inspect_file("s1")["object_count"] == 1
+        assert Path(params["cfg_path"]).read_bytes() == b"original configuration, never saved by AutoLog"
     finally:
         block.finish()
-        runtime.close_for_test()
+
+
+@pytest.mark.parametrize("close_on_stop", [False, True])
+def test_deferred_restore_survives_new_setter_failure_without_losing_baseline(fixture, close_on_stop):
+    capture, app, params, root = fixture
+    original = str(root / "rejected.blf")
+    app.blocks[0] = block = RejectedIdlePathBlock(original)
+    if close_on_stop:
+        def close_writer():
+            block.pause()
+            block.finish()
+        block.Trigger.Stop = close_writer
+    capture, app, path = prepared(fixture)
+    try:
+        capture.start("s1", {"temp_path": str(path)})
+        with pytest.raises(RuntimeError, match="stop is unconfirmed"):
+            capture.release()
+        assert block.Trigger.Active
+        assert capture.stop("s1")["output_restore_deferred"]
+        assert capture.inspect_file("s1")["object_count"] == 1
+        assert bool(capture._handoff) != close_on_stop
+        prior_idle = block.FullName
+        capture.prepare(params)
+        block.fail_output_once = str(root / "failed.blf")
+        with pytest.raises(RuntimeError, match="new output setter rejected"):
+            capture.configure("s2", {"temp_path": block.fail_output_once})
+        assert block.FullName == prior_idle and capture._output_snapshot["full_name"] == original
+        capture.prepare(params)
+        next_path = root / "next.blf"
+        capture.configure("s3", {"temp_path": str(next_path)})
+        capture.start("s3", {"temp_path": str(next_path)})
+        capture.stop("s3")
+        assert capture.inspect_file("s3")["object_count"] == 1
+        assert capture.release()["output_restore_deferred"]
+        assert app.Measurement.Running and not block.Trigger.Active
+        assert capture._output_snapshot["full_name"] == original
+    finally:
+        block.finish()
+
+
+@pytest.mark.parametrize("fault", ["path", "active", "option", "cfg", "layout", "selection"])
+def test_deferred_restore_does_not_adopt_foreign_recording_or_selection(fixture, fault):
+    capture, app, params, root = fixture
+    app.blocks[0] = block = RejectedIdlePathBlock(str(root / "rejected.blf"))
+    capture, app, path = prepared(fixture)
+    try:
+        capture.start("s1", {"temp_path": str(path)})
+        assert capture.stop("s1")["output_restore_deferred"]
+        capture.inspect_file("s1")
+        starts, stops = block.Trigger.starts, block.Trigger.stops
+        if fault == "path":
+            block.FullName = str(root / "foreign.blf")
+        elif fault == "active":
+            block.Trigger.Active = True
+        elif fault == "option":
+            block.FileNameOptions.IncrementAfterDuration = True
+        elif fault == "cfg":
+            app.Configuration.FullName = str(root / "foreign.cfg")
+        elif fault == "layout":
+            block.Name = "Foreign block"
+        else:
+            params = {**params, "logging_block": "2"}
+        with pytest.raises(RuntimeError):
+            capture.prepare(params)
+        assert (block.Trigger.starts, block.Trigger.stops) == (starts, stops)
+        assert path.is_file() and capture.stats()["output_restore_pending"]
+        if fault != "selection":
+            with pytest.raises(RuntimeError):
+                capture.release()
+    finally:
+        block.finish()
 
 
 def test_next_trigger_finalizes_every_real_file_without_stopping_measurement(fixture):

@@ -364,6 +364,8 @@ EVENTS = {
     "SESSION_FAILED": ("캡처 실패", "Capture failed"),
     "SESSION_INCOMPLETE": ("정지·보관 확인 필요 · 생성된 파일 보존", "Stop/archive needs review · created files preserved"),
     "OPERATION_ERROR": ("작업 오류", "Operation error"),
+    "CANOE_OUTPUT_RESTORE_DEFERRED": ("CANoe의 기존 출력 경로 복구 보류 · 다음 기록은 계속할 수 있습니다",
+                                      "Original CANoe output restoration deferred · Next recording is available"),
     "ENVIRONMENT_READY": ("환경 확인 완료", "Environment check completed"),
     "NO_TARGETS": ("로깅 대상을 하나 이상 선택하세요.", "Select at least one capture target."),
     "REAL_ADAPTER_UNAVAILABLE": ("실제 장비 연동은 아직 구현되지 않았습니다.",
