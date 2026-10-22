@@ -848,7 +848,8 @@ class Runtime:
                         self._accept_quality(details)
                         if details.get("link", {}).get("state") == "disconnected":
                             faults[role] = "Ethernet link disconnected"
-                        elif any(row.get("status") == "warning" for row in self._monitor_reports.get(role.value, {}).get("rules", [])):
+                        elif any(row.get("status") == "warning" or row.get("violation_reasons")
+                                 for row in self._monitor_reports.get(role.value, {}).get("rules", [])):
                             faults[role] = "Required Ethernet receive criteria failed"
                         report = self._monitor_reports.get(role.value, {})
                         unverified = report.get("status") == "unknown" and any(

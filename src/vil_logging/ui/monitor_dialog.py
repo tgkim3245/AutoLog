@@ -38,6 +38,8 @@ def monitor_description(report, language):
     for row in report.get("rules", []):
         lines.append(row["name"] + " · " + tr(row["status"], language))
         lines.extend(tr("monitor_reason_" + reason, language) for reason in row["reasons"])
+        lines.extend(row.get("violation_utc", "") + " · " + tr("monitor_reason_" + reason, language)
+                     for reason in row.get("violation_reasons", []) if reason not in row["reasons"])
         if row.get("last_capture_utc"):
             lines.append(tr("monitor_last", language) + ": " + row["last_capture_utc"])
         lines.append(tr("monitor_counts", language).format(

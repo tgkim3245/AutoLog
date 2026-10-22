@@ -37,6 +37,8 @@ class RuleState:
     previous_status: str = ""
     rate_buckets: deque = field(default_factory=lambda: deque(maxlen=21))
     low_rate_since: float | None = None
+    violation_reasons: list = field(default_factory=list)
+    violation_utc: str = ""
     counters: dict = field(default_factory=lambda: {"missing": 0, "source": 0, "recovered": 0, "unknown": 0})
 
 
@@ -105,6 +107,9 @@ class MonitorEngine:
             reasons = (["missing_flow"] if state.missing else []) + (["unexpected_source"] if state.source_warning else [])
             if rate_failed:
                 reasons.append("low_receive_rate")
+            if reasons and not state.violation_reasons:
+                state.violation_reasons = list(reasons)
+                state.violation_utc = datetime.fromtimestamp(wall, UTC).isoformat(timespec="milliseconds")
             status = "warning" if reasons else ("normal" if state.good >= state.rule.recovery_count else "unknown")
             if not reasons and status == "unknown":
                 reasons = ["waiting_samples"]
@@ -181,6 +186,7 @@ class MonitorEngine:
                          "age_ms": round((now - state.last_flow) * 1000) if state.last_flow is not None else None,
                          "matched_packets": state.matched, "mismatched_packets": state.mismatches,
                          "receive_pps": round(self._rate(state, now), 1), "minimum_pps": state.rule.minimum_pps,
+                         "violation_reasons": list(state.violation_reasons), "violation_utc": state.violation_utc,
                          "max_delay_ms": state.rule.max_delay_ms,
                          "recovery_samples": min(state.good, state.rule.recovery_count),
                          "counters": dict(state.counters)})

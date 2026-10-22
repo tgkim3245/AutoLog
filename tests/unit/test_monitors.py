@@ -86,6 +86,21 @@ def test_zipy_sparse_prefix_packets_fail_rate_without_a_silence_false_positive()
     assert "missing_flow" not in result["reasons"]
 
 
+def test_detected_failure_stays_latched_when_receive_recovers_before_next_ui_poll():
+    clock = Clock()
+    monitor = engine(clock)
+    for _ in range(2):
+        monitor.feed(clock.packet())
+    clock.advance(3)
+    # Feed detects the gap, then enough good packets recover current receive status.
+    for _ in range(2):
+        monitor.feed(clock.packet())
+    result = row(monitor)
+    assert result["status"] == "normal"
+    assert result["violation_reasons"] == ["missing_flow"]
+    assert result["violation_utc"]
+
+
 @pytest.mark.parametrize("prefix", ["02:00:00:00:00:01:00", "020000", None])
 def test_invalid_prefix_rejected(prefix):
     with pytest.raises(ValueError):

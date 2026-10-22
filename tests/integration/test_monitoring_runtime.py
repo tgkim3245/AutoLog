@@ -236,6 +236,15 @@ def test_cable_unplug_stops_every_target_and_preserves_files_once(real):
     assert runtime.phase == SessionPhase.COMPLETED
 
 
+def test_recovered_receive_still_stops_when_worker_detected_a_failure_between_polls(real):
+    runtime, tools = real
+    runtime.toggle((Role.ETHERNET,)).result(5)
+    tools.monitor["rules"][0]["violation_reasons"] = ["missing_flow"]
+    runtime._submit(runtime._query).result(5)
+    assert runtime.phase == SessionPhase.FAILED
+    assert runtime._plan.files[0].final_path.is_file()
+
+
 def test_delayed_ipc_report_cannot_leave_a_stale_normal_status(real):
     runtime, tools = real
     runtime.toggle((Role.ETHERNET,)).result(5)
