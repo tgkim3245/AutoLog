@@ -1,4 +1,4 @@
-"""Hold process handles for CANoe instances created by this AutoLog run."""
+"""Hold process handles for CANoe instances created by this One Click Log run."""
 
 import ctypes
 import logging
@@ -42,7 +42,7 @@ class OwnedCanoe:
                 raise ctypes.WinError(ctypes.get_last_error())
             created = ((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime) / 10000000 - 11644473600
             if Path(buffer.value).name.casefold() not in {"canoe.exe", "canoe32.exe", "canoe64.exe"} or created < self.started - 1:
-                raise ValueError("Refusing a process not created for this AutoLog run")
+                raise ValueError("Refusing a process not created for this One Click Log run")
             with self._lock:
                 if self._closing:
                     win32api.TerminateProcess(handle, 0)

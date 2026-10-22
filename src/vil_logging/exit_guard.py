@@ -35,7 +35,7 @@ class ExitGuard:
             if self._forcing or self._finished:
                 return
             self._forcing = True
-        threading.Thread(target=self._abort, args=(reason,), daemon=True, name="AutoLog-force-exit").start()
+        threading.Thread(target=self._abort, args=(reason,), daemon=True, name="One Click Log-force-exit").start()
 
     def _terminate(self):
         with self._lock:

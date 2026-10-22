@@ -1,14 +1,14 @@
-# AutoLog
+# One Click Log
 
 Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을 선택하고 상태에 따라 문구·색·클릭 동작이 바뀌는 메인 기록 버튼으로 제어합니다.
 
-배포받은 사용자는 EXE 옆 **START_HERE.txt**와 **AutoLog_User_Guide.html**을 먼저 읽으세요. Defender의 `CAPLcompExec.exe`·`CANoe64.exe` 허용 앱 등록과 최초 연결·기록·복구 절차를 안내합니다. [공식 사용자 가이드 관리 원본·변경 이력](user_guide/README.md)은 소프트웨어 변경과 함께 갱신하며 빌드/ZIP에 자동 포함합니다.
+배포받은 사용자는 EXE 옆 **START_HERE.txt**와 **One Click Log_User_Guide.html**을 먼저 읽으세요. Defender의 `CAPLcompExec.exe`·`CANoe64.exe` 허용 앱 등록과 최초 연결·기록·복구 절차를 안내합니다. [공식 사용자 가이드 관리 원본·변경 이력](user_guide/README.md)은 소프트웨어 변경과 함께 갱신하며 빌드/ZIP에 자동 포함합니다.
 
-현재 소스 버전은 **0.9.13**입니다. [단절·수신 감시·메인 화면·CANoe 종료 수정](docs/capture_safety_0_9_13.md)을 반영했습니다. [Wireshark CLI 동봉 배포](docs/bundled_tshark_0_9_12.md)로 TShark·dumpcap·capinfos와 필요한 DLL·프로토콜 자료를 ZIP 안에 넣고 기본 도구로 사용합니다. Wireshark 별도 설치는 필요 없으며 Npcap 드라이버는 별도로 설치합니다. 기존 [X 완전 종료·중단 구간 폐기](docs/shutdown_policy_0_9_11.md) 정책은 유지합니다.
+현재 소스 버전은 **0.9.14**입니다. [설정·유효성검사 팝업·이름/아이콘 변경](docs/ui_validation_0_9_14.md)을 반영했습니다. [단절·수신 감시·메인 화면·CANoe 종료 수정](docs/capture_safety_0_9_13.md)을 반영했습니다. [Wireshark CLI 동봉 배포](docs/bundled_tshark_0_9_12.md)로 TShark·dumpcap·capinfos와 필요한 DLL·프로토콜 자료를 ZIP 안에 넣고 기본 도구로 사용합니다. Wireshark 별도 설치는 필요 없으며 Npcap 드라이버는 별도로 설치합니다. 기존 [X 완전 종료·중단 구간 폐기](docs/shutdown_policy_0_9_11.md) 정책은 유지합니다.
 
 CAN과 Diag의 **연결 확인**은 서로 다른 cfg를 별도 CANoe 창에 연결합니다. 조회 가능한 로컬 Vector 장치의 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교하며, 실제 차량 수신 성공과 구분합니다. [Diag 반복 시작 수정](docs/canoe_fixes_0_9_9.md), [BLF 마지막 버퍼 완성](docs/canoe_fixes_0_9_8.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md), [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
-**기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
+설정의 **zipy 유효성검사**에서 수신 규칙과 실패 팝업 안내를 수정합니다. 원본 크기·증가 속도·해석 지연·저장 공간은 내부 진단에 남깁니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
 
 기본 선택은 **CAN·Zipy**입니다. `한 | EN | 中` 버튼은 클릭할 때마다 표시 언어를 바꾸고 기억합니다. Ethernet은 동봉된 도구를 기본으로 사용하며 다른 설치본만 직접 지정합니다. 네트워크 목록 오른쪽 그래프는 해당 어댑터 전체의 초당 수신 패킷 수입니다. **로그 폴더**는 사용자가 지정한 캡처 저장 폴더를 엽니다.
 
@@ -61,9 +61,9 @@ X는 언제든 종료합니다. 정상 정리가 실패하거나 약 3초가 지
 
 Python 3.14 x64 환경 준비와 검사 절차는 [개발 안내](CONTRIBUTING.md)에 있습니다. `run.cmd`는 프로젝트 `.venv`를 먼저 찾고 기존 AppData 개발 환경도 지원합니다.
 
-**`build.cmd`를 더블클릭하면** 버전별 Windows 배포 폴더와 ZIP을 만듭니다. 결과는 빌드 저장소 아래 `AutoLog-<SW버전>_<날짜_시각>/`에 저장하며 같은 버전을 다시 빌드해도 기존 파일을 덮어쓰지 않습니다. `AutoLog.exe`와 `_internal/`을 포함한 폴더 전체 또는 생성한 ZIP을 배포합니다.
+**`build.cmd`를 더블클릭하면** 버전별 Windows 배포 폴더와 ZIP을 만듭니다. 결과는 빌드 저장소 아래 `AutoLog-<SW버전>_<날짜_시각>/`에 저장하며 같은 버전을 다시 빌드해도 기존 파일을 덮어쓰지 않습니다. `One Click Log.exe`와 `_internal/`을 포함한 폴더 전체 또는 생성한 ZIP을 배포합니다.
 
-프로젝트가 사용자 `Documents` 안에 있는 이 PC의 기본 빌드 저장소는 `%USERPROFILE%\Downloads\AutoLog_Builds\`입니다. 그 외 경로에서는 프로젝트 `outputs/`를 사용하며 쓰기가 보호된 경우 다운로드 위치를 사용합니다. 실제 저장 경로는 빌드 화면에 표시하며 보안 설정은 변경하지 않습니다.
+프로젝트가 사용자 `Documents` 안에 있는 이 PC의 기본 빌드 저장소는 `%USERPROFILE%\Downloads\OneClickLog_Builds\`입니다. 그 외 경로에서는 프로젝트 `outputs/`를 사용하며 쓰기가 보호된 경우 다운로드 위치를 사용합니다. 실제 저장 경로는 빌드 화면에 표시하며 보안 설정은 변경하지 않습니다.
 
 SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉니다. 앱, 패키지, EXE 속성, 빌드 폴더명이 이 값을 함께 사용합니다. 빌드 상세 정보와 오류는 결과 폴더의 `build_info.json`과 `build.log`에 있습니다.
 
@@ -71,17 +71,17 @@ SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 바꿉
 
 ## 실제 기록과 개발자로그
 
-차량 캡처 파일은 앱에서 사용자가 선택한 저장 위치에 저장합니다. 저장 폴더, CANoe 구성 경로, TShark 경로, NIC와 파일 형식은 앱이 기억합니다. 사용자 설정·번호·이력 DB는 `%LOCALAPPDATA%\AutoLog`에 보관합니다.
+차량 캡처 파일은 앱에서 사용자가 선택한 저장 위치에 저장합니다. 저장 폴더, CANoe 구성 경로, TShark 경로, NIC와 파일 형식은 앱이 기억합니다. 사용자 설정·번호·이력 DB는 `%LOCALAPPDATA%\One Click Log`에 보관합니다.
 
-시작할 때 오래된 DB 이력을 같은 프로필의 `history_archive/AutoLog_history_*.jsonl.gz`로 내보내고 재읽기·해시 확인 후 정리합니다. 기본 90일·이벤트 10,000개·완료 세션/완료 파일 작업 각 1,000개 기준이며 최근 이벤트 500개와 완료 이력 각 100개는 남깁니다. 미완료·실패·미확인 파일 작업 관련 이력은 보존하고 캡처 파일과 다음 번호는 변경하지 않습니다. 내보내기 실패 시 DB도 유지합니다.
+시작할 때 오래된 DB 이력을 같은 프로필의 `history_archive/One Click Log_history_*.jsonl.gz`로 내보내고 재읽기·해시 확인 후 정리합니다. 기본 90일·이벤트 10,000개·완료 세션/완료 파일 작업 각 1,000개 기준이며 최근 이벤트 500개와 완료 이력 각 100개는 남깁니다. 미완료·실패·미확인 파일 작업 관련 이력은 보존하고 캡처 파일과 다음 번호는 변경하지 않습니다. 내보내기 실패 시 DB도 유지합니다.
 
-개발자로그는 항상 기록하며, 소스 실행 시 저장소 루트의 `developer_logs/`, 배포 실행 시 EXE 옆 `developer_logs/`에 저장합니다. 기본 파일명은 `AutoLog_developer.jsonl`이며 5MB 파일 하나와 최대 4개 순환 백업으로 크기를 제한합니다.
+개발자로그는 항상 기록하며, 소스 실행 시 저장소 루트의 `developer_logs/`, 배포 실행 시 EXE 옆 `developer_logs/`에 저장합니다. 기본 파일명은 `One_Click_Log_developer.jsonl`이며 5MB 파일 하나와 최대 4개 순환 백업으로 크기를 제한합니다.
 
 **버그리포트** 버튼은 최근 로그와 백업을 ZIP으로 묶어 바탕화면에 저장하고 `Taegon.Kim`에게 해당 파일을 이메일로 보내 달라고 안내합니다. ZIP의 `manifest.json`에 원본별 크기와 SHA256을 넣고 저장 전에 검증합니다. 압축 크기와 원본 크기는 다르며 내보낸 뒤에도 원본 로그는 계속 증가합니다. 앱이 이메일을 직접 보내지는 않습니다. 최근 활동 화면은 최대 500개를 표시합니다.
 
 ## 기존 사용자 데이터
 
-이전 `%LOCALAPPDATA%\Auto_Log` 또는 `%LOCALAPPDATA%\VILLogging`의 SQLite 설정과 번호 이력은 새 프로필이 없을 때 `%LOCALAPPDATA%\AutoLog`로 복사합니다. 이전 기본 prefix는 `AutoLog`로 바꾸고 사용자 지정 prefix, 저장 경로, 장치 선택과 다음 번호는 유지합니다. 기존 캡처 파일은 이동하거나 이름을 바꾸지 않습니다. 이전에 선택한 TShark 경로도 유지하며 자동으로 다른 설치본으로 바꾸지 않습니다.
+이전 `%LOCALAPPDATA%\AutoLog`, `Auto_Log`, `VILLogging`의 SQLite 설정과 번호 이력은 새 프로필이 없을 때 `%LOCALAPPDATA%\One Click Log`로 복사합니다. 이전 기본 prefix는 `One_Click_Log`로 바꾸고 사용자 지정 prefix, 저장 경로, 장치 선택과 다음 번호는 유지합니다. 기존 캡처 파일은 이동하거나 이름을 바꾸지 않습니다. 기존 프로그램이 실행 중이면 먼저 종료하도록 안내합니다.
 
 ## 구현 및 검증 범위
 

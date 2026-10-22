@@ -12,7 +12,7 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 class SingleInstance(QObject):
     activated = Signal()
 
-    def __init__(self, data_dir: Path, *, name_prefix: str = "AutoLog"):
+    def __init__(self, data_dir: Path, *, name_prefix: str = "OneClickLog"):
         super().__init__()
         data_dir.mkdir(parents=True, exist_ok=True)
         session_id = ctypes.c_ulong()

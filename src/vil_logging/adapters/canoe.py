@@ -174,7 +174,7 @@ class CanoeCapture:
                     self._trace("canoe.preparation_blocked", reason="manual_recording_active", block=self.index,
                                 **idle_output_change)
                     raise RuntimeError("The selected Logging Block is already recording. "
-                                       "Stop it manually before AutoLog starts a new segment.")
+                                       "Stop it manually before One Click Log starts a new segment.")
                 expected["blocks"][self.index - 1] = dict(selected)
                 self._trace("canoe.idle_output_refreshed", block=self.index, name=selected["name"],
                             **idle_output_change)
@@ -394,7 +394,7 @@ class CanoeCapture:
                     raise RuntimeError("Stop measurement manually before changing the configuration.")
                 if self.app.Configuration.Modified:
                     raise RuntimeError("The CANoe configuration has unsaved edits. Resolve them in CANoe "
-                                       "before switching configurations; AutoLog does not save or discard them.")
+                                       "before switching configurations; One Click Log does not save or discard them.")
                 self._trace("canoe.configuration_switch_requested", previous=self.cfg, requested=str(cfg))
                 self.app.Open(str(cfg), False, True)
             # Explicit Connect may adopt the user's exact chosen project in the owned
@@ -511,11 +511,11 @@ class CanoeCapture:
                         measurement_diagnostics=diagnostics)
             missing = ", ".join(diagnostics["missing_options"])
             history = f" CANoe Write history reports missing options: {missing} (may be an earlier attempt)." if missing else ""
-            raise RuntimeError("Start measurement (F9) in the AutoLog-created CANoe window after checking channel mapping "
+            raise RuntimeError("Start measurement (F9) in the One Click Log-created CANoe window after checking channel mapping "
                                "and all bus-option licenses required by this cfg. If F9 fails, review CANoe's Write window. "
                                "Confirm CAN reception in Trace, then press Start recording; measurement is checked automatically." + history)
         if self.block.Trigger.Active:
-            raise RuntimeError("The selected Logging Block is already recording. Stop it manually before AutoLog starts a new segment.")
+            raise RuntimeError("The selected Logging Block is already recording. Stop it manually before One Click Log starts a new segment.")
         self._trace("canoe.prepared", block=self.index)
         return {**details, **self.stats()}
 

@@ -68,7 +68,7 @@ class CaptureWorkerPool(FakeWorkerPool):
             if role not in self._processes:
                 parent, child = self._context.Pipe()
                 process = self._context.Process(target=canoe_worker_main, args=(role, child),
-                                                name=f"AutoLog-CANoe-{role.value}", daemon=True)
+                                                name=f"One Click Log-CANoe-{role.value}", daemon=True)
                 process.start()
                 child.close()
                 # CANoe is a user-visible COM server, never part of the kill-on-close capture job.
@@ -87,7 +87,7 @@ class CaptureWorkerPool(FakeWorkerPool):
                 import win32api
                 import win32con
                 import win32job
-                job = win32job.CreateJobObject(None, f"AutoLog-{os.getpid()}-{uuid4().hex}")
+                job = win32job.CreateJobObject(None, f"One Click Log-{os.getpid()}-{uuid4().hex}")
                 self._jobs[role] = job
                 limits = win32job.QueryInformationJobObject(job, win32job.JobObjectExtendedLimitInformation)
                 limits["BasicLimitInformation"]["LimitFlags"] |= win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE

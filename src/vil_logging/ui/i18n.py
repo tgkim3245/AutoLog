@@ -323,6 +323,15 @@ TEXT.update({
     "monitor_rate": ("2초 평균 {rate}pps · 최소 {minimum}pps", "2s average {rate}pps · Minimum {minimum}pps"),
 })
 
+TEXT.update({
+    "validation_title": ("zipy 유효성검사", "Zipy validation"),
+    "validation_help": ("기록 중 규칙 위반을 확인하면 전체 기록을 정지하고 아래 안내 문구를 팝업으로 표시합니다. 다른 Source의 패킷도 모두 저장합니다. 변경한 기준과 안내는 다음 기록부터 적용합니다.",
+                        "A rule violation stops all selected targets and shows its popup message. Other packet sources are saved too. Changed rules and messages apply to the next recording."),
+    "validation_fallback": ("Zipy 유효성검사에 실패하여 기록을 정지했습니다. 연결과 설정을 확인하세요.",
+                            "Recording stopped because Zipy validation failed. Check the connection and settings."),
+    "monitor_field_popup_message": ("팝업 안내 문구 (선택)", "Popup message (optional)"),
+})
+
 EVENTS = {
     "CAPTURE_AUTO_STOP": ("연결·통신 이상 확인 · 선택한 기록을 모두 정지하고 저장합니다", "Connection or receive failure · Stopping all selected targets and saving files"),
     "PREVIOUS_FORCED_EXIT": ("이전 실행이 강제 종료됐습니다. 중단 구간은 정리하고 새 기록을 시작할 수 있습니다.",

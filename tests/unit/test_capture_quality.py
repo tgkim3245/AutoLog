@@ -13,7 +13,6 @@ from vil_logging.diagnostics.capture_quality import CaptureMetrics, validate_buf
 from vil_logging.diagnostics.load_test import MAGIC, inspect_sequences, validate_load
 from vil_logging.storage.pcapng_stats import capture_loss_report
 from vil_logging.storage.repository import Repository
-from vil_logging.ui.quality_dialog import QualityDialog
 from vil_logging.ui.settings_dialog import SettingsDialog
 
 
@@ -181,23 +180,6 @@ def test_numbered_scanner_checks_identity_content_duplicates_and_missing(tmp_pat
 def test_load_parameters_bound_fixture_size(values):
     with pytest.raises(ValueError):
         validate_load(*values)
-
-
-def test_quality_ui_unknown_stale_and_final_samples_are_distinct(qtbot):
-    dialog = QualityDialog()
-    qtbot.addWidget(dialog)
-    assert "아직" in dialog.status.text()
-    data = {"state": "recording", "sampled_epoch": time.time(), "parsed_packets": 25,
-            "display_drops": 20, "metrics": {"file_bytes": 4096},
-            "capture_loss": {"driver_dropped": None, "os_dropped": None}}
-    dialog.set_report(data)
-    assert dialog.values["display"].text() == "20" and "확인 불가" in dialog.values["loss"].text()
-    dialog.set_report({**data, "sampled_epoch": time.time() - 10})
-    assert "갱신 지연" in dialog.status.text()
-    dialog.set_report({**data, "state": "archived", "packet_count": 25, "sampled_epoch": 1})
-    assert "보관 완료" in dialog.status.text() and "25 / 25" == dialog.values["counts"].text()
-    dialog.set_language("en")
-    assert "Unknown" in dialog.values["loss"].text() and "lossless" in dialog.note.text()
 
 
 def test_buffer_is_fixed_and_legacy_ui_choice_is_not_exposed(qtbot):

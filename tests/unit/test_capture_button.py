@@ -48,7 +48,6 @@ def test_cancel_is_requested_once_and_does_not_reenable_during_start_transition(
 
 def test_stop_remains_available_during_background_checks_and_cannot_be_double_clicked(window):
     spy = QSignalSpy(window.logging_requested)
-    window.set_environment_checking(True)
     window.set_target(TargetSnapshot(Role.DIAG, connection=ConnectionState.CONNECTING))
     window.set_phase(SessionPhase.RECORDING)
     assert window.logging_button.isEnabled()
@@ -63,7 +62,6 @@ def test_stop_remains_available_during_background_checks_and_cannot_be_double_cl
     assert window.logging_button.text() == "Zipy 파일 저장 중…"
     assert not window.logging_button.isEnabled()
     window.set_target(TargetSnapshot(Role.DIAG, connection=ConnectionState.READY))
-    window.set_environment_checking(False)
     window.set_phase(SessionPhase.COMPLETED)
     assert window.logging_button.text() == "다음 기록 시작"
 
@@ -75,9 +73,6 @@ def test_loading_connection_file_work_and_exit_are_visible_and_block_start(windo
     window.set_initializing(False, failed=True)
     assert button.text() == "초기화 실패" and not button.isEnabled()
     window.set_initializing(False)
-    window.set_environment_checking(True)
-    assert button.text() == "환경 확인 중…" and not button.isEnabled()
-    window.set_environment_checking(False)
     window.set_target(TargetSnapshot(Role.CAN, connection=ConnectionState.CONNECTING))
     assert button.text() == "CAN 연결 중…" and not button.isEnabled()
     window.set_target(TargetSnapshot(Role.CAN, connection=ConnectionState.READY))

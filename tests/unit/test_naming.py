@@ -33,7 +33,7 @@ def test_exact_role_names_share_large_decimal_index(tmp_path):
 
 def test_diag_only_retains_marker_and_zero_index(tmp_path):
     plan = build_plan(settings_for(tmp_path, next_index=0), (Role.DIAG,))
-    assert [file.filename for file in plan.files] == ["AutoLog_Diag_0.blf"]
+    assert [file.filename for file in plan.files] == ["One_Click_Log_Diag_0.blf"]
 
 
 def test_capture_prefix_adds_one_separator_and_preserves_existing_separator():

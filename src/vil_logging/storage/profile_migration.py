@@ -37,8 +37,8 @@ def migrate_legacy_profile(source_dir: Path, destination_dir: Path) -> bool:
             row = new_db.execute("SELECT document FROM settings WHERE id=1").fetchone()
             if row:
                 document = json.loads(row[0])
-                if document.get("prefix") in {"VIL", "Auto_Log"}:
-                    document["prefix"] = "AutoLog"
+                if document.get("prefix") in {"VIL", "Auto_Log", "AutoLog"}:
+                    document["prefix"] = "One_Click_Log"
                     new_db.execute("UPDATE settings SET document=? WHERE id=1", (
                         json.dumps(document, ensure_ascii=False, allow_nan=False),
                     ))

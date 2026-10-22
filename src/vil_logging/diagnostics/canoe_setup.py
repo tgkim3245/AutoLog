@@ -59,7 +59,7 @@ def ensure_independent_activation():
         if processes:
             raise CanoeActivationError(
                 "restart_required", "CANoe is running in shared COM mode. Save your work and close all CANoe "
-                "windows once, then reconnect. AutoLog will prepare independent connections automatically.",
+                "windows once, then reconnect. One Click Log will prepare independent connections automatically.",
                 path=path, process_ids=processes)
         result = set_single_client(path, True, expected=expected)
         log.info("canoe.independent_mode_prepared", extra={"fields": result})

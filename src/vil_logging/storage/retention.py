@@ -54,7 +54,7 @@ def maintain(repository, *, now=None, days=90, event_limit=10000, session_limit=
             return {"status": "unchanged", "counts": counts}
         folder = repository.db_path.parent / "history_archive"
         folder.mkdir(exist_ok=True)
-        archive = folder / ("AutoLog_history_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ_") + uuid4().hex + ".jsonl.gz")
+        archive = folder / ("One Click Log_history_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ_") + uuid4().hex + ".jsonl.gz")
         digest = hashlib.sha256()
         # Any export failure rolls back the DB. Completed exports survive a later crash.
         with archive.open("xb") as raw:

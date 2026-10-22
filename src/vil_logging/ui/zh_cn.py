@@ -195,7 +195,7 @@ PHRASES = {
     "Finish capture and resolve incomplete sessions first.": "请先结束记录并处理未完成会话。",
     "Simulation is ready. No real device is connected.": "模拟准备就绪，未连接实际设备。",
     "Measurement and logging block found. Start segment recording with logging.": "已确认测量与记录块，请点击 logging 开始分段记录。",
-    "Select a logging block and start measurement in the CANoe window opened by AutoLog, then check again.": "请选择记录块，在 AutoLog 打开的 CANoe 窗口中启动测量后重新检查。",
+    "Select a logging block and start measurement in the CANoe window opened by One Click Log, then check again.": "请选择记录块，在 One Click Log 打开的 CANoe 窗口中启动测量后重新检查。",
     "CANoe is in View Only mode. Activate a measurement license on the test PC, then check again.": "CANoe 处于只读模式，请在测试 PC 激活测量许可证后重新检查。",
     "The selected Logging Block is already recording. Stop that block in CANoe, then check again.": "所选记录块正在记录，请在 CANoe 中停止该记录块后重新检查。",
     "Close existing CANoe windows once after saving your work, then check the connection again.": "请先保存工作并关闭现有 CANoe 窗口，然后重新检查连接。",
@@ -258,4 +258,10 @@ EVENTS.update({
     "CAPTURE_AUTO_STOP": "连接或接收异常 · 停止所有选中目标并保存文件",
     "MONITOR_MISSING": "未收到所选数据流",
     "MONITOR_SOURCE": "所选数据流来源异常",
+})
+TEXT.update({
+    "validation_title": "Zipy 有效性检查",
+    "validation_help": "记录期间发现规则违反时，将停止所有选中目标并显示对应提示。其他来源的数据包也会保存。修改的规则和提示从下次记录生效。",
+    "validation_fallback": "Zipy 有效性检查失败，记录已停止。请检查连接和设置。",
+    "monitor_field_popup_message": "弹窗提示文字（可选）",
 })

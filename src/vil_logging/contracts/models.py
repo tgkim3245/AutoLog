@@ -64,7 +64,7 @@ class SessionPhase(StrEnum):
 
 @dataclass(frozen=True)
 class AppSettings:
-    prefix: str = "AutoLog"
+    prefix: str = "One_Click_Log"
     next_index: int = 1
     output_dir: str = ""
     ethernet_format: str = "pcap"

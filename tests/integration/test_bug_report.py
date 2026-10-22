@@ -51,13 +51,13 @@ def test_bug_report_button_exports_logs_and_shows_email_instructions(tmp_path):
                 assert title == "버그리포트"
                 assert "Taegon.Kim" in message
                 assert "@" not in message
-                assert "AutoLog_BugReport_" in message
-                reports = list(desktop.glob("AutoLog_BugReport_*.zip"))
+                assert "One_Click_Log_BugReport_" in message
+                reports = list(desktop.glob("One_Click_Log_BugReport_*.zip"))
                 assert len(reports) == 1
                 assert reports[0].name in message
                 with zipfile.ZipFile(reports[0]) as archive:
-                    assert "AutoLog_developer.jsonl" in archive.namelist()
-                    content = archive.read("AutoLog_developer.jsonl").decode("utf-8")
+                    assert "One_Click_Log_developer.jsonl" in archive.namelist()
+                    content = archive.read("One_Click_Log_developer.jsonl").decode("utf-8")
                     assert "bug_report.export_requested" in content
                     manifest = json.loads(archive.read("manifest.json"))
                     assert manifest["send_to"] == "Taegon.Kim"

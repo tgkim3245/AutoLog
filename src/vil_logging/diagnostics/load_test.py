@@ -17,7 +17,7 @@ from vil_logging.diagnostics.debug_log import DebugLogService
 from vil_logging.monitors.rules import encode_rules
 from vil_logging.runtime import Runtime
 
-MAGIC = b"AutoLog!"
+MAGIC = b"AutoLog!"  # Stable synthetic fixture format, independent of product branding.
 
 
 def validate_load(duration, pps, payload_size):

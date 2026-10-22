@@ -163,7 +163,7 @@ def bundle_wireshark(root, package, cache, work, logger):
         label = ("vendor-build-recipes" if item["name"].startswith("wireshark-vcpkg-scripts-")
                  else item["name"].split(".tar")[0])
         copy_licenses(source, package / "licenses/Wireshark" / label)
-    shutil.copy2(root / "packaging/WIRESHARK_BUNDLE_NOTICE.txt", destination / "AUTOLOG_BUNDLE_NOTICE.txt")
+    shutil.copy2(root / "packaging/WIRESHARK_BUNDLE_NOTICE.txt", destination / "ONE_CLICK_LOG_BUNDLE_NOTICE.txt")
     manifest = {"version": lock["version"], "installer": lock["installer"], "sources": lock["sources"],
                 "drivers_included": False, "version_checks": version_checks,
                 "files": [{"path": str(path.relative_to(package)).replace("\\", "/"),

@@ -1,9 +1,9 @@
-AutoLog bundled capture tools
+One Click Log bundled capture tools
 
 This directory contains unmodified TShark, dumpcap, capinfos, their runtime
 libraries, stock plugins and protocol resources from the official Wireshark
 Windows x64 distribution. Wireshark's graphical application is not included.
-AutoLog communicates with these separate programs through command-line arguments
+One Click Log communicates with these separate programs through command-line arguments
 and pipes; it does not link to Wireshark libraries.
 
 Wireshark is Copyright 1998-2026 Gerald Combs and contributors and is licensed
@@ -14,15 +14,15 @@ are provided unmodified from the official MSI as application-local dependencies.
 Corresponding upstream source archives and vendor build recipes are provided in
 ../../third_party_sources/Wireshark/. Extracted license texts are provided in
 ../../licenses/Wireshark/. bundle_manifest.json lists versions, source URLs and
-SHA256 hashes. Sources and libraries have not been modified by AutoLog. Vendor
+SHA256 hashes. Sources and libraries have not been modified by One Click Log. Vendor
 patches/build settings are described in the Wireshark source's FetchArtifacts,
 the vendor build-recipe archive, and the upstream dependency packages.
 These source files are for license compliance and rebuilding the external tools;
-end users do not need to compile them to run AutoLog.
+end users do not need to compile them to run One Click Log.
 
 Npcap and USBPcap drivers/installers are NOT included. A suitable Npcap installation
 is required for live capture on Windows. Driver installation is separate and may
-require administrator permission. AutoLog does not install or modify drivers.
+require administrator permission. One Click Log does not install or modify drivers.
 
 Wireshark project: https://www.wireshark.org/
 Wireshark license/aggregation guidance: https://www.wireshark.org/faq.html

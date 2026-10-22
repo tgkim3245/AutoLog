@@ -9,6 +9,7 @@ from build_release import read_app_metadata, windows_version_info
 
 app_name, app_version = read_app_metadata(project_root)
 license_data = [(str(path), 'licenses') for path in (project_root / 'licenses').glob('*') if path.is_file()]
+license_data.append((str(project_root / 'assets/one_click_log.ico'), 'assets'))
 python_license = Path(sys.base_prefix) / 'LICENSE.txt'
 if python_license.exists():
     license_data.append((str(python_license), 'licenses/Python'))
@@ -34,6 +35,7 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=app_name, debug=False,
+          icon=str(project_root / 'assets/one_click_log.ico'),
           bootloader_ignore_signals=False, strip=False, upx=False, console=False,
           version=windows_version_info(app_name, app_version))
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name=app_name)

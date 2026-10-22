@@ -109,7 +109,7 @@ def test_reservation_failure_never_sends_start(real, monkeypatch):
 
 def test_existing_output_blocks_capture_before_prepare(real):
     runtime, pool = real
-    existing = runtime.data_dir / "captures/AutoLog_1.pcap"
+    existing = runtime.data_dir / "captures/One_Click_Log_1.pcap"
     existing.write_bytes(b"precious original")
     runtime.toggle((Role.ETHERNET,)).result(timeout=5)
     assert not pool.calls and runtime._settings.next_index == 1

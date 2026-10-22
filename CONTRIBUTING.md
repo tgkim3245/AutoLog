@@ -2,7 +2,7 @@
 
 ## 프로젝트 기준
 
-- 제품명은 **AutoLog**이며 Python 패키지와 import 경로는 기존 호환성을 위해 `vil_logging`을 사용합니다.
+- 제품명은 **One Click Log**이며 Python 패키지와 import 경로는 기존 호환성을 위해 `vil_logging`을 사용합니다.
 - 앱 코드는 `src/vil_logging/` 아래에서 관리합니다. Python 화면 코드는 `src/vil_logging/ui/`, HTML 화면 시안은 `docs/design/wireframe.html`에 있습니다.
 - 장비가 필요 없는 검사는 `tests/unit/`과 `tests/integration/`에 둡니다. 실제 CANoe, NIC, TShark 장비 검증은 `tests/hardware/`에 분리합니다.
 - `.venv/`, `outputs/`, 로컬 설정과 업무 원본은 Git에 올리지 않습니다. 배포·검증 결과가 필요하면 `outputs/`에 보관하고, 재현 가능한 절차와 요약을 문서에 기록합니다.

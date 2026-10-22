@@ -21,7 +21,7 @@ def default_data_dir(demo: bool = False) -> Path:
 def legacy_data_dirs(demo: bool = False) -> tuple[Path, ...]:
     base = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share"))
     suffix = ("demo",) if demo else ()
-    return tuple(base.joinpath(name, *suffix) for name in ("Auto_Log", "VILLogging"))
+    return tuple(base.joinpath(name, *suffix) for name in ("AutoLog", "Auto_Log", "VILLogging"))
 
 
 def developer_log_directory(data_dir: Path, *, use_data_dir: bool = False,
@@ -130,17 +130,17 @@ def main(argv: list[str] | None = None) -> int:
 
     from vil_logging.contracts.models import AppEvent, SessionPhase
     from vil_logging.diagnostics.debug_log import DebugLogService
-    from vil_logging.diagnostics.readiness import missing_dependencies
     from vil_logging.instance import SingleInstance
     from vil_logging.runtime import Runtime
     from vil_logging.ui import MainWindow
-    from vil_logging.ui.environment_dialog import EnvironmentDialog
+    from vil_logging.ui.branding import application_icon
     from vil_logging.ui.i18n import tr
 
     app = QApplication(sys.argv[:1])
     app.setStyle("Fusion")
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(__version__)
+    app.setWindowIcon(application_icon())
     app.setOrganizationName(APP_NAME)
     app.setFont(QFont("Malgun Gothic", 9))
     app.setQuitOnLastWindowClosed(False)
@@ -151,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.data_dir is None:
             old_profiles = legacy_data_dirs(args.demo)
             for legacy_dir in old_profiles:
-                legacy_instance = SingleInstance(legacy_dir, name_prefix=legacy_dir.name)
+                legacy_instance = SingleInstance(legacy_dir, name_prefix=legacy_dir.parent.name if args.demo else legacy_dir.name)
                 if not legacy_instance.acquire(activate_existing=False):
                     for acquired in legacy_instances:
                         acquired.close()
@@ -273,58 +273,11 @@ def main(argv: list[str] | None = None) -> int:
     window.delete_files_requested.connect(runtime.delete_files)
     window.files_refresh_requested.connect(runtime.refresh_file_history)
     window.recovery_requested.connect(runtime.recover)
-    environment_dialog = EnvironmentDialog(window)
-    environment_state = {"environment": {}, "connections": {}, "pending": False, "discovering": False,
-                         "error": "", "startup_checked": args.demo}
-
-    def show_environment():
-        environment_dialog.set_language(window._language)
-        environment_dialog.set_roles(window.selected_roles())
-        environment_dialog.show()
-        environment_dialog.raise_()
-        environment_dialog.activateWindow()
-        environment_state["pending"] = True
-        window.set_environment_checking(True)
-        environment_state["error"] = ""
-        environment_dialog.set_busy(True)
-        runtime.diagnose()
-        runtime.discover()
-
     def toggle_capture():
-        if (not args.demo and runtime.phase in {SessionPhase.IDLE, SessionPhase.COMPLETED, SessionPhase.FAILED}
-                and missing_dependencies(environment_state["environment"], environment_state["connections"],
-                                         window.selected_roles())):
-            show_environment()
-            window.set_phase(runtime.phase)
-            return
         runtime.toggle(window.selected_roles())
         window.set_phase(runtime.phase)
 
     window.logging_requested.connect(toggle_capture)
-    window.environment_requested.connect(show_environment)
-    environment_dialog.refresh_requested.connect(show_environment)
-    environment_dialog.settings_requested.connect(window.settings_dialog.open_section)
-
-    def update_environment():
-        window.set_environment_checking(environment_state["pending"] or environment_state["discovering"])
-        environment_dialog.set_roles(window.selected_roles())
-        environment_dialog.set_report(environment_state["environment"], environment_state["connections"])
-        environment_dialog.set_busy(environment_state["pending"] or environment_state["discovering"])
-        if environment_state["error"]:
-            environment_dialog.set_error(environment_state["error"])
-            if not environment_state["startup_checked"]:
-                environment_state["startup_checked"] = True
-                environment_dialog.show()
-        if (not environment_state["startup_checked"] and environment_state["environment"]
-                and environment_state["connections"]):
-            environment_state["startup_checked"] = True
-            missing = missing_dependencies(environment_state["environment"], environment_state["connections"],
-                                           window.selected_roles())
-            debug.log("readiness.startup_checked", missing=sorted(missing))
-            if missing:
-                environment_dialog.show()
-                environment_dialog.raise_()
-                environment_dialog.activateWindow()
 
     def drain():
         nonlocal last_debug_error, exiting
@@ -338,7 +291,6 @@ def main(argv: list[str] | None = None) -> int:
                 break
             if kind == "settings":
                 window.set_settings(value)
-                environment_dialog.set_language(value.language)
             elif kind == "phase":
                 # A click already reflects the latest runtime phase immediately.
                 # Delayed queued notifications must not undo that newer state.
@@ -356,8 +308,8 @@ def main(argv: list[str] | None = None) -> int:
                 window.set_files(*value)
             elif kind == "capture_history":
                 window.set_capture_history(value)
-            elif kind == "capture_quality":
-                window.set_capture_quality(value)
+            elif kind == "validation_failure":
+                window.show_validation_failure(value)
             elif kind == "file_operations":
                 window.file_manager.set_operations(value)
             elif kind == "file_busy":
@@ -370,27 +322,13 @@ def main(argv: list[str] | None = None) -> int:
                 window.recovery_dialog.set_result(value)
             elif kind == "connections":
                 window.set_connection_discovery(value)
-                environment_state["connections"] = value
-                update_environment()
             elif kind == "discovery_busy":
                 window.settings_dialog.set_discovery_busy(value)
-                environment_state["discovering"] = value
-                update_environment()
             elif kind == "discovery_error":
                 window.settings_dialog.set_error(value)
                 window.settings_dialog.set_discovery_error(value)
-                environment_state["error"] = value
-                update_environment()
             elif kind == "preparation":
                 window.set_preparation_report(value)
-            elif kind == "environment" and not args.smoke_test:
-                environment_state["environment"] = value
-                environment_state["pending"] = False
-                update_environment()
-            elif kind == "environment_error":
-                environment_state["pending"] = False
-                environment_state["error"] = value
-                update_environment()
             elif kind == "exit_ready":
                 if value:
                     # Leave the UI event loop only after orderly shutdown is verified.
@@ -422,13 +360,13 @@ def main(argv: list[str] | None = None) -> int:
     if not args.smoke_test or args.smoke_discovery:
         runtime.discover()
     if not args.demo:
-        environment_state["pending"] = True
-        runtime.diagnose()
+        runtime.diagnose(show=False)
     from vil_logging.diagnostics.ui_responsiveness import UiResponsiveness
     responsiveness = UiResponsiveness()
     window.show()
     smoke = {"started": False, "stopped": False, "passed": False, "button_actions": [],
-             "discovery_passed": not args.smoke_discovery}
+             "discovery_passed": not args.smoke_discovery, "validation_requested": False,
+             "validation_passed": False, "icon_passed": False}
     if args.smoke_test:
         smoke_timer = QTimer()
         smoke_timer.setInterval(100)
@@ -461,6 +399,28 @@ def main(argv: list[str] | None = None) -> int:
             elif runtime.phase == SessionPhase.COMPLETED:
                 if window._phase != SessionPhase.COMPLETED:
                     return
+                from dataclasses import asdict
+
+                from vil_logging.monitors.rules import (
+                    DEFAULT_POPUP_MESSAGE,
+                    default_rules_json,
+                    parse_rules,
+                )
+                if not smoke["validation_requested"]:
+                    smoke["validation_requested"] = True
+                    payload = {"session_id": runtime._plan.session_id,
+                               "rules": [asdict(parse_rules(default_rules_json())[0])]}
+                    runtime._publish("validation_failure", payload)
+                    runtime._publish("validation_failure", payload)
+                    return
+                if not window._validation_alerts:
+                    return
+                assert len(window._validation_alerts) == 1
+                alert = window._validation_alerts[0]
+                assert alert.text() == DEFAULT_POPUP_MESSAGE and not alert.isModal()
+                assert not window.windowIcon().isNull()
+                smoke["validation_passed"] = smoke["icon_passed"] = True
+                debug.log("smoke.validation_popup_verified", nonmodal=True, deduplicated=True, icon_present=True)
                 smoke["passed"] = True
                 smoke_timer.stop()
                 window.close()
@@ -490,6 +450,8 @@ def main(argv: list[str] | None = None) -> int:
         exit_guard.finish()
     if args.smoke_test:
         print(json.dumps({"smoke_passed": smoke["passed"], "data_dir": str(data_dir),
+                          "validation_popup_verified": smoke["validation_passed"],
+                          "application_icon_verified": smoke["icon_passed"],
                           "capture_button_actions": smoke["button_actions"],
                           "developer_log_default": developer_log_default,
                           "developer_log_path": str(debug.log_path or ""),

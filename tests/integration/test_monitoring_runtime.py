@@ -245,6 +245,24 @@ def test_recovered_receive_still_stops_when_worker_detected_a_failure_between_po
     assert runtime._plan.files[0].final_path.is_file()
 
 
+def test_validation_alert_carries_rule_message_once_while_normal_stop_archives(real):
+    runtime, tools = real
+    runtime.toggle((Role.ETHERNET,)).result(5)
+    tools.monitor = report("warning", source=1)
+    tools.monitor["rules"][0]["popup_message"] = "테스트 안내\n|6 → e1"
+    runtime._submit(runtime._query).result(5)
+    runtime._submit(runtime._query).result(5)
+    alerts = []
+    while not runtime.messages.empty():
+        kind, value = runtime.messages.get_nowait()
+        if kind == "validation_failure":
+            alerts.append(value)
+    assert len(alerts) == 1
+    assert alerts[0]["rules"][0]["popup_message"] == "테스트 안내\n|6 → e1"
+    assert runtime.phase == SessionPhase.FAILED
+    assert runtime._plan.files[0].final_path.is_file()
+
+
 def test_delayed_ipc_report_cannot_leave_a_stale_normal_status(real):
     runtime, tools = real
     runtime.toggle((Role.ETHERNET,)).result(5)

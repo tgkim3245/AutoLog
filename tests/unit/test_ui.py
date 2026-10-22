@@ -119,7 +119,7 @@ def test_demo_file_actions_explain_that_no_files_are_created(qtbot, monkeypatch)
     window = MainWindow(demo=True)
     qtbot.addWidget(window)
     assert "모의 데모" in window.demo_label.text()
-    assert "실제 로그 파일을 만들지 않습니다" in window.footer.text()
+    assert not hasattr(window, "footer")
     assert not window.rename_button.isEnabled()
     assert not window.delete_button.isEnabled()
     assert "실제 파일을 만들지 않아" in window.rename_button.toolTip()
@@ -148,7 +148,7 @@ def test_settings_applied_language_is_reflected_in_all_views(window):
     window.set_settings(AppSettings(language="en", ethernet_format="pcapng"))
     assert window.file_manager_button.text() == "Operation history"
     assert window.target_formats[Role.ETHERNET].text() == ".pcapng"
-    assert "AutoLog_1.pcapng" in window.file_names.text()
+    assert "One_Click_Log_1.pcapng" in window.file_names.text()
 
 
 def test_capture_preview_adds_delimiter_to_user_entered_prefix(window):
@@ -170,14 +170,13 @@ def test_demo_results_do_not_claim_real_files_completed(qtbot, monkeypatch):
     instance = MainWindow(demo=True)
     qtbot.addWidget(instance)
     instance.set_phase(SessionPhase.RECORDING)
-    assert "모의 기록 중" in instance.phase_label.text()
+    assert "모의" in instance.logging_button.text() and "기록 중" in instance.logging_button.text()
     instance.set_phase(SessionPhase.COMPLETED)
     instance.set_files(["VIL_1.pcap"], "demo_files")
-    assert instance.phase_label.text() == "모의 종료 · 파일 미생성"
+    assert not hasattr(instance, "phase_label")
     assert "파일 미생성" in instance.subtitle.text()
     assert "파일 미생성" in instance.file_heading.text()
     instance.set_language("en")
-    assert instance.phase_label.text() == "Simulation ended · no files created"
     assert "no files created" in instance.file_heading.text()
 
 

@@ -178,6 +178,7 @@ class MonitorEngine:
         for state in self.rules:
             status, reasons = self._evaluate(state, now, wall, reader_ok) if self.active else ("not_monitored", [])
             rows.append({"id": state.rule.id, "name": state.rule.name, "status": status, "reasons": reasons,
+                         "popup_message": state.rule.popup_message,
                          "last_capture_utc": state.last_capture_utc, "last_source": state.last_source,
                          "last_source_mac": state.last_source_mac, "last_mismatch_utc": state.last_mismatch_utc,
                          "last_mismatch_source": state.last_mismatch_source, "last_mismatch_mac": state.last_mismatch_mac,

@@ -81,7 +81,7 @@ def verify():
                 elif self.step == 6 and self._phase == SessionPhase.COMPLETED and self.rename_button.isEnabled():
                     assert len(self._files) == 1 and Path(self._files[0]).is_file()
                     assert self._settings.next_index == 2
-                    assert self.quality_dialog.report["packet_count"] == 8
+                    assert self._capture_history[0]["files"][0]["status"] == "published"
                     self.initial_height = self.height()
                     self.previous_name.setText("UI_renamed")
                     self.rename_button.click()

@@ -243,7 +243,7 @@ def test_bug_report_export_contains_current_and_rotated_logs(tmp_path: Path) -> 
 
     report = service.export_report(tmp_path / "Desktop")
     assert report.parent.name == "Desktop"
-    assert report.name.startswith("AutoLog_BugReport_")
+    assert report.name.startswith("One_Click_Log_BugReport_")
     with zipfile.ZipFile(report) as archive:
         names = archive.namelist()
         assert path.name in names

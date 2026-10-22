@@ -3,9 +3,11 @@
 import ipaddress
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 MAX_RULES = 16
+DEFAULT_RULE_NAME = "Zipy 활성화 실패"
+DEFAULT_POPUP_MESSAGE = "Zipy 데이터 활성화에 실패하였습니다. Render 터미널에 아래의 커맨드를 입력하세요. |6 → e1"
 
 
 def address(value, *, mac=False):
@@ -36,6 +38,7 @@ class EthernetRule:
     expected_mac: str = ""
     source_mac_prefix: str = ""
     minimum_pps: int = 0
+    popup_message: str = ""
 
     def __post_init__(self):
         for key in ("id", "name"):
@@ -64,6 +67,8 @@ class EthernetRule:
         object.__setattr__(self, "source_mac_prefix", prefix)
         if type(self.minimum_pps) is not int or not 0 <= self.minimum_pps <= 10000000:
             raise ValueError("minimum_pps: 0~10000000 integer required")
+        if not isinstance(self.popup_message, str) or len(self.popup_message) > 2048 or "\x00" in self.popup_message:
+            raise ValueError("Popup message must be text of at most 2048 characters")
 
     def in_flow(self, packet):
         return ((not self.protocol or packet.protocol.upper() == self.protocol) and
@@ -104,5 +109,20 @@ def encode_rules(rules) -> str:
 
 def default_rules_json():
     # A presence/rate selector, not an exclusive source allow-list or capture filter.
-    return encode_rules([EthernetRule("zipy-source-020000", "Zipy · 02:00:00", 3000, 5000, 1500, 10,
-                                     source_mac_prefix="02:00:00", minimum_pps=100)])
+    return encode_rules([EthernetRule("zipy-source-020000", DEFAULT_RULE_NAME, 3000, 5000, 1500, 10,
+                                     source_mac_prefix="02:00:00", minimum_pps=100, popup_message=DEFAULT_POPUP_MESSAGE)])
+
+
+def upgrade_default_popup(document):
+    """Upgrade the old built-in rule once; preserve explicit custom messages/criteria."""
+    rules = parse_rules(document)
+    if not document:
+        return default_rules_json()
+    raw = json.loads(document)["ethernet"]
+    updated = []
+    for rule, item in zip(rules, raw, strict=True):
+        if rule.id == "zipy-source-020000" and "popup_message" not in item:
+            rule = replace(rule, name=DEFAULT_RULE_NAME if rule.name == "Zipy · 02:00:00" else rule.name,
+                           popup_message=DEFAULT_POPUP_MESSAGE)
+        updated.append(rule)
+    return encode_rules(updated) if tuple(updated) != rules else document

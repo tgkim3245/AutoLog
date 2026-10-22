@@ -8,7 +8,6 @@ from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QFileDialog
 
 from vil_logging.contracts.models import AppSettings, ConnectionState, Role, TargetSnapshot
-from vil_logging.ui.environment_dialog import EnvironmentDialog
 from vil_logging.ui.settings_dialog import SettingsDialog
 
 
@@ -126,26 +125,6 @@ def test_discovery_never_overwrites_a_tool_selected_while_scan_was_running(dialo
     dialog.fields["tshark_path"].setText("D:/chosen/tshark.exe")
     dialog.set_connection_discovery(discovered())
     assert dialog.fields["tshark_path"].text() == "D:/chosen/tshark.exe"
-
-
-def test_environment_is_readable_and_details_are_optional(qtbot):
-    instance = EnvironmentDialog()
-    qtbot.addWidget(instance)
-    instance.set_report({}, discovered())
-    assert instance.details.isHidden()
-    assert "Wireshark" in instance.cards["tshark"][2].text()
-    assert "설치" in instance.cards["canoe"][2].text()
-    spy = QSignalSpy(instance.settings_requested)
-    instance.cards["network"][3].click()
-    assert spy.at(0)[0] == "ethernet"
-    instance.set_busy(True)
-    assert not instance.refresh_button.isEnabled()
-    assert "확인 중" in instance.summary.text()
-    instance.set_error("A diagnostic error")
-    assert instance.refresh_button.isEnabled()
-    assert instance.summary.property("tone") == "error"
-    instance.set_language("en")
-    assert instance.summary.text() == "Check failed"
 
 
 def test_opening_settings_refreshes_network_inventory(dialog):

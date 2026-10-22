@@ -192,7 +192,7 @@ def verify_monitoring(data_dir: Path, *, tshark_path: str = "") -> dict:
 
             def send(count, delay):
                 for number in range(count):
-                    sender.sendto(f"AutoLog-monitor-fixture-{number}".encode(), ("127.0.0.1", port))
+                    sender.sendto(f"One Click Log-monitor-fixture-{number}".encode(), ("127.0.0.1", port))
                     time.sleep(delay)
 
             def wait_normal(min_packets):

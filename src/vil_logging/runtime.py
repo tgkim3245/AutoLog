@@ -180,6 +180,11 @@ class Runtime:
             from vil_logging.monitors.rules import default_rules_json
             self._settings = self._repo.save_preferences({"monitor_rules_json": default_rules_json()})
             log.info("monitor.zipy_default_added")
+        from vil_logging.monitors.rules import upgrade_default_popup
+        upgraded = upgrade_default_popup(self._settings.monitor_rules_json)
+        if upgraded != self._settings.monitor_rules_json:
+            self._settings = self._repo.save_preferences({"monitor_rules_json": upgraded})
+            log.info("validation.default_popup_upgraded")
         from vil_logging.diagnostics.capture_tools import replaces_legacy_managed_tool
         if replaces_legacy_managed_tool(self._settings.tshark_path):
             self._settings = self._repo.save_preferences({"tshark_path": ""})
@@ -225,7 +230,7 @@ class Runtime:
 
         self._ready = True
         self._event("APP_READY", demo=self.demo, data_dir=str(self.data_dir))
-        marker = self.data_dir / "AutoLog_force_exit.json"
+        marker = self.data_dir / "One_Click_Log_force_exit.json"
         if marker.is_file():
             try:
                 if marker.stat().st_size > 65536:
@@ -472,10 +477,10 @@ class Runtime:
             ready = stage == "segment_ready"
             ko, en = (stage_guidance(stage, language) for language in ("ko", "en"))
             detail_ko = ("기록 중에는 CANoe의 기존 로깅 버튼·파일 설정을 함께 조작하지 마세요. "
-                         "AutoLog는 선택 블록의 경로·자동 번호 옵션을 구간 동안 적용하고 정지 후 복구합니다.") if block else ""
-            detail_en = ("Avoid concurrent CANoe logging controls or filename edits. AutoLog temporarily manages "
+                         "One Click Log는 선택 블록의 경로·자동 번호 옵션을 구간 동안 적용하고 정지 후 복구합니다.") if block else ""
+            detail_en = ("Avoid concurrent CANoe logging controls or filename edits. One Click Log temporarily manages "
                          "this block's path and filename options, then restores them after stop.") if block else ""
-            detail_zh = ("记录期间请勿同时操作 CANoe 的记录控制或修改文件名。AutoLog 会临时管理此块的路径和文件名选项，停止后恢复。") if block else ""
+            detail_zh = ("记录期间请勿同时操作 CANoe 的记录控制或修改文件名。One Click Log 会临时管理此块的路径和文件名选项，停止后恢复。") if block else ""
             diagnostics = details.get("measurement_diagnostics", {})
             detail_ko = "\n".join(filter(None, (option_history_text(diagnostics, "ko"), detail_ko)))
             detail_en = "\n".join(filter(None, (option_history_text(diagnostics, "en"), detail_en)))
@@ -507,9 +512,9 @@ class Runtime:
                   if restart else "Could not prepare independent CANoe connections automatically. Review setup access."
                   if setup_failed else "CANoe connection failed. Review the detailed error.")
             if restart:
-                detail = ("AutoLog가 필요한 설정을 자동 적용하고 각 .cfg를 별도 CANoe 창으로 엽니다. 연결 방식 선택은 필요 없습니다."
+                detail = ("One Click Log가 필요한 설정을 자동 적용하고 각 .cfg를 별도 CANoe 창으로 엽니다. 연결 방식 선택은 필요 없습니다."
                           if self._settings.language == "ko" else
-                          "AutoLog will prepare the required mode and open each .cfg in its own CANoe instance automatically.")
+                          "One Click Log will prepare the required mode and open each .cfg in its own CANoe instance automatically.")
             elif setup_failed:
                 detail = ("CANoe 설치 설정을 읽거나 적용하지 못했습니다. 설정 파일: " if self._settings.language == "ko" else
                           "Could not read or apply the CANoe installation setting. Settings file: ") + details.get("settings_path", "")
@@ -865,6 +870,9 @@ class Runtime:
                         if role in faults:
                             self._event("CAPTURE_AUTO_STOP", level="ERROR", target=role.label,
                                         original=faults[role], link=details.get("link"), monitor=self._monitor_reports.get(role.value))
+                            self._publish("validation_failure", {"session_id": self._plan.session_id,
+                                "cause": faults[role], "rules": [dict(row) for row in report.get("rules", [])
+                                    if row.get("status") == "warning" or row.get("violation_reasons")]})
                     if details.get("summary_drops", 0) and not self._observation_loss_reported:
                         self._observation_loss_reported = True
                         self._event("DISPLAY_SUMMARY_LOSS", level="WARNING", target=role.label,
@@ -1338,7 +1346,7 @@ class Runtime:
             notice["worker_abort_error"] = str(error)
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
-            path = self.data_dir / "AutoLog_force_exit.json"
+            path = self.data_dir / "One_Click_Log_force_exit.json"
             temporary = path.with_suffix(".json.new")
             temporary.write_text(json.dumps(notice, ensure_ascii=False), encoding="utf-8")
             os.replace(temporary, path)

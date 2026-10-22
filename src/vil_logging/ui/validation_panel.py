@@ -1,35 +1,33 @@
-"""Receive evidence and editable Ethernet monitor criteria."""
-
+"""Zipy receive validation rules embedded in Settings."""
 from dataclasses import asdict
 from uuid import uuid4
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QDialog,
     QFormLayout,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
-    QTableWidget,
-    QTableWidgetItem,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from vil_logging.contracts.models import Role, TargetSnapshot
 from vil_logging.monitors.rules import MAX_RULES, EthernetRule, encode_rules, parse_rules
 
 from .i18n import tr
-from .theme import ThemedComboBox, apply_theme
+from .theme import ThemedComboBox
 
-FIELDS = ("name", "protocol", "destination_ip", "destination_mac", "expected_ip", "expected_mac",
-          "source_mac_prefix", "minimum_pps", "timeout_ms", "grace_ms", "max_delay_ms", "recovery_count")
+FIELDS = ("name", "popup_message", "source_mac_prefix", "minimum_pps", "protocol", "destination_ip",
+          "destination_mac", "expected_ip", "expected_mac", "timeout_ms", "grace_ms", "max_delay_ms", "recovery_count")
 
+def _field_text(field):
+    return field.toPlainText() if isinstance(field, QPlainTextEdit) else field.text()
+
+def _set_field_text(field, text):
+    field.setPlainText(text) if isinstance(field, QPlainTextEdit) else field.setText(text)
 
 def monitor_description(report, language):
     lines = []
@@ -55,111 +53,74 @@ def monitor_description(report, language):
             errors=report.get("parse_errors", 0)))
     return "\n".join(lines)
 
-
-class MonitorDialog(QDialog):
+class ValidationPanel(QWidget):
     preferences_changed = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("monitorDialog")
-        self.resize(860, 650)
-        self.setMinimumSize(720, 520)
-        apply_theme(self)
+        self.setObjectName("zipyValidationPanel")
         self._language = "ko"
         self._rules = []
         self._editing_id = ""
-        self._locked = False
-        self._updating = False
+        self._locked = self._updating = False
         self._drafts = {}
         self._document = None
-        self._targets = {role: TargetSnapshot(role) for role in Role}
         layout = QVBoxLayout(self)
-        self.help_label = QLabel()
-        self.help_label.setWordWrap(True)
-        layout.addWidget(self.help_label)
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs, 1)
-        status_page = QWidget()
-        status_layout = QVBoxLayout(status_page)
-        self.table = QTableWidget(0, 5)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.verticalHeader().hide()
-        for col in (0, 1):
-            self.table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
-        for col in (2, 3, 4):
-            self.table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
-        status_layout.addWidget(self.table, 1)
-        self.details = QPlainTextEdit()
-        self.details.setReadOnly(True)
-        status_layout.addWidget(self.details, 1)
-        self.tabs.addTab(status_page, "")
-        editor = QWidget()
-        editor_layout = QVBoxLayout(editor)
+        layout.setContentsMargins(10, 10, 10, 10)
         self.rules_hint = QLabel()
         self.rules_hint.setWordWrap(True)
-        editor_layout.addWidget(self.rules_hint)
-        rule_row = QHBoxLayout()
+        layout.addWidget(self.rules_hint)
+        row = QHBoxLayout()
         self.rule_combo = ThemedComboBox()
         self.rule_combo.currentIndexChanged.connect(self._choose_rule)
-        rule_row.addWidget(self.rule_combo, 1)
+        row.addWidget(self.rule_combo, 1)
         self.new_button = QPushButton()
         self.new_button.clicked.connect(self._new_rule)
-        rule_row.addWidget(self.new_button)
+        row.addWidget(self.new_button)
         self.delete_button = QPushButton()
         self.delete_button.clicked.connect(self._delete_rule)
-        rule_row.addWidget(self.delete_button)
-        editor_layout.addLayout(rule_row)
+        row.addWidget(self.delete_button)
+        layout.addLayout(row)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         body = QWidget()
         form = QFormLayout(body)
-        self.fields = {}
-        self.labels = {}
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        self.fields, self.labels = {}, {}
         for key in FIELDS:
-            field = QLineEdit()
-            field.setObjectName("monitor_" + key)
-            label = QLabel()
-            self.fields[key], self.labels[key] = field, label
-            form.addRow(label, field)
+            field = QPlainTextEdit() if key == "popup_message" else QLineEdit()
+            if key == "popup_message":
+                field.setFixedHeight(88)
+            field.setObjectName("validation_" + key)
+            self.fields[key], self.labels[key] = field, QLabel()
+            form.addRow(self.labels[key], field)
         scroll.setWidget(body)
-        editor_layout.addWidget(scroll, 1)
+        layout.addWidget(scroll, 1)
         self.error_label = QLabel()
         self.error_label.setWordWrap(True)
         self.error_label.setProperty("tone", "error")
         self.error_label.hide()
-        editor_layout.addWidget(self.error_label)
+        layout.addWidget(self.error_label)
         self.save_button = QPushButton()
         self.save_button.setProperty("variant", "primary")
         self.save_button.clicked.connect(self._save_rule)
-        editor_layout.addWidget(self.save_button)
-        self.tabs.addTab(editor, "")
-        self.close_button = QPushButton()
-        self.close_button.clicked.connect(self.close)
-        layout.addWidget(self.close_button)
+        layout.addWidget(self.save_button)
         self.set_language("ko")
         self._render_rules()
 
     def set_language(self, language):
         self._language = language
-        self.setWindowTitle(tr("monitor_title", language))
-        self.help_label.setText(tr("monitor_help", language))
-        self.rules_hint.setText(tr("monitor_rules_help", language))
-        self.tabs.setTabText(0, tr("monitor_status", language))
-        self.tabs.setTabText(1, tr("monitor_rules", language))
+        self.rules_hint.setText(tr("validation_help", language))
         if self.rule_combo.count():
             self.rule_combo.setItemText(0, tr("monitor_new", language))
-        self.table.setHorizontalHeaderLabels([tr(key, language) for key in (
-            "monitor_target_rule", "file_state", "monitor_last", "source", "monitor_samples")])
         for key, label in self.labels.items():
             label.setText(tr("monitor_field_" + key, language))
             self.fields[key].setPlaceholderText(tr("monitor_optional" if key in {
-                "protocol", "destination_ip", "destination_mac", "expected_ip", "expected_mac", "source_mac_prefix", "minimum_pps"}
-                else "monitor_required", language))
+                "popup_message", "source_mac_prefix", "minimum_pps", "protocol", "destination_ip",
+                "destination_mac", "expected_ip", "expected_mac"} else "monitor_required", language))
         for button, key in ((self.new_button, "monitor_new"), (self.delete_button, "monitor_delete"),
-                            (self.save_button, "monitor_save"), (self.close_button, "close")):
+                            (self.save_button, "monitor_save")):
             button.setText(tr(key, language))
-        self._render_status()
 
     def set_settings(self, settings):
         if settings.monitor_rules_json == self._document:
@@ -191,7 +152,7 @@ class MonitorDialog(QDialog):
 
     def _choose_rule(self, *_):
         if not self._updating:
-            self._drafts[self._editing_id] = {key: field.text() for key, field in self.fields.items()}
+            self._drafts[self._editing_id] = {key: _field_text(field) for key, field in self.fields.items()}
             self._load_rule()
 
     def _load_rule(self):
@@ -199,7 +160,7 @@ class MonitorDialog(QDialog):
         rule = next((rule for rule in self._rules if rule.id == self._editing_id), None)
         values = self._drafts.get(self._editing_id, asdict(rule) if rule else {})
         for key, field in self.fields.items():
-            field.setText(str(values.get(key, "")))
+            _set_field_text(field, str(values.get(key, "")))
         self.delete_button.setEnabled(not self._locked and bool(rule))
 
     def _new_rule(self):
@@ -209,7 +170,7 @@ class MonitorDialog(QDialog):
         if self._locked:
             return
         try:
-            values = {key: field.text().strip() for key, field in self.fields.items()}
+            values = {key: _field_text(field).strip() for key, field in self.fields.items()}
             values["minimum_pps"] = values["minimum_pps"] or "0"
             for key in ("timeout_ms", "grace_ms", "max_delay_ms", "recovery_count", "minimum_pps"):
                 if not values[key] or not values[key].isascii() or not values[key].isdecimal() or len(values[key]) > 9:
@@ -241,25 +202,3 @@ class MonitorDialog(QDialog):
         for widget in (*self.fields.values(), self.rule_combo, self.new_button, self.save_button):
             widget.setEnabled(not locked)
         self.delete_button.setEnabled(not locked and bool(self._editing_id))
-
-    def set_target(self, target):
-        self._targets[target.role] = target
-        self._render_status()
-
-    def _render_status(self):
-        rows, details = [], []
-        for role, target in self._targets.items():
-            report = target.observation_details
-            details.append(role.label + " · " + tr(target.observation.value, self._language) + "\n" +
-                           monitor_description(report, self._language))
-            for row in report.get("rules", []) or [{"status": target.observation.value}]:
-                rows.append([role.label + (" · " + row["name"] if row.get("name") else ""),
-                             tr(row["status"], self._language), row.get("last_capture_utc", "") or "—",
-                             row.get("last_source", "") or "—", str(row.get("matched_packets", 0))])
-        self.table.setRowCount(len(rows))
-        for index, values in enumerate(rows):
-            for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                item.setToolTip(value)
-                self.table.setItem(index, column, item)
-        self.details.setPlainText("\n\n".join(details))

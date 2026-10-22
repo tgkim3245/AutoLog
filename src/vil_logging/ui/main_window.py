@@ -20,9 +20,9 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QScrollArea,
-    QStyle,
     QSystemTrayIcon,
     QToolButton,
     QVBoxLayout,
@@ -42,15 +42,15 @@ from vil_logging.diagnostics.canoe_readiness import stage_text
 from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.naming import capture_prefix
 
+from .branding import application_icon
 from .capture_button import CaptureButton
 from .file_manager_dialog import FileHistoryDialog, confirm_delete
 from .i18n import render_event, report_text, tr
 from .language_button import LanguageButton
-from .monitor_dialog import MonitorDialog, monitor_description
-from .quality_dialog import QualityDialog
 from .recovery_dialog import RecoveryDialog
 from .settings_dialog import SettingsDialog
 from .theme import COLOR, STYLE, ThemedCheckBox, apply_theme, refresh_style
+from .validation_panel import monitor_description
 from .window_fit import ScreenFit
 
 logger = logging.getLogger(__name__)
@@ -126,7 +126,6 @@ class MainWindow(QMainWindow):
     prepare_requested = Signal(object)
     discovery_requested = Signal()
     exit_requested = Signal()
-    environment_requested = Signal()
     open_debug_folder_requested = Signal()
     rename_requested = Signal(str, str)
     delete_files_requested = Signal(object)
@@ -146,10 +145,11 @@ class MainWindow(QMainWindow):
         self._debug_path = ""
         self._debug_error = ""
         self._capture_history = []
+        self._validation_popup_sessions = deque(maxlen=64)
+        self._validation_alerts = []
         self._file_busy = False
         self._initializing = False
         self._initialization_failed = False
-        self._environment_checking = False
         self._exiting = False
         self._capture_step = {}
         self._pending_capture_action = ""
@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
         self.setMinimumWidth(360)
         apply_theme(self)
         self.setStyleSheet(STYLE + MAIN_STYLE)
-        self.setWindowIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+        self.setWindowIcon(application_icon())
         root = QWidget()
         self.main_scroll = QScrollArea()
         self.main_scroll.setObjectName("mainScrollArea")
@@ -179,7 +179,8 @@ class MainWindow(QMainWindow):
         outer.setSpacing(9)
         header = QHBoxLayout()
         header.setSpacing(5)
-        self.eyebrow = _label(f"AUTOLOG / LOGGING CONTROL · {__version__}", "eyebrow")
+        self.eyebrow = _label(f"ONE CLICK LOG · {__version__}", "eyebrow")
+        self.eyebrow.setWordWrap(True)
         header.addWidget(self.eyebrow, 1)
         self.bug_report_button = QPushButton()
         self.bug_report_button.setObjectName("bugReportButton")
@@ -211,16 +212,6 @@ class MainWindow(QMainWindow):
         self.target_heading = _label(variant="section")
         self.selection_count = _label(variant="helper")
         target_heading.addWidget(self.target_heading, 1)
-        self.monitor_button = QPushButton()
-        self.monitor_button.setObjectName("openMonitorButton")
-        self.monitor_button.setProperty("compact", True)
-        self.monitor_button.clicked.connect(self._show_monitor)
-        target_heading.addWidget(self.monitor_button)
-        self.quality_button = QPushButton()
-        self.quality_button.setObjectName("openQualityButton")
-        self.quality_button.setProperty("compact", True)
-        self.quality_button.clicked.connect(self._show_quality)
-        target_heading.addWidget(self.quality_button)
         target_heading.addWidget(self.selection_count)
         outer.addLayout(target_heading)
         cards = QHBoxLayout()
@@ -265,10 +256,6 @@ class MainWindow(QMainWindow):
         self.logging_button = CaptureButton()
         self.logging_button.clicked.connect(self._capture_clicked)
         outer.addWidget(self.logging_button)
-        self.phase_label = _label(variant="helper")
-        self.phase_label.setWordWrap(True)
-        self.phase_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        outer.addWidget(self.phase_label)
         self.recovery_button = QPushButton()
         self.recovery_button.setObjectName("openRecoveryButton")
         self.recovery_button.setProperty("compact", True)
@@ -295,15 +282,15 @@ class MainWindow(QMainWindow):
         self.debug_folder_button.setProperty("compact", True)
         self.debug_folder_button.clicked.connect(self.open_debug_folder_requested)
         self.debug_folder_button.setEnabled(False)
-        file_actions.addWidget(self.debug_folder_button)
-        file_actions.addStretch()
+        file_top.addWidget(self.debug_folder_button)
+        file_actions.insertStretch(0)
         self.delete_button = QPushButton()
         self.delete_button.setObjectName("deletePreviousButton")
         self.delete_button.setProperty("variant", "ghost")
         self.delete_button.setProperty("compact", True)
         self.delete_button.setEnabled(False)
         self.delete_button.clicked.connect(self._delete_previous)
-        file_top.addWidget(self.delete_button)
+        file_actions.addWidget(self.delete_button)
         file_layout.addLayout(file_top)
         file_layout.addLayout(file_actions)
         self.file_names = QLabel()
@@ -328,7 +315,7 @@ class MainWindow(QMainWindow):
         file_layout.addLayout(rename_row)
         self.file_feedback = _label(variant="helper")
         self.file_feedback.setWordWrap(True)
-        self.file_feedback.setMinimumHeight(32)
+        self.file_feedback.hide()
         file_layout.addWidget(self.file_feedback)
         outer.addWidget(file_frame)
         event_row = QHBoxLayout()
@@ -352,7 +339,7 @@ class MainWindow(QMainWindow):
         self.event_list = QListWidget()
         self.event_list.setObjectName("eventList")
         self.event_list.setWordWrap(True)
-        self.event_list.setFixedHeight(108)
+        self.event_list.setMinimumHeight(108)
         self.event_list.setAccessibleName("Notifications and capture events")
         self.event_list.itemSelectionChanged.connect(
             lambda: self.event_copy.setEnabled(bool(self.event_list.selectedItems())))
@@ -366,10 +353,6 @@ class MainWindow(QMainWindow):
         self.debug_status.setObjectName("debugStatusLabel")
         self.debug_status.setWordWrap(True)
         outer.addWidget(self.debug_status)
-        self.footer = _label(variant="helper")
-        self.footer.setWordWrap(True)
-        self.footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        outer.addWidget(self.footer)
         self.settings_dialog = SettingsDialog(self)
         self.settings_dialog.settings_applied.connect(self.settings_applied)
         if hasattr(self.settings_dialog, "preferences_changed"):
@@ -377,10 +360,6 @@ class MainWindow(QMainWindow):
         if hasattr(self.settings_dialog, "discovery_requested"):
             self.settings_dialog.discovery_requested.connect(self.discovery_requested)
         self.settings_dialog.prepare_requested.connect(self.prepare_requested)
-        self.settings_dialog.environment_requested.connect(self.environment_requested)
-        self.quality_dialog = QualityDialog(self)
-        self.monitor_dialog = MonitorDialog(self)
-        self.monitor_dialog.preferences_changed.connect(self.preferences_changed)
         self.file_manager = FileHistoryDialog(self)
         self.file_manager.refresh_requested.connect(self.files_refresh_requested)
         self.recovery_dialog = RecoveryDialog(self)
@@ -405,6 +384,32 @@ class MainWindow(QMainWindow):
         self.settings_dialog.raise_()
         self.settings_dialog.activateWindow()
 
+    def show_validation_failure(self, report):
+        session = report.get("session_id")
+        if self._exiting or session in self._validation_popup_sessions:
+            return
+        self._validation_popup_sessions.append(session)
+        rules = report.get("rules", [])
+        title = tr("validation_title", self._language)
+        body = tr("validation_fallback", self._language)
+        if rules:
+            if len(rules) == 1:
+                title += " · " + rules[0]["name"]
+                body = rules[0].get("popup_message") or body
+            else:
+                body = "\n\n".join(row["name"] + "\n" + (row.get("popup_message") or body) for row in rules)
+        alert = QMessageBox(QMessageBox.Icon.Warning, title, body, QMessageBox.StandardButton.Ok, self)
+        alert.setObjectName("zipyValidationAlert")
+        alert.setWindowModality(Qt.WindowModality.NonModal)
+        alert.setTextFormat(Qt.TextFormat.PlainText)
+        alert.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        alert.button(QMessageBox.StandardButton.Ok).setText(tr("close", self._language))
+        self._validation_alerts.append(alert)
+        alert.finished.connect(lambda _result: self._validation_alerts.remove(alert) if alert in self._validation_alerts else None)
+        alert.show()
+        logger.info("validation.popup_shown", extra={"fields": {"session_id": session,
+                    "rule_ids": [row.get("id") for row in rules]}})
+
     def _change_language(self, language: str):
         logger.debug("Display language requested: %s", language)
         self.set_language(language)
@@ -413,7 +418,7 @@ class MainWindow(QMainWindow):
     def set_language(self, language: str):
         self._language = language if language in {"ko", "en", "zh"} else "ko"
         language = self._language
-        self.setWindowTitle(f"AutoLog · {tr('title', language)} · {__version__}")
+        self.setWindowTitle(f"One Click Log · {tr('title', language)} · {__version__}")
         self.demo_label.setText(tr("demo", language))
         self.language_button.set_language(language)
         self.settings_button.setToolTip(tr("settings", language))
@@ -426,7 +431,8 @@ class MainWindow(QMainWindow):
         self.rename_button.setToolTip(tr(help_key, language))
         self.previous_name.setPlaceholderText(tr("previous_name", language))
         self.previous_name.setToolTip(tr(help_key, language))
-        self.file_feedback.setText(tr(help_key, language))
+        if not self._file_busy:
+            self.file_feedback.hide()
         if self._last_file_result:
             self.set_file_result(self._last_file_result)
         self.event_heading.setText(tr("events", language))
@@ -438,13 +444,7 @@ class MainWindow(QMainWindow):
         self.target_heading.setText(tr("capture_targets", language))
         self.bug_report_button.setText(tr("bug_report", language))
         self.debug_folder_button.setText(tr("debug_folder", language))
-        self.footer.setText(tr("demo", language) if self.demo else
-                            tr("ethernet_stage", language) + "\n" + tr("real", language))
         self.settings_dialog.set_language(language)
-        self.monitor_dialog.set_language(language)
-        self.monitor_button.setText(tr("monitor_title", language))
-        self.quality_button.setText(tr("quality", language))
-        self.quality_dialog.set_language(language)
         self.file_manager.set_language(language)
         self.recovery_dialog.set_language(language)
         self.set_recovery(self._recovery_report)
@@ -457,20 +457,11 @@ class MainWindow(QMainWindow):
 
     def set_settings(self, settings: AppSettings):
         self._settings = settings
-        self.monitor_dialog.set_settings(settings)
         self.settings_dialog.set_settings(settings)
         self.set_language(settings.language)
 
     def selected_roles(self) -> tuple[Role, ...]:
         return tuple(role for role, check in self.role_checks.items() if check.isChecked())
-
-    def _show_quality(self):
-        self.quality_dialog.show()
-        self.quality_dialog.raise_()
-        self.quality_dialog.activateWindow()
-
-    def set_capture_quality(self, report):
-        self.quality_dialog.set_report(report)
 
     def _selection_changed(self, *_):
         logger.debug("Capture selection changed: %s", [role.value for role in self.selected_roles()])
@@ -524,10 +515,6 @@ class MainWindow(QMainWindow):
         self._initializing, self._initialization_failed = pending, failed
         self._render_capture_button()
 
-    def set_environment_checking(self, pending):
-        self._environment_checking = pending
-        self._render_capture_button()
-
     def set_exiting(self, pending):
         self._exiting = pending
         self._render_capture_button()
@@ -577,8 +564,6 @@ class MainWindow(QMainWindow):
             if connecting:
                 key, tone, enabled, busy, action = "connecting", "progress", False, True, ""
                 targets = " · ".join(connecting)
-            elif self._environment_checking:
-                key, tone, enabled, busy, action = "checking", "progress", False, True, ""
             elif phase == SessionPhase.COMPLETED:
                 key, tone = "completed", "success"
             elif phase == SessionPhase.FAILED:
@@ -615,18 +600,9 @@ class MainWindow(QMainWindow):
             check.setToolTip(tr("locked" if busy else "ready_tip", self._language))
         self.language_button.setEnabled(not busy)
         self.settings_dialog.set_busy(busy)
-        phase_key = (
-            "demo_" + phase.value
-            if self.demo and phase in (
-                SessionPhase.COMPLETED, SessionPhase.RECORDING, SessionPhase.PARTIAL
-            )
-            else phase.value
-        )
-        self.phase_label.setText(tr(phase_key, self._language))
         self._render_readiness()
         self._render_file_controls()
         self.recovery_dialog.set_locked(self._file_busy or phase in BUSY_PHASES)
-        self.monitor_dialog.set_locked(busy)
 
     def set_target(self, target: TargetSnapshot):
         if self._targets.get(target.role) != target:
@@ -659,7 +635,6 @@ class MainWindow(QMainWindow):
         self.observation_labels[target.role].setProperty("tone", "attention" if target.observation in {
             ObservationState.WARNING, ObservationState.UNKNOWN} else "neutral")
         refresh_style(self.observation_labels[target.role])
-        self.monitor_dialog.set_target(target)
         self.target_formats[target.role].setText(
             "." + self._settings.ethernet_format if target.role == Role.ETHERNET else ".blf"
         )
@@ -676,13 +651,8 @@ class MainWindow(QMainWindow):
 
     def _render_files(self):
         if self._files:
-            default_heading = "demo_files" if self.demo else "completed"
-            heading_key = self._files_label or default_heading
-            heading_key = {
-                "recording": "current_files", "completed": "previous_files",
-                "incomplete": "incomplete_files"
-            }.get(heading_key, heading_key)
-            self.file_heading.setText(tr(heading_key, self._language))
+            self.file_heading.setText(tr("demo_files" if self.demo else
+                "current_files" if self._files_label == "recording" else "previous_files", self._language))
             self.file_names.setText(" · ".join(Path(path).name for path in self._files))
             self.file_names.setToolTip("\n".join(self._files))
         else:
@@ -723,6 +693,7 @@ class MainWindow(QMainWindow):
         if busy:
             self._last_file_result = None
             self.file_feedback.setText(tr("file_operation_busy", self._language))
+            self.file_feedback.show()
         elif self._last_file_result:
             self.set_file_result(self._last_file_result)
         self.set_phase(self._phase)
@@ -750,11 +721,6 @@ class MainWindow(QMainWindow):
         self.file_manager.show()
         self.file_manager.raise_()
 
-    def _show_monitor(self):
-        self.monitor_dialog.show()
-        self.monitor_dialog.raise_()
-        self.monitor_dialog.activateWindow()
-
     def _show_recovery(self):
         self.files_refresh_requested.emit()
         self.recovery_dialog.show()
@@ -774,6 +740,7 @@ class MainWindow(QMainWindow):
         message = result.get("error") or tr("file_result_" + result["status"], self._language)
         self.file_feedback.setText(message.splitlines()[-1][:160])
         self.file_feedback.setToolTip(message)
+        self.file_feedback.show()
         self.file_manager.set_result(result)
 
     def add_event(self, event: AppEvent):
@@ -787,7 +754,7 @@ class MainWindow(QMainWindow):
         self._event_counter()
         if event.code == "SETTINGS_ERROR":
             self.settings_dialog.set_error(render_event(event, self._language))
-            self.monitor_dialog.set_error(render_event(event, self._language, include_details=False))
+            self.settings_dialog.validation_panel.set_error(render_event(event, self._language, include_details=False))
         elif event.code == "SETTINGS_SAVED":
             self.settings_dialog.set_error("")
 
@@ -862,8 +829,8 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, "eyebrow"):
-            self.eyebrow.setText(f"AUTOLOG · {__version__}" if self.width() < 450 else
-                                  f"AUTOLOG / LOGGING CONTROL · {__version__}")
+            self.eyebrow.setText(f"One Click Log\n{__version__}" if self.width() < 450 else
+                                  f"ONE CLICK LOG · {__version__}")
         for label in getattr(self, "target_formats", {}).values():
             label.setVisible(self.width() >= 420)
         if hasattr(self, "settings_dialog"):

@@ -16,7 +16,7 @@ class UiResponsiveness:
         self._reported = False
         self._closed = threading.Event()
         if start:
-            threading.Thread(target=self._watch, name="AutoLog-UI-watch", daemon=True).start()
+            threading.Thread(target=self._watch, name="One Click Log-UI-watch", daemon=True).start()
 
     def pulse(self):
         self._pulse = time.monotonic()

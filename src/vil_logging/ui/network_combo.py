@@ -74,7 +74,7 @@ class NetworkComboBox(ThemedComboBox):
         self.setItemDelegate(NetworkDelegate(self.view()))
         self.setMaxVisibleItems(10)
         self.popup_open = False
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="AutoLog-NIC")
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="One Click Log-NIC")
         self._future = None
         self._history = ActivityHistory()
         self._activity = {}

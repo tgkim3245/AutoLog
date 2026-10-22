@@ -61,7 +61,7 @@ class ExercisedWindow(ui.MainWindow):
             return
         self.exercise.stop()
         if scenario=='resume':
-            (root/'startup-marker-cleared.json').write_text(json.dumps({'cleared':not (root/'AutoLog_force_exit.json').exists()}))
+            (root/'startup-marker-cleared.json').write_text(json.dumps({'cleared':not (root/'One_Click_Log_force_exit.json').exists()}))
         (root/'exit-request.json').write_text(json.dumps({'at':time.time(),'workers':[p.pid for p in runtime._pool._processes.values()]}))
         self.close()
         if scenario=='repeat':QTimer.singleShot(100,self.close)
@@ -75,7 +75,7 @@ raise SystemExit(main(['--demo','--data-dir',str(root)]))
     assert result.returncode == 0, result.stdout + result.stderr
     request = json.loads((tmp_path / "exit-request.json").read_text())
     assert time.time() - request["at"] < (2 if scenario == "repeat" else 5)
-    marker = tmp_path / "AutoLog_force_exit.json"
+    marker = tmp_path / "One_Click_Log_force_exit.json"
     if scenario != "recording":
         notice = json.loads(marker.read_text(encoding="utf-8"))
         assert notice["reason"] == ("repeat_close" if scenario == "repeat" else "deadline")

@@ -292,7 +292,7 @@ class DebugLogService:
                 self._last_failed_event = None
             directory = self._log_dir
             directory.mkdir(parents=True, exist_ok=True)
-            path = directory / "AutoLog_developer.jsonl"
+            path = directory / "One_Click_Log_developer.jsonl"
             output = _StrictRotatingHandler(
                 path, maxBytes=self._max_bytes, backupCount=self._backup_count,
                 encoding="utf-8", errors="strict",
@@ -347,7 +347,7 @@ class DebugLogService:
             listener.flush_pending()
 
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report = destination_dir / f"AutoLog_BugReport_To_Taegon.Kim_{stamp}_{uuid4().hex[:8]}.zip"
+            report = destination_dir / f"One_Click_Log_BugReport_To_Taegon.Kim_{stamp}_{uuid4().hex[:8]}.zip"
             temporary = report.with_name(f".{report.name}.{uuid4().hex[:8]}.tmp")
             # The listener has drained all records up to the barrier. Holding the
             # rotating handler lock keeps filenames stable while the archive is

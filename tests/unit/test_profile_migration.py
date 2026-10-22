@@ -8,14 +8,15 @@ from vil_logging.storage.repository import Repository
 
 
 @pytest.mark.parametrize(("old_prefix", "expected_prefix"), [
-    ("VIL", "AutoLog"),
-    ("Auto_Log", "AutoLog"),
+    ("VIL", "One_Click_Log"),
+    ("Auto_Log", "One_Click_Log"),
+    ("AutoLog", "One_Click_Log"),
     ("custom_run", "custom_run"),
 ])
 def test_migrates_settings_and_preserves_capture_index(tmp_path: Path, old_prefix: str,
                                                        expected_prefix: str) -> None:
     legacy = tmp_path / "VILLogging"
-    new = tmp_path / "AutoLog"
+    new = tmp_path / "One Click Log"
     (tmp_path / "my-captures").mkdir()
     old_db = Repository(legacy / "state.sqlite3")
     settings = old_db.load_settings(str(tmp_path / "my-captures"))

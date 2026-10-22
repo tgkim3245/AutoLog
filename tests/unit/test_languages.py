@@ -35,7 +35,7 @@ def test_one_language_button_cycles_all_views_and_emits_persisted_choice(qtbot, 
     assert spy.at(1)[0] == {"language": "zh"}
     assert window.settings_dialog.apply_button.text() == "应用"
     assert window.file_manager.close_button.text() == "关闭"
-    assert window.monitor_dialog.windowTitle() == "通信监测"
+    assert window.settings_dialog.tabs.tabText(3) == "Zipy 有效性检查"
     window.add_event(AppEvent("APP_READY", original="Error 0x80004005"))
     assert "程序已就绪" in window.event_list.item(0).text()
     assert "0x80004005" in window.event_list.item(0).text()

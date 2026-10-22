@@ -1,6 +1,6 @@
 # 공식 배포용 사용자 가이드
 
-배포 사용자에게 전달하는 문서는 **AutoLog_User_Guide.html**과 **START_HERE.txt**다. `build.cmd`가 현재 소프트웨어 버전·문서 개정일을 반영해 EXE 옆에 만들고 ZIP에도 포함한다. HTML은 별도 프로그램 설치나 인터넷 없이 브라우저에서 읽을 수 있다.
+배포 사용자에게 전달하는 문서는 **One Click Log_User_Guide.html**과 **START_HERE.txt**다. `build.cmd`가 현재 소프트웨어 버전·문서 개정일을 반영해 EXE 옆에 만들고 ZIP에도 포함한다. HTML은 별도 프로그램 설치나 인터넷 없이 브라우저에서 읽을 수 있다.
 
 ## 관리 원본
 

@@ -32,6 +32,7 @@ from . import zh_cn
 from .i18n import localized, report_text, tr
 from .network_combo import NetworkComboBox
 from .theme import ThemedComboBox, apply_theme, refresh_style
+from .validation_panel import ValidationPanel
 
 logger = logging.getLogger(__name__)
 PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format",
@@ -104,7 +105,6 @@ class SettingsDialog(QDialog):
     settings_applied = Signal(object)
     preferences_changed = Signal(object)
     prepare_requested = Signal(object)
-    environment_requested = Signal()
     discovery_requested = Signal()
 
     def __init__(self, parent=None):
@@ -234,17 +234,15 @@ class SettingsDialog(QDialog):
         layout.addWidget(self._preparation_box(Role.ETHERNET))
         layout.addStretch()
         self.tabs.addTab(ethernet, "")
+        self.validation_panel = ValidationPanel()
+        self.validation_panel.preferences_changed.connect(self.preferences_changed)
+        self.tabs.addTab(self.validation_panel, "")
         self.feedback = self._helper()
         self.feedback.setObjectName("settingsFeedback")
         outer.addWidget(self.feedback)
-        self.scope_hint = self._helper()
-        outer.addWidget(self.scope_hint)
         actions = QHBoxLayout()
-        self.environment_button = QPushButton()
-        self.environment_button.clicked.connect(self.environment_requested)
         self.close_button = QPushButton()
         self.close_button.clicked.connect(self.hide)
-        actions.addWidget(self.environment_button)
         actions.addStretch()
         actions.addWidget(self.close_button)
         outer.addLayout(actions)
@@ -541,6 +539,7 @@ class SettingsDialog(QDialog):
             self._pending_patches.popleft()
         pending = {key for _, patch in self._pending_patches for key in patch}
         self._settings = settings
+        self.validation_panel.set_settings(settings)
         self._updating = True
         try:
             for key, field in self.fields.items():
@@ -610,7 +609,7 @@ class SettingsDialog(QDialog):
         self.set_discovery_busy(False)
 
     def open_section(self, section: str):
-        self.tabs.setCurrentIndex({"storage": 0, "canoe": 1, "ethernet": 2}.get(section, 0))
+        self.tabs.setCurrentIndex({"storage": 0, "canoe": 1, "ethernet": 2, "validation": 3}.get(section, 0))
         self.show()
         self.raise_()
         self.activateWindow()
@@ -814,9 +813,11 @@ class SettingsDialog(QDialog):
 
     def set_language(self, language):
         self._language = language if language in {"ko", "en", "zh"} else "ko"
-        self.setWindowTitle(f"{tr('settings', self._language)} · AutoLog {__version__}")
+        self.setWindowTitle(f"{tr('settings', self._language)} · One Click Log {__version__}")
         self.heading.setText(tr("settings", self._language))
         self.hint.setText(tr("locked", self._language) if self._busy else self._t("intro"))
+        self.tabs.setTabText(3, tr("validation_title", self._language))
+        self.validation_panel.set_language(self._language)
         for index, key in enumerate(("storage", "canoe", "ethernet")):
             self.tabs.setTabText(index, self._t(key))
         for label in self.labels.values():
@@ -832,16 +833,14 @@ class SettingsDialog(QDialog):
             button.setText(self._t("select") if button.property("picker") == "tool" else tr("browse", self._language))
         for label, key in ((self.naming_hint, "naming_help"), (self.can_hint, "can_help"),
                            (self.tool_heading, "tool"), (self.tool_hint, "tool_help"),
-                           (self.network_label, "network"), (self.network_hint, "network_help"),
-                           (self.scope_hint, "scope")):
+                           (self.network_label, "network"), (self.network_hint, "network_help")):
             label.setText(self._t(key))
         self.format_label.setText(tr("format", self._language))
         self.format_input.setToolTip(self._t("format_help"))
         for key, label in self.block_labels.items():
             label.setText(self._t("can_block_label" if key.startswith("can_") else "diag_block_label"))
             self.block_inputs[key].setItemText(0, self._phrase("연결 후 블록 선택", "Choose block after connection"))
-        for button, key in ((self.environment_button, "environment"),
-                            (self.apply_button, "apply"), (self.close_button, "close")):
+        for button, key in ((self.apply_button, "apply"), (self.close_button, "close")):
             button.setText(tr(key, self._language))
         self._render_networks(self._current("nic_id") if "nic_id" in self._dirty else self._settings.nic_id)
         self._render_discovery()
@@ -850,6 +849,7 @@ class SettingsDialog(QDialog):
 
     def set_busy(self, busy):
         self._busy = busy
+        self.validation_panel.set_locked(busy)
         for widget in [*self.fields.values(), *self.browse_buttons, self.nic_input,
                        *self.block_inputs.values(), self.format_input,
                        self.apply_button]:

@@ -13,7 +13,7 @@ class PacketBridge:
         self._drops = OrderedDict()
         self._lock = threading.Lock()
         self._closed = threading.Event()
-        self._reader = threading.Thread(target=self._receive, name="AutoLog-display-IPC", daemon=True)
+        self._reader = threading.Thread(target=self._receive, name="One Click Log-display-IPC", daemon=True)
         self._reader.start()
 
     def _receive(self):

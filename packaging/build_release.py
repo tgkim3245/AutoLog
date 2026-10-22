@@ -1,4 +1,4 @@
-"""Build a versioned AutoLog folder and ZIP from any working directory."""
+"""Build a versioned One Click Log folder and ZIP from any working directory."""
 
 import argparse
 import ast
@@ -28,7 +28,7 @@ def read_app_metadata(root: Path) -> tuple[str, str]:
                     values[target.id] = node.value.value
     app_name = values.get("APP_NAME")
     app_version = values.get("__version__")
-    if not isinstance(app_name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", app_name):
+    if not isinstance(app_name, str) or app_name != app_name.strip() or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _-]{0,79}", app_name):
         raise ValueError("APP_NAME must be a safe folder name.")
     if not isinstance(app_version, str) or not re.fullmatch(
         r"\d+\.\d+\.\d+(?:[A-Za-z0-9.-]+)?", app_version
@@ -192,8 +192,8 @@ def build(
     if output_root is not None:
         output = new_output_directory(output_root.expanduser().resolve(), build_id)
     elif root.is_relative_to(Path.home() / "Documents"):
-        location_note = "Source is in Documents; building in Downloads/AutoLog_Builds."
-        output = new_output_directory(Path.home() / "Downloads/AutoLog_Builds", build_id)
+        location_note = "Source is in Documents; building in Downloads/OneClickLog_Builds."
+        output = new_output_directory(Path.home() / "Downloads/OneClickLog_Builds", build_id)
     else:
         try:
             output = new_output_directory(root / "outputs", build_id)
@@ -201,11 +201,11 @@ def build(
             if getattr(error, "winerror", None) not in (2, 3, 5) or not (root / "outputs").is_dir():
                 raise
             location_note = (
-                "Project outputs could not be written. Using Downloads/AutoLog_Builds "
+                "Project outputs could not be written. Using Downloads/OneClickLog_Builds "
                 "without changing Windows security settings. "
                 f"Original error: {error}"
             )
-            output = new_output_directory(Path.home() / "Downloads/AutoLog_Builds", build_id)
+            output = new_output_directory(Path.home() / "Downloads/OneClickLog_Builds", build_id)
     logger = logging.getLogger("autolog.build")
     logger.setLevel(logging.INFO)
     logger.propagate = False

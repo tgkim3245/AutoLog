@@ -1,11 +1,9 @@
 """Missing dependencies should guide installation without declaring capture ready."""
 
 import pytest
-from PySide6.QtTest import QSignalSpy
 
 from vil_logging.contracts.models import Role
 from vil_logging.diagnostics.readiness import missing_dependencies
-from vil_logging.ui.environment_dialog import EnvironmentDialog
 
 
 def healthy():
@@ -36,16 +34,3 @@ def test_partial_driver_install_is_not_declared_usable():
     environment, connections = healthy()
     connections["npcap"]["status"] = "unknown"
     assert missing_dependencies(environment, connections, (Role.ETHERNET,)) == {"npcap"}
-
-
-def test_missing_tools_link_to_settings_without_installer_actions(qtbot):
-    dialog = EnvironmentDialog()
-    qtbot.addWidget(dialog)
-    dialog.set_roles((Role.ETHERNET,))
-    dialog.set_report({}, {"tshark": {"status": "missing"}, "npcap": {"status": "missing"}})
-    spy = QSignalSpy(dialog.settings_requested)
-    dialog.cards["tshark"][3].click()
-    assert spy.at(0)[0] == "ethernet"
-    assert dialog.cards["npcap"][3].isHidden()
-    assert dialog.cards["canoe"][1].text() == "선택 대상 아님"
-    assert dialog.summary.text() == "4곳 확인 필요"
