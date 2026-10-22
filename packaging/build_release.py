@@ -284,7 +284,7 @@ def build(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build a versioned AutoLog EXE folder and ZIP.")
+    parser = argparse.ArgumentParser(description="Build a versioned One Click Log EXE folder and ZIP.")
     parser.add_argument("--no-pause", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--check", action="store_true", help="Check version and tools without building.")
     parser.add_argument("--output-root", type=Path, help="Choose the parent folder for build results.")

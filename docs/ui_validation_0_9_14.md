@@ -10,6 +10,7 @@
 - 환경 확인 UI와 시작 전 팝업 가로채기를 제거했다. 설정에서 대상별 준비 오류를 확인한다. 내부 환경 기록/개발용 CLI 진단은 버그 분석을 위해 유지한다.
 - 제품 이름과 EXE는 `One Click Log` / `One Click Log.exe`, 기본 prefix·개발자 로그·버그리포트의 파일 이름은 `One_Click_Log`를 사용한다. 기존 `AutoLog` 프로필은 새 프로필에 SQLite backup으로 한 번 복사한다. 기존 프로그램 실행 여부를 먼저 확인하고, 원래 DB/캡처와 사용자 지정 경로·이름·번호는 유지한다. 내부 Python 패키지·Git 저장소와 과거 파일의 식별 규약은 호환성을 유지한다.
 - `assets/one_click_log.svg`와 16~256px 7개 크기의 ICO를 추가했다. ONE/CLICK/LOG 이름을 세 줄로 크게 배치하고 EXE 리소스와 실행 창에 함께 적용한다. `packaging/generate_icon.py`로 다시 생성한다.
+- 공백이 포함된 새 배포 폴더에서 Wireshark MSI를 풀 때 속성값만 인용하도록 빌드 명령을 수정했다. 셸을 사용하지 않으며 드라이버/제품 설치 없이 관리 추출만 수행한다.
 
 ## 검증
 

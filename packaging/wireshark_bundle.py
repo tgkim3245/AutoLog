@@ -132,8 +132,12 @@ def bundle_wireshark(root, package, cache, work, logger):
     sources = [(item, download(item, cache, logger)) for item in lock["sources"]]
     image = Path(tempfile.mkdtemp(prefix="wireshark-image-", dir=work))
     logger.info("Extracting verified Wireshark MSI (no product/driver installation)")
-    result = subprocess.run(["msiexec.exe", "/a", str(installer), "/qn", f"TARGETDIR={image}",
-                             "/L*v", str(image.parent / "wireshark-extract.log")],
+    # MSI's property grammar requires quotes around the value, not the whole
+    # PROPERTY=value argument. list2cmdline quotes that whole argument when the
+    # product/build directory contains spaces. Pass a command line (no shell).
+    command = (subprocess.list2cmdline(["msiexec.exe", "/a", str(installer), "/qn"])
+               + f' TARGETDIR="{image}" /L*v "{image.parent / "wireshark-extract.log"}"')
+    result = subprocess.run(command,
                             creationflags=subprocess.CREATE_NO_WINDOW, timeout=120)
     if result.returncode:
         raise RuntimeError(f"Wireshark administrative extraction failed ({result.returncode})")
