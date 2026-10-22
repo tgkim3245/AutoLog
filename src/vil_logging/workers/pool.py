@@ -2,7 +2,6 @@
 
 import logging
 import multiprocessing as mp
-import queue
 import threading
 import time
 from collections.abc import Mapping
@@ -10,6 +9,7 @@ from collections.abc import Mapping
 from vil_logging.contracts.commands import Command, CommandResult, FakeBehavior, WorkerProgress
 from vil_logging.contracts.models import PacketSummary, Role
 from vil_logging.workers.fake_worker import worker_main
+from vil_logging.workers.packet_bridge import PacketBridge
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ class FakeWorkerPool:
     def __init__(self, behaviors: Mapping[Role, FakeBehavior] | None = None):
         self._context = mp.get_context("spawn")
         self._packets = self._context.Queue(maxsize=1000)
+        self._display = PacketBridge(self._packets)
         self._pipes = {}
         self._processes = {}
         self._behaviors = dict(behaviors or {})
@@ -150,17 +151,13 @@ class FakeWorkerPool:
     def drain_packets(self, limit: int = 100) -> list[PacketSummary]:
         if self._closed:
             return []
-        packets = []
-        for _ in range(limit):
-            try:
-                packets.append(self._packets.get_nowait())
-            except (queue.Empty, ValueError, OSError):
-                break
-        return packets
+        return self._display.drain(limit)
 
     def force_abort(self):
         """Terminate only tracked worker handles; no joins or pipe/COM requests."""
         self._closed = True
+        if display := getattr(self, "_display", None):
+            display.close()
         for process in tuple(self._processes.values()):
             try:
                 if process.is_alive():
@@ -185,5 +182,6 @@ class FakeWorkerPool:
                 process.join(timeout=1.0)
             self._pipes[role].close()
             process.close()
+        self._display.close()
         self._packets.cancel_join_thread()
         self._packets.close()

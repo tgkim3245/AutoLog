@@ -43,6 +43,9 @@ def canoe_worker_main(role, pipe):
                 elif command.action == "query":
                     state, details = capture.query()
                     evidence = details.get("error", "Owned configuration, measurement and logging trigger observed")
+                elif command.action == "release":
+                    details = capture.release()
+                    state, evidence = "stopped", "Idle output ownership validated for COM release; configuration not saved"
                 elif command.action == "shutdown":
                     details = capture.release()
                     pipe.send(CommandResult(command, True, "stopped", "COM reference released; CANoe window/measurement remain",

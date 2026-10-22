@@ -4,7 +4,9 @@ Windows용 CANoe/Wireshark 로깅 제어 앱입니다. CAN, Diag, Zipy 대상을
 
 배포받은 사용자는 EXE 옆 **START_HERE.txt**와 **AutoLog_User_Guide.html**을 먼저 읽으세요. Defender의 `CAPLcompExec.exe`·`CANoe64.exe` 허용 앱 등록과 최초 연결·기록·복구 절차를 안내합니다. [공식 사용자 가이드 관리 원본·변경 이력](user_guide/README.md)은 소프트웨어 변경과 함께 갱신하며 빌드/ZIP에 자동 포함합니다.
 
-현재 소스 버전은 **0.9.9**입니다. [Diag 출력 복구 거부로 다음 기록이 차단되는 문제 수정](docs/canoe_fixes_0_9_9.md)을 우선 확인하세요. 0.9.8 현장에서는 CAN+Zipy 반복과 Diag 첫 구간 보관이 성공했고, Diag 다음 시작의 복구 오류를 이번에 수정했습니다. [CANoe 마지막 버퍼·파일 완성 수정](docs/canoe_fixes_0_9_8.md), [파일 핸들 보유·중첩 번호 수정](docs/canoe_fixes_0_9_7.md), [CANoe 출력 자동 번호 복구·항상 종료](docs/canoe_fixes_0_9_6.md), [메인 기록 버튼 상태 표시](docs/capture_button_0_9_5.md), [CAN 종료 지연·네트워크 선택 수정](docs/capture_fixes_0_9_4.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md)를 확인하세요. CAN과 Diag의 **연결 확인**은 각 .cfg를 별도 CANoe 창에 연결하고 구성 열기·측정 대기·구간 기록 준비를 구분합니다. 로컬 Vector 장치의 채널을 조회할 수 있으면 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교합니다. 조회 불가와 실제 수신 성공은 구분합니다. 이전 [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)도 참고하세요.
+현재 소스 버전은 **0.9.10**입니다. [종료·재실행·Enter 이름 변경 수정](docs/capture_fixes_0_9_10.md)을 우선 확인하세요. 0.9.9 현장에서 세 대상 연속 3구간을 포함한 9구간 보관은 성공했고, 마지막 새 구간의 응답 없음 종료 후 미완료 차단을 확인했습니다. 화면 IPC 수신 분리·종료 복구 보류 수용·지연 진단을 반영했으며 새 버전 실제 CANoe 종료/재실행은 재시험이 남아 있습니다.
+
+CAN과 Diag의 **연결 확인**은 서로 다른 cfg를 별도 CANoe 창에 연결합니다. 조회 가능한 로컬 Vector 장치의 시리얼·포트를 기준으로 저장해 다음 연결/시작 때 비교하며, 실제 차량 수신 성공과 구분합니다. [Diag 반복 시작 수정](docs/canoe_fixes_0_9_9.md), [BLF 마지막 버퍼 완성](docs/canoe_fixes_0_9_8.md), [CANoe 환경별 검증표](docs/canoe_support_matrix.md), [전체 검토](docs/project_audit_0_8_6.md), [개선 항목별 상태](docs/improvement_backlog.md), [개발 안내](CONTRIBUTING.md)를 참고하세요.
 
 **기록 품질**에서 파일 크기·증가 속도·해석 속도/지연·표시 큐 누락·저장 공간을 확인합니다. 종료 파일이 제공하는 원본 누락 통계와 화면 누락은 구분하며, 통계가 없으면 확인 불가로 표시합니다. 캡처 버퍼는 **64 MiB 고정**이며 최대 파일 크기를 제한하지 않습니다. 번호를 넣은 localhost 반복 시험은 `--verify-load`로 실행할 수 있습니다.
 

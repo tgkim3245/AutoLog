@@ -22,6 +22,13 @@ class CaptureWorkerPool(FakeWorkerPool):
 
     def request(self, roles, action, session_id, **kwargs):
         results = super().request(roles, action, session_id, **kwargs)
+        if display := getattr(self, "_display", None):
+            for role, result in list(results.items()):
+                if role == Role.ETHERNET and result.details.get("session_id"):
+                    dropped = display.dropped(result.details["session_id"])
+                    results[role] = replace(result, details={**result.details,
+                        "display_transport_drops": dropped,
+                        "summary_drops": result.details.get("summary_drops", 0) + dropped})
         if os.name == "nt" and action in {"stop", "query"}:
             import win32job
             for role, result in list(results.items()):
@@ -112,21 +119,29 @@ class CaptureWorkerPool(FakeWorkerPool):
             for result in observed.values():
                 if not result.success or result.state not in {"idle", "stopped", "ready"}:
                     raise RuntimeError("Real capture shutdown is unconfirmed; keep the application open")
-            # Do this before any shutdown command. Otherwise a rejected restoration
-            # reply can be discarded when the idle worker is torn down, losing the
-            # only snapshot of the user's original CANoe output settings.
+            # Validate restoration OR the adapter's strictly verified stopped
+            # owned output before teardown. A pending original filename alone
+            # must not undo release()'s deferred-restoration policy.
             for role, result in observed.items():
                 if role != Role.ETHERNET and result.details.get("output_restore_pending"):
-                    restored = self.request((role,), "restore", result.details["session_id"], timeout=15)[role]
-                    if not restored.success or restored.details.get("output_restore_pending"):
+                    restored = self.request((role,), "release", result.details["session_id"], timeout=2)[role]
+                    if not restored.success or (restored.details.get("output_restore_pending")
+                                                and not restored.details.get("output_restore_deferred")):
                         raise RuntimeError("CANoe output restoration is unconfirmed; keep the application open: "
                                            + restored.evidence)
+            # Consume progress/results while workers exit. Joining first can
+            # strand a CANoe worker writing its diagnostic reply to a full pipe.
+            stopped = self.request(tuple(self._processes), "shutdown", "shutdown", timeout=1)
+            if any(not result.success or result.state != "stopped" for result in stopped.values()):
+                raise RuntimeError("Worker shutdown acknowledgement is unconfirmed")
+            log.info("worker.shutdown_confirmed", extra={"fields": {"roles": [role.value for role in stopped]}})
         self._closed = True
-        for role, pipe in self._pipes.items():
-            try:
-                pipe.send(Command("shutdown", role, "shutdown"))
-            except (OSError, EOFError, BrokenPipeError):
-                pass
+        if abnormal:
+            for role, pipe in self._pipes.items():
+                try:
+                    pipe.send(Command("shutdown", role, "shutdown"))
+                except (OSError, EOFError, BrokenPipeError):
+                    pass
         for role, process in self._processes.items():
             process.join(timeout=1)
             if process.is_alive() and abnormal:
@@ -140,6 +155,7 @@ class CaptureWorkerPool(FakeWorkerPool):
                 process.join(timeout=1)
             self._pipes[role].close()
             process.close()
+        self._display.close()
         self._packets.cancel_join_thread()
         self._packets.close()
 

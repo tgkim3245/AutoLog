@@ -64,5 +64,64 @@ def test_failed_output_restore_keeps_canoe_worker_and_snapshot_available():
     pool.request = request
     with pytest.raises(RuntimeError, match="output restoration"):
         pool.close()
-    assert calls == [("query", "shutdown-check"), ("restore", "original-session")]
+    assert calls == [("query", "shutdown-check"), ("release", "original-session")]
     assert not pool._closed and Role.CAN in pool._processes
+
+
+@pytest.mark.parametrize("deferred", [True, False])
+def test_shutdown_accepts_only_adapter_confirmed_deferred_restore(deferred):
+    pool = object.__new__(ethernet_pool.CaptureWorkerPool)
+    pool._closed = False
+    calls, sent, closed = [], [], []
+    pool._jobs = {}
+    pool._processes = {Role.DIAG: SimpleNamespace(join=lambda **_: None, is_alive=lambda: False,
+                                               close=lambda: closed.append("worker"))}
+    pool._pipes = {Role.DIAG: SimpleNamespace(send=sent.append, close=lambda: closed.append("pipe"))}
+    pool._display = SimpleNamespace(close=lambda: closed.append("display"))
+    pool._packets = SimpleNamespace(cancel_join_thread=lambda: None, close=lambda: closed.append("queue"))
+
+    def request(roles, action, session_id, **kwargs):
+        calls.append(action)
+        return {Role.DIAG: CommandResult(Command(action, Role.DIAG, session_id), True, "stopped", details={
+            "session_id": "original-session", "output_restore_pending": True,
+            "output_restore_deferred": deferred if action == "release" else False})}
+
+    pool.request = request
+    if deferred:
+        pool.close()
+        assert pool._closed and not sent  # Shutdown is acknowledged through request(), never an unread pipe send.
+        assert closed == ["pipe", "worker", "display", "queue"]
+    else:
+        with pytest.raises(RuntimeError, match="output restoration"):
+            pool.close()
+        assert not pool._closed and not sent and not closed
+    assert calls == (["query", "release", "shutdown"] if deferred else ["query", "release"])
+
+
+def test_shutdown_reply_must_be_consumed_before_teardown():
+    pool = object.__new__(ethernet_pool.CaptureWorkerPool)
+    pool._closed = False
+    pool._processes = {Role.CAN: object()}
+    calls = []
+
+    def request(roles, action, session_id, **kwargs):
+        calls.append(action)
+        return {Role.CAN: CommandResult(Command(action, Role.CAN, session_id), action != "shutdown", "stopped")}
+
+    pool.request = request
+    with pytest.raises(RuntimeError, match="shutdown acknowledgement"):
+        pool.close()
+    assert calls == ["query", "shutdown"] and not pool._closed
+
+
+def test_display_bridge_drops_are_included_once_in_ethernet_quality(monkeypatch):
+    pool = object.__new__(ethernet_pool.CaptureWorkerPool)
+    pool._jobs = {}
+    pool._display = SimpleNamespace(dropped=lambda session: 3 if session == "s1" else 0)
+    reply = CommandResult(Command("query", Role.ETHERNET, "s1"), True, "recording", details={
+        "session_id": "s1", "summary_drops": 2})
+    monkeypatch.setattr(FakeWorkerPool, "request", lambda *args, **kwargs: {Role.ETHERNET: reply})
+    for _ in range(2):
+        observed = pool.request((Role.ETHERNET,), "query", "s1")[Role.ETHERNET].details
+        assert observed["summary_drops"] == 5 and observed["display_transport_drops"] == 3
+    assert reply.details["summary_drops"] == 2

@@ -33,6 +33,18 @@ def test_rename_uses_literal_filename_input_and_fixed_input_without_resizing(win
     assert window.size() == before
 
 
+@pytest.mark.parametrize("key", [Qt.Key.Key_Return, Qt.Key.Key_Enter])
+def test_enter_renames_previous_once_and_obeys_file_lock(window, qtbot, key):
+    spy = QSignalSpy(window.rename_requested)
+    window.show()
+    window.previous_name.setText("새 이름")
+    qtbot.keyClick(window.previous_name, key)
+    assert spy.count() == 1 and spy.at(0) == ["previous", "새 이름"]
+    window.set_file_busy(True)
+    window.previous_name.returnPressed.emit()
+    assert spy.count() == 1
+
+
 def test_capture_and_file_operations_lock_mutating_controls(window):
     assert window.rename_button.isEnabled()
     window.set_file_busy(True)

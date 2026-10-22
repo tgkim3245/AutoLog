@@ -317,6 +317,7 @@ class MainWindow(QMainWindow):
         self.rename_button.setObjectName("renamePreviousButton")
         self.rename_button.setEnabled(False)
         self.rename_button.clicked.connect(self._rename_previous)
+        self.previous_name.returnPressed.connect(self._rename_previous)
         rename_row.addWidget(self.rename_button)
         file_layout.addLayout(rename_row)
         self.file_feedback = _label(variant="helper")

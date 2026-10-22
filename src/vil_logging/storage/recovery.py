@@ -122,7 +122,9 @@ class RecoveryService:
             raise FileManagementError("먼저 외부 기록 종료를 확인하세요. / Confirm all external recording has stopped.")
         row = next((row for row in rows if row[key] == identifier), None)
         if row is None or row["token"] != token:
-            raise FileManagementError("상태가 바뀌었습니다. 새로 고친 뒤 다시 확인하세요. / Recovery selection changed; refresh first.")
+            raise FileManagementError("파일·기록 상태가 바뀌었습니다. CANoe의 수동 기록이 정지됐는지 확인한 뒤 "
+                                      "새로 고치고 다시 선택하세요. / Recovery selection changed; stop any manual "
+                                      "CANoe logging, refresh and select again.")
         return row
 
     def publish(self, session_id, role, token, stopped, tshark_path=""):

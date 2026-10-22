@@ -327,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def drain():
         nonlocal last_debug_error, exiting
+        responsiveness.pulse()
         if window._initializing and initialization.done():
             window.set_initializing(False, failed=not runtime._ready)
         for _ in range(256):
@@ -425,6 +426,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.demo:
         environment_state["pending"] = True
         runtime.diagnose()
+    from vil_logging.diagnostics.ui_responsiveness import UiResponsiveness
+    responsiveness = UiResponsiveness()
     window.show()
     smoke = {"started": False, "stopped": False, "passed": False, "button_actions": [],
              "discovery_passed": not args.smoke_discovery}
@@ -470,6 +473,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = app.exec()
     finally:
+        responsiveness.close()
         timer.stop()
         health_timer.stop()
         sys.excepthook = saved_excepthook

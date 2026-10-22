@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.parametrize("scenario", ["history", "stop_exception"])
+@pytest.mark.parametrize("scenario", ["history", "stop_exception", "completed"])
 def test_x_closes_with_old_history_or_after_a_failed_stop_retry(tmp_path, scenario):
     script = r'''
 import sys
@@ -88,6 +88,12 @@ class ExercisedWindow(ui.MainWindow):
             else:
                 runtime.toggle((Role.ETHERNET,))
         elif runtime.phase == SessionPhase.RECORDING:
+            if scenario == 'completed':
+                runtime.toggle((Role.ETHERNET,))
+            else:
+                self.check.stop()
+                self.close()
+        elif scenario == 'completed' and runtime.phase == SessionPhase.COMPLETED:
             self.check.stop()
             self.close()
 
@@ -98,8 +104,23 @@ assert len(warnings) == (1 if scenario == 'stop_exception' else 0)
 if scenario == 'stop_exception':
     assert len(attempts) == 2
     assert instances[0]._plan.files[0].final_path.is_file()
-else:
+elif scenario == 'history':
     assert plan.files[0].temp_path.is_file()
+else:
+    assert instances[0].phase == SessionPhase.COMPLETED
+    previous = instances[0]._plan.files[0].final_path
+    assert previous.is_file()
+    restarted = Runtime(root)
+    try:
+        restarted.initialize().result(5)
+        assert restarted.phase == SessionPhase.IDLE and restarted._settings.next_index == 2
+        restarted.toggle((Role.ETHERNET,)).result(5)
+        assert restarted.phase == SessionPhase.RECORDING
+        restarted.toggle((Role.ETHERNET,)).result(5)
+        assert restarted.phase == SessionPhase.COMPLETED and restarted._settings.next_index == 3
+        assert previous.is_file() and restarted.request_exit().result(5)
+    finally:
+        restarted.close_for_test()
 print('X_EXIT_PASSED')
 '''
     result = subprocess.run(
@@ -108,7 +129,7 @@ print('X_EXIT_PASSED')
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    if scenario == "history":
+    if scenario in {"history", "completed"}:
         assert "X_EXIT_PASSED" in result.stdout
     else:
         import json
