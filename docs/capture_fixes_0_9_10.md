@@ -35,3 +35,10 @@ SQLite 사전 백업 후 기존 RecoveryService로 완전한 BLF 두 개만 최�
 멈춘 IPC 수신 중 실제 Qt X 이벤트 처리, bounded 표시/세션별 누락 집계, 복구 보류의 정상 종료 수용과 외부 편집 거부, 저장 완료→X→재실행→새 기록, Return/Enter 단일 이름 변경과 잠금을 검사한다. Windows AppHang의 정확한 원인 확정·새 버전 실장 종료/재실행·차량 고부하/장시간 검증은 남아 있다.
 
 전체 자동 검사 577개(61.45초), Ruff·의존성·diff와 문서 로컬 링크 283개를 통과했다. 종료 응답 미확인 시 정상 완료 거부, 표시 큐 누락의 세션별 합산/중복 합산 방지와 UI 지연 한 회당 스택 한 번 기록·복귀도 검사했다. 공식 가이드 2026-10-22.2의 12개 PC/작은 폭 뷰포트에서 Enter·종료·복구·검증 범위를 검토했다.
+
+## 배포 검증
+
+- 깨끗한 소스 `f0976e073e1d316db2d8fa0768d608032502ec7b`로 `AutoLog-0.9.10_20261022_110539`을 빌드했다. ZIP 52,986,279바이트·SHA256 `6ac2094cdc5415370449c1d5a9368353405c7015eeaf613a0384cd9a62294b09`, EXE SHA256 `bb0e1ab91d76381e2d9e0deabba95fad59234f995302ca3b6f294426ccd3f654`다.
+- ZIP CRC/해시·Windows 제품/파일 버전과 압축 해제 EXE의 중국어 모의 기록 시작/정지·완료 버튼·X 종료·읽기 전용 NIC 조회를 확인했다. 개발 Python 없는 PATH에서 실행했고 개발자로그 101건에 ERROR/CRITICAL이 없었다.
+- 같은 EXE의 추출 PYZ에 포함된 CAN·Runtime·BLF 마무리/복구·IPC bridge·종료 검증·Enter UI·지연 진단을 개발 Python에서 실행해 대역 136개를 통과했다. 실제 CANoe 장비 시험과 구분한다.
+- HTML 30,211바이트·START_HERE 5,342바이트의 미리보기·ZIP·EXE 폴더·압축 해제본과 build_info 문서 개정/해시가 일치한다. 로컬 빌드 폴더 `verification/result.json`, `verification/capture_button_result.json`, `frozen-core/result.json`, `documentation_verification.json`에 근거를 남겼다.
