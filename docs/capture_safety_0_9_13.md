@@ -21,6 +21,8 @@
 
 소스 전체 612개 검사 통과(63.64초), Ruff·의존성·diff 검사 통과. 세 언어 메인 창 480/360px에서 가로 넘침 없음, 기본 감시 편집 값 표시 확인. 가이드는 데스크톱/모바일 14개 화면으로 렌더링해 검토했다. native 테스트 전용 자식 프로세스로 생성 시각 검증·보관 핸들 종료·늦은 등록·다른 프로세스 유지와 coordinator 대기 중 즉시 종료 신호를 검사했다. 배포본 검증 결과는 빌드 후 추가한다.
 
+실제 EXE 재현에서 출처 위반이 확인되자 정지해 이후 시험 패킷 일부가 기록되지 않는 정상 동작을 확인했다. 검증 명령은 위반 패킷 하나로 정지를 검사하도록 바꿔 정지 이후 패킷 수를 요구하지 않는다. 완성 파일 수와 실제 읽힌 패킷 수 확인은 유지한다.
+
 실제 VN 및 물리 Ethernet 케이블 분리와 실제 CANoe 종료는 현장 재시험이 필요하다. 모의 성공을 실제 차량 시험 성공으로 표시하지 않는다.
 
 Windows API 근거: [MIB_IF_ROW2](https://learn.microsoft.com/en-us/windows/win32/api/netioapi/ns-netioapi-mib_if_row2), [TerminateProcess](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess). 종료 요청은 비동기이며 완료 대기는 별도 API다.

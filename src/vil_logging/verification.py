@@ -230,19 +230,21 @@ def verify_monitoring(data_dir: Path, *, tshark_path: str = "") -> dict:
                                       protocol="UDP", destination_ip="127.0.0.1", expected_ip="192.0.2.99")
             runtime.save_preferences({"monitor_rules_json": encode_rules([unexpected])}).result(10)
             runtime.toggle((Role.ETHERNET,)).result(30)
-            send(10, .02)
+            # One violation is enough to request stop; do not require subsequent
+            # fixture packets to survive an intentionally immediate stop.
+            send(1, .02)
             wait_phase(SessionPhase.FAILED)
             report["cases"].append({"case": "unexpected_source_auto_stops", "passed": True})
             stored = runtime._submit(runtime._repo.captures).result(10)
             if len(stored) != 4 or sum(item["phase"] == "failed" for item in stored) != 3:
                 raise AssertionError("Auto-stop sessions were not distinguished from healthy completion")
-            if sum(item["details"]["inspection"]["packet_count"] for item in stored) != 1220:
+            if sum(item["details"]["inspection"]["packet_count"] for item in stored) != 1211:
                 raise AssertionError("Generated packet count differs from fully read capture files")
             saved_events = runtime._submit(runtime._repo.recent_events).result(10)
             codes = [event.code for event in saved_events]
             if codes.count("CAPTURE_AUTO_STOP") != 3 or "MONITOR_SOURCE" not in codes:
                 raise AssertionError("Auto-stop evidence was not persisted")
-            report["cases"].append({"case": "archive_and_persistent_fault_evidence", "passed": True, "packets": 1220})
+            report["cases"].append({"case": "archive_and_persistent_fault_evidence", "passed": True, "packets": 1211})
         if not runtime.request_exit().result(10):
             raise AssertionError("Orderly exit failed")
         report["passed"] = True
