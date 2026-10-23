@@ -389,6 +389,10 @@ class Runtime:
             if changed:
                 self._event("PREFERENCES_SAVED", fields=changed)
             if any(key in changed for key in ("tshark_path", "nic_id")):
+                self._target(Role.ETHERNET, connection=ConnectionState.UNKNOWN, evidence="Ethernet settings changed")
+                self._publish("preparation", self._preparation_report(
+                    Role.ETHERNET, "attention", "설정이 변경됐습니다. 연결 확인을 다시 눌러주세요.",
+                    "Settings changed. Check the connection again."))
                 self._begin_discovery()
             for role, prefix in ((Role.CAN, "can"), (Role.DIAG, "diag")):
                 if any(key in changed for key in (prefix + "_cfg", prefix + "_logging_block", prefix + "_hardware_baseline")):
@@ -502,6 +506,10 @@ class Runtime:
                               next_action_en="Use Start recording / Stop to control segments. Avoid concurrent CANoe logging controls "
                               "or filename edits during recording.",
                               next_action_zh="使用主界面的开始记录/停止按钮控制分段记录。记录期间不要同时操作 CANoe 的记录按钮或文件设置。")
+            elif stage == "measurement_waiting":
+                report.update(next_action_ko="F9(번개)와 Trace 수신을 확인한 뒤 메인의 ‘CANoe 측정 확인 후 시작’을 누르세요. 연결 확인을 다시 누를 필요는 없습니다.",
+                              next_action_en="Confirm F9 measurement and Trace reception, then use Check measurement · Start on the main screen. No additional connection check is needed.",
+                              next_action_zh="确认 F9 测量和 Trace 接收后，点击主界面的‘确认 CANoe 测量后开始’。无需再次检查连接。")
             else:
                 report.update(next_action_ko="위 항목을 조치한 뒤 연결 확인을 다시 누르세요.",
                               next_action_en="Complete the steps above, then check the connection again.")

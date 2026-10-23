@@ -59,12 +59,13 @@ def main():
                            can_cfg="C:/Project/CAN.cfg", diag_cfg="C:/Project/Diag.cfg",
                            can_logging_block="1", diag_logging_block="1", nic_id="example-ethernet",
                            tshark_path="C:/One Click Log/tools/Wireshark/tshark.exe")
-    window.set_settings(settings)
+    window.set_settings(replace(settings, can_cfg="", can_logging_block="", diag_cfg="", diag_logging_block="", nic_id=""))
     window.set_debug_status("developer_logs/One_Click_Log_developer.jsonl")
     window.show()
     app.processEvents()
     # Actual widgets with example values. No Runtime, worker pool or COM object.
     save("overview", window, QRect(0, 0, 480, window.logging_button.mapTo(window, QPoint()).y() + 60))
+    window.set_settings(settings)
     dialog = window.settings_dialog
     dialog.resize(700, 730)
     dialog.show()
@@ -113,6 +114,10 @@ def main():
         window.set_target(TargetSnapshot(role, connection=ConnectionState.READY))
     window.set_phase(SessionPhase.IDLE)
     save("ready", window, QRect(0, 0, 480, window.logging_button.mapTo(window, QPoint()).y() + 60))
+    window.set_target(TargetSnapshot(Role.CAN, connection=ConnectionState.UNKNOWN))
+    window.set_preparation_report({"role": "can", "status": "attention", "readiness_stage": "measurement_waiting",
+        "connected_cfg": settings.can_cfg, "selected_block": "1"})
+    save("measurement-waiting", window, QRect(0, 0, 480, window.logging_button.mapTo(window, QPoint()).y() + 60))
     for role in (Role.CAN, Role.ETHERNET):
         window.set_target(TargetSnapshot(role, connection=ConnectionState.READY, recording=RecordingState.RECORDING,
             observation=ObservationState.NORMAL if role == Role.ETHERNET else ObservationState.UNSUPPORTED))

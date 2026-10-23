@@ -1,6 +1,11 @@
 """Simplified Chinese UI catalog. Diagnostic originals and device names stay intact."""
 
 TEXT = {
+    "capture_setup_required": "需要设置", "capture_connection_required": "需要检查连接",
+    "capture_measurement_required": "确认 CANoe 测量后开始",
+    "capture_setup_required_help": "请先完成保存位置及所选目标的设置。点击按钮进入所需设置。",
+    "capture_connection_required_help": "请先检查 {targets} 的连接。点击按钮打开连接设置。",
+    "capture_measurement_required_help": "请在 {targets} CANoe 窗口确认 F9 测量和 Trace 接收，再点击此按钮。开始记录前会再次检查测量状态。",
     "capture_ready": "开始记录", "capture_loading": "正在加载程序…", "capture_load_failed": "初始化失败",
     "capture_checking": "正在检查环境…", "capture_connecting": "正在连接 {targets}…",
     "capture_preparing": "正在准备 · 取消", "capture_starting": "正在启动 · 取消", "capture_cancelling": "正在取消…",

@@ -22,6 +22,15 @@ def report_text(report: dict, key: str, language: str, default="") -> str:
 
 TEXT = {
     "capture_ready": ("기록 시작", "Start recording"),
+    "capture_setup_required": ("환경 설정 필요", "Setup required"),
+    "capture_connection_required": ("연결 확인 필요", "Connection check needed"),
+    "capture_measurement_required": ("CANoe 측정 확인 후 시작", "Check measurement · Start"),
+    "capture_setup_required_help": ("저장 위치와 선택한 대상의 설정을 먼저 완료하세요. 버튼을 누르면 필요한 설정으로 이동합니다.",
+                                    "Complete storage and selected target settings first. Press the button to open the required settings."),
+    "capture_connection_required_help": ("{targets} 연결을 먼저 확인하세요. 버튼을 누르면 연결 설정으로 이동합니다.",
+                                         "Check the {targets} connection first. Press the button to open its settings."),
+    "capture_measurement_required_help": ("{targets} CANoe 창에서 F9(번개)와 Trace 수신을 확인한 뒤 이 버튼을 누르세요. 측정을 다시 확인하고 기록을 시작합니다.",
+                                          "Check F9 measurement and Trace reception in {targets} CANoe, then press this button. Measurement is checked again before recording."),
     "capture_loading": ("프로그램 준비 중…", "Loading application…"),
     "capture_load_failed": ("초기화 실패", "Initialization failed"),
     "capture_checking": ("환경 확인 중…", "Checking environment…"),

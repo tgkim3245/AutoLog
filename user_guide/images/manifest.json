@@ -1,5 +1,5 @@
 {
-  "app_version": "0.9.18",
+  "app_version": "0.9.19",
   "illustrative_data": true,
   "real_device_capture": false,
   "screenshots": [
@@ -7,7 +7,7 @@
       "file": "overview.png",
       "width": 480,
       "height": 296,
-      "sha256": "48d8f1acf616e5688ae4d23cd466dcb115a15398a96eced8d57bbf379b2d5568"
+      "sha256": "8393d133bb358442ed5c1a192f0f6000ac4acbba5a8d46fb2eda1a2358fc0fd7"
     },
     {
       "file": "storage.png",
@@ -49,19 +49,25 @@
       "file": "ready.png",
       "width": 480,
       "height": 296,
-      "sha256": "992234fef1d95380aa6e4ec66fa44a559e433991b2b32f9b1f579613308527ae"
+      "sha256": "55ed2f9a08513716662347cd1ac8b175c4dc39a54c75313ea220f2708e46157b"
+    },
+    {
+      "file": "measurement-waiting.png",
+      "width": 480,
+      "height": 296,
+      "sha256": "e5d9468d14532bb3592132527e409194e0f3d895de0243a4c9cb5ada7b332d7a"
     },
     {
       "file": "recording.png",
       "width": 480,
       "height": 296,
-      "sha256": "cdf5a397418b68cda9fc03f78fef44c52325df1b05ad7c564a351a92352db7ad"
+      "sha256": "fb885004c76326d10a92ac9903269eda309cd5c00ec2c79a1759a18b9870fd5c"
     },
     {
       "file": "completed.png",
       "width": 480,
       "height": 455,
-      "sha256": "85cff663eae3854bbe5aac2ac771b95105fa8276ac3cb50437668ef8a764628f"
+      "sha256": "08711f65369ffff9e5b7942d3b44f5a0cc211798fa63ca0cb6c40da253d5b653"
     },
     {
       "file": "bug-report.png",

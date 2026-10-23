@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from vil_logging.contracts.commands import Command, CommandResult
-from vil_logging.contracts.models import ObservationState, Role, SessionPhase
+from vil_logging.contracts.models import ConnectionState, ObservationState, Role, SessionPhase
 from vil_logging.monitors.rules import EthernetRule, encode_rules
 from vil_logging.runtime import Runtime
 from vil_logging.storage.repository import Repository
@@ -95,6 +95,15 @@ def real(tmp_path):
 
 def events(runtime):
     return runtime._submit(runtime._repo.recent_events).result(5)
+
+
+def test_changing_ethernet_connection_choices_invalidates_the_previous_check(real, monkeypatch):
+    runtime, tools = real
+    monkeypatch.setattr(runtime, "_begin_discovery", lambda: None)
+    runtime._submit(runtime._target, Role.ETHERNET, connection=ConnectionState.READY).result(5)
+    runtime.save_preferences({"nic_id": "changed-example-network"}).result(5)
+    assert runtime._snapshots[Role.ETHERNET].connection == ConnectionState.UNKNOWN
+    assert not tools.calls
 
 
 def test_existing_profile_is_repaired_before_capture_and_not_repaired_again(tmp_path):

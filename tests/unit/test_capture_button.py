@@ -1,9 +1,17 @@
 """The main action must describe and permit only the current operation."""
 
+from dataclasses import replace
+
 import pytest
 from PySide6.QtTest import QSignalSpy
 
-from vil_logging.contracts.models import ConnectionState, Role, SessionPhase, TargetSnapshot
+from vil_logging.contracts.models import (
+    AppSettings,
+    ConnectionState,
+    Role,
+    SessionPhase,
+    TargetSnapshot,
+)
 from vil_logging.ui.main_window import MainWindow
 
 
@@ -11,6 +19,10 @@ from vil_logging.ui.main_window import MainWindow
 def window(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
+    window.set_settings(AppSettings(output_dir="C:/generated", can_cfg="C:/project/CAN.cfg",
+                                    can_logging_block="1", nic_id="example-ethernet"))
+    for role in window.selected_roles():
+        window.set_target(TargetSnapshot(role, connection=ConnectionState.READY))
     return window
 
 
@@ -114,3 +126,118 @@ def test_language_changes_and_progress_indicator_follow_current_state(window, qt
     window.set_phase(SessionPhase.STOPPING)
     window.hide()
     assert not button._timer.isActive()
+
+
+def test_first_launch_opens_missing_settings_without_requesting_capture(qtbot):
+    fresh = MainWindow()
+    qtbot.addWidget(fresh)
+    spy = QSignalSpy(fresh.logging_requested)
+    assert fresh.logging_button.text() == "환경 설정 필요"
+    assert fresh.logging_button.property("tone") == "neutral"
+    fresh.logging_button.click()
+    assert spy.count() == 0 and fresh.settings_dialog.isVisible()
+    assert fresh.settings_dialog.tabs.currentIndex() == 0
+
+
+@pytest.mark.parametrize("patch,tab,text", [
+    ({"output_dir": ""}, 0, "환경 설정 필요"),
+    ({"can_cfg": ""}, 1, "환경 설정 필요"),
+    ({"nic_id": ""}, 2, "환경 설정 필요"),
+    ({"can_logging_block": ""}, 1, "연결 확인 필요"),
+    ({"nic_id": "new-network"}, 2, "연결 확인 필요"),
+    ({"tshark_path": "C:/Other/tshark.exe"}, 2, "연결 확인 필요"),
+    ({"can_cfg": "C:/project/new.cfg"}, 1, "연결 확인 필요"),
+])
+def test_missing_or_changed_configuration_routes_to_the_correct_tab(window, patch, tab, text):
+    spy = QSignalSpy(window.logging_requested)
+    window.set_settings(replace(window._settings, **patch))
+    assert window.logging_button.text() == text and window.logging_button.property("tone") != "success"
+    window.logging_button.click()
+    assert spy.count() == 0 and window.settings_dialog.tabs.currentIndex() == tab
+
+
+def test_remembered_paths_are_not_treated_as_checked_connections(qtbot):
+    fresh = MainWindow()
+    qtbot.addWidget(fresh)
+    fresh.set_settings(AppSettings(output_dir="C:/generated", can_cfg="C:/project/CAN.cfg",
+                                  can_logging_block="1", nic_id="example-ethernet"))
+    assert fresh.logging_button.text() == "연결 확인 필요"
+    fresh.set_target(TargetSnapshot(Role.CAN, connection=ConnectionState.READY))
+    assert fresh.logging_button.text() == "연결 확인 필요"
+    fresh.logging_button.click()
+    assert fresh.settings_dialog.tabs.currentIndex() == 2
+    fresh.set_target(TargetSnapshot(Role.ETHERNET, connection=ConnectionState.READY))
+    assert fresh.logging_button.text() == "기록 시작" and fresh.logging_button.property("tone") == "success"
+
+
+def test_only_selected_targets_need_configuration_and_connection(window):
+    window.set_settings(replace(window._settings, can_cfg="", can_logging_block=""))
+    window.role_checks[Role.CAN].setChecked(False)
+    assert window.logging_button.text() == "기록 시작"
+    window.role_checks[Role.CAN].setChecked(True)
+    assert window.logging_button.text() == "환경 설정 필요"
+
+
+def test_storage_name_and_index_edits_do_not_require_reconnecting(window):
+    window.set_settings(replace(window._settings, output_dir="C:/new-output", prefix="Changed", next_index=12))
+    assert window.logging_button.text() == "기록 시작" and window.logging_button.property("tone") == "success"
+
+
+@pytest.mark.parametrize("phase", [SessionPhase.COMPLETED, SessionPhase.FAILED])
+def test_repeat_start_is_green_only_when_selected_connections_are_still_ready(window, phase):
+    window.set_phase(phase)
+    assert window.logging_button.property("tone") == "success"
+    window.set_target(TargetSnapshot(Role.ETHERNET, connection=ConnectionState.ERROR))
+    assert window.logging_button.text() == "연결 확인 필요" and window.logging_button.property("tone") == "neutral"
+    window.set_target(TargetSnapshot(Role.ETHERNET, connection=ConnectionState.READY))
+    assert window.logging_button.property("tone") == "success"
+
+
+def measurement_waiting(window, **patch):
+    window.set_target(TargetSnapshot(Role.CAN, connection=ConnectionState.UNKNOWN))
+    window.set_preparation_report({"role": "can", "status": "attention", "readiness_stage": "measurement_waiting",
+        "connected_cfg": "c:\\PROJECT\\can.cfg", "selected_block": "1", **patch})
+
+
+def test_f9_can_be_started_externally_then_checked_by_start_without_reconnecting(window):
+    measurement_waiting(window)
+    assert window.logging_button.text() == "CANoe 측정 확인 후 시작"
+    assert window.logging_button.property("tone") == "attention"
+    assert "F9" in window.subtitle.text()
+    spy = QSignalSpy(window.logging_requested)
+    window.logging_button.click()
+    assert spy.count() == 1 and not window.settings_dialog.isVisible()
+    window.set_target(TargetSnapshot(Role.CAN, connection=ConnectionState.READY))
+    window.set_phase(SessionPhase.COMPLETED)
+    assert window.logging_button.text() == "다음 기록 시작"
+    assert "측정" not in window.target_states[Role.CAN].text()
+
+
+@pytest.mark.parametrize("patch", [
+    {"connected_cfg": "C:/project/other.cfg"}, {"selected_block": "2"},
+    {"readiness_stage": "license_required"}, {"readiness_stage": "hardware_mismatch"},
+    {"readiness_stage": "block_recording"}, {"connected_cfg": None},
+])
+def test_stale_or_blocked_canoe_checks_cannot_use_the_measurement_waiting_shortcut(window, patch):
+    measurement_waiting(window, **patch)
+    spy = QSignalSpy(window.logging_requested)
+    assert window.logging_button.text() == "연결 확인 필요"
+    window.logging_button.click()
+    assert spy.count() == 0 and window.settings_dialog.tabs.currentIndex() == 1
+
+
+@pytest.mark.parametrize("language,text", [("ko", "환경 설정 필요"), ("en", "Setup required"), ("zh", "需要设置")])
+def test_setup_state_is_localized(qtbot, language, text):
+    fresh = MainWindow()
+    qtbot.addWidget(fresh)
+    fresh.set_language(language)
+    assert fresh.logging_button.text() == text
+
+
+def test_demo_keeps_simulation_start_without_real_configuration(qtbot):
+    demo = MainWindow(demo=True)
+    qtbot.addWidget(demo)
+    spy = QSignalSpy(demo.logging_requested)
+    assert demo.logging_button.text() == "모의 · 기록 시작"
+    demo.logging_button.click()
+    assert spy.count() == 1

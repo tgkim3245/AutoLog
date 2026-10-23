@@ -1,19 +1,20 @@
-"""Missing environment reports never intercept the recording action with a removed dialog."""
+"""Fresh startup routes to setup; only checked targets can emit a real start."""
 
 import os
 import subprocess
 import sys
 
 
-def test_recording_action_is_not_intercepted_by_environment_dialog(tmp_path):
+def test_unconfigured_startup_opens_settings_then_allows_start_after_preparation(tmp_path):
     script = r'''
 import sys
+from dataclasses import replace
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 from vil_logging import ui
 from vil_logging.app import main
 from vil_logging.runtime import Runtime
-from vil_logging.contracts.models import SessionPhase
+from vil_logging.contracts.models import ConnectionState, Role, SessionPhase, TargetSnapshot
 calls=[]
 Runtime.discover=lambda self:None
 Runtime.diagnose=lambda self,**kwargs:None
@@ -33,6 +34,15 @@ class Window(ui.MainWindow):
         self.timer.stop()
         assert not hasattr(self.settings_dialog,'environment_button')
         assert self.settings_dialog.tabs.count()==4
+        assert self.logging_button.text()=='환경 설정 필요'
+        self.logging_button.click()
+        assert not calls and self.settings_dialog.isVisible()
+        assert self.settings_dialog.tabs.currentIndex()==1
+        self.settings_dialog.hide()
+        self.set_settings(replace(self._settings,can_cfg='C:/example/CAN.cfg',can_logging_block='1',nic_id='example-nic'))
+        for role in (Role.CAN,Role.ETHERNET):
+            self.set_target(TargetSnapshot(role,connection=ConnectionState.READY))
+        assert self.logging_button.property('tone')=='success'
         self.logging_button.click()
         assert len(calls)==1
         assert not any('EnvironmentDialog' in type(w).__name__ for w in QApplication.topLevelWidgets())

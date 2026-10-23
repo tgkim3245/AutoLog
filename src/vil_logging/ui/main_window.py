@@ -4,7 +4,7 @@ import logging
 from collections import deque
 from dataclasses import replace
 from math import cos, pi, sin
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
@@ -31,6 +31,7 @@ from vil_logging import __version__
 from vil_logging.contracts.models import (
     AppEvent,
     AppSettings,
+    ConnectionState,
     ObservationState,
     Role,
     SessionPhase,
@@ -466,7 +467,17 @@ class MainWindow(QMainWindow):
         self.set_phase(self._phase)
 
     def set_settings(self, settings: AppSettings):
+        previous = self._settings
         self._settings = settings
+        for role, keys in (
+            (Role.CAN, ("can_cfg", "can_logging_block", "can_hardware_baseline")),
+            (Role.DIAG, ("diag_cfg", "diag_logging_block", "diag_hardware_baseline")),
+            (Role.ETHERNET, ("nic_id", "tshark_path")),
+        ):
+            if any(getattr(previous, key) != getattr(settings, key) for key in keys):
+                self._preparation_reports.pop(role, None)
+                if self._targets[role].connection.value == "ready":
+                    self._targets[role] = replace(self._targets[role], connection=ConnectionState.UNKNOWN)
         self.settings_dialog.set_settings(settings)
         self.set_language(settings.language)
 
@@ -515,7 +526,12 @@ class MainWindow(QMainWindow):
         message = tr(action, self._language)
         if self.demo and self._phase == SessionPhase.COMPLETED:
             message = tr("demo_completed", self._language)
-        if self._preparation_report and self._phase == SessionPhase.IDLE:
+        requirement = self._capture_requirement()
+        if requirement and self._phase == SessionPhase.IDLE:
+            key, _section, targets = requirement
+            message = tr("capture_" + key + "_help", self._language).format(targets=targets)
+        if self._preparation_report and self._phase == SessionPhase.IDLE and (
+                self._preparation_report.get("role") in {role.value for role in self.selected_roles()}):
             message = report_text(self._preparation_report, "message", self._language) or message
         self.subtitle.setText(message)
         self.subtitle.setToolTip(str(self._preparation_report.get("detail", message)))
@@ -534,12 +550,57 @@ class MainWindow(QMainWindow):
         self._render_capture_button()
 
     def _capture_clicked(self):
-        if self._capture_action == "review":
+        if self._capture_action == "configure":
+            requirement = self._capture_requirement()
+            if requirement:
+                _key, section, targets = requirement
+                logger.info("ui.capture_setup_opened", extra={"section": section, "targets": targets})
+                self.settings_dialog.open_section(section)
+        elif self._capture_action == "review":
             self._show_recovery()
         elif self._capture_action:
             self._pending_capture_action = self._capture_action
             self._render_capture_button()
             self.logging_requested.emit()
+
+    def _capture_requirement(self):
+        """Use committed choices and current checks, without filesystem/COM work.
+
+        Measurement-waiting is actionable: F9 may have been turned on externally
+        since the last check. Start performs its existing live preflight in that
+        case; do not trap the user behind another connection check.
+        """
+        roles = self.selected_roles()
+        if self.demo or not roles:
+            return None
+        if not self._settings.output_dir.strip():
+            return "setup_required", "storage", ""
+        for role in roles:
+            configured = self._settings.nic_id if role == Role.ETHERNET else getattr(self._settings, role.value + "_cfg")
+            if not configured.strip():
+                return "setup_required", "ethernet" if role == Role.ETHERNET else "canoe", role.label
+        waiting = []
+        for role in roles:
+            target = self._targets[role]
+            if role != Role.ETHERNET and not getattr(self._settings, role.value + "_logging_block").strip():
+                return "connection_required", "canoe", role.label
+            if target.connection.value == "ready":
+                continue
+            report = self._preparation_reports.get(role, {})
+            if role != Role.ETHERNET and target.connection.value == "unknown" and (
+                    report.get("readiness_stage") == "measurement_waiting" and
+                    report.get("status") == "attention" and
+                    isinstance(report.get("connected_cfg"), str) and
+                    PureWindowsPath(report.get("connected_cfg", "")) ==
+                    PureWindowsPath(getattr(self._settings, role.value + "_cfg")) and
+                    report.get("selected_block") == getattr(self._settings, role.value + "_logging_block") and
+                    bool(report.get("selected_block"))):
+                waiting.append(role.label)
+                continue
+            return "connection_required", "ethernet" if role == Role.ETHERNET else "canoe", role.label
+        if waiting:
+            return "measurement_required", "canoe", " · ".join(waiting)
+        return None
 
     def _render_capture_button(self):
         phase = self._phase
@@ -574,6 +635,10 @@ class MainWindow(QMainWindow):
             if connecting:
                 key, tone, enabled, busy, action = "connecting", "progress", False, True, ""
                 targets = " · ".join(connecting)
+            elif requirement := self._capture_requirement():
+                key, _section, targets = requirement
+                tone = "attention" if key == "measurement_required" else "neutral"
+                action = "start" if key == "measurement_required" else "configure"
             elif phase == SessionPhase.COMPLETED:
                 key, tone = "completed", "success"
             elif phase == SessionPhase.FAILED:
@@ -582,6 +647,8 @@ class MainWindow(QMainWindow):
         if self.demo:
             text = tr("capture_demo", self._language).format(text=text)
         tip = self.subtitle.text()
+        if key in {"setup_required", "connection_required", "measurement_required"}:
+            tip = tr("capture_" + key + "_help", self._language).format(targets=targets)
         if key in {"cancelling", "start_requested", "stop_requested", "loading", "checking", "connecting", "exiting"}:
             tip = text
         elif key == "incomplete":
@@ -628,7 +695,8 @@ class MainWindow(QMainWindow):
             state.setText(tr("disconnected_short", self._language))
         if not active and target.connection.value != "connecting":
             stage = self._preparation_reports.get(target.role, {}).get("readiness_stage")
-            if stage:
+            if stage and ((target.connection == ConnectionState.READY and stage == "segment_ready") or
+                          (target.connection == ConnectionState.UNKNOWN and stage != "segment_ready")):
                 state.setText(tr(stage + "_short", self._language) if self.width() < 420 else
                               stage_text(stage, self._language).split(" · ")[-1])
         state.setToolTip(target.evidence)
