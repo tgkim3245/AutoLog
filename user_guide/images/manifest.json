@@ -1,5 +1,5 @@
 {
-  "app_version": "0.9.20",
+  "app_version": "0.9.21",
   "illustrative_data": true,
   "real_device_capture": false,
   "screenshots": [
@@ -7,7 +7,7 @@
       "file": "overview.png",
       "width": 480,
       "height": 296,
-      "sha256": "e03a4643d3973efe67eb63fa67c3d655f8590d9f1ebec9d54dbcc21c80951f02"
+      "sha256": "114b6535cc1a9e4421c952d4ab5fcd6316ff9b64a35633a1b84af7f26bebf63f"
     },
     {
       "file": "storage.png",
@@ -49,25 +49,25 @@
       "file": "ready.png",
       "width": 480,
       "height": 296,
-      "sha256": "b9cde2c4d7cc20a44af96d84ec0b8f23bf0c4ace30e814adc32cacce82f84cda"
+      "sha256": "6c5dea18cb57e460ed9e673cb1f1f25235ee0746aea17afbc04d2d37fe6736e8"
     },
     {
       "file": "measurement-waiting.png",
       "width": 480,
       "height": 296,
-      "sha256": "2cc121a3b1a5369b0cd8d105ae1a6c4f1600f55380df6d454222468153fd118a"
+      "sha256": "133e885bd5978162ee58e661d42b094e29250e32ca1600e931498e673fe58c00"
     },
     {
       "file": "recording.png",
       "width": 480,
       "height": 296,
-      "sha256": "c6c776fbd9b97ee301e4218d9deca9a5b8427d63e928c6ef583b9b8b38977845"
+      "sha256": "3733064704f0fad4328f5841a9c458380d6c8f6e09732d2c1a1c49dcb130f44d"
     },
     {
       "file": "completed.png",
       "width": 480,
       "height": 455,
-      "sha256": "a0fec58116c6fbb08fb5837ec530dedfe0607c8eb2f0567efed39d510d10b34a"
+      "sha256": "8c98e6ca578abf38ad832a53e055f3c6df70885535c31484b2abab31737abb19"
     },
     {
       "file": "bug-report.png",
@@ -85,7 +85,7 @@
       "file": "overview-en.png",
       "width": 480,
       "height": 296,
-      "sha256": "86d36635186fac98afd0d670e24cd73d8b042c1f4539018c3ffdd9159796f43e"
+      "sha256": "5f48b7b2d23edf3026273ea9cca2a66f1738dff60beaf8f4a2dd7b1947a1893e"
     },
     {
       "file": "storage-en.png",
@@ -127,25 +127,25 @@
       "file": "ready-en.png",
       "width": 480,
       "height": 296,
-      "sha256": "9cd8e0c26e9bc5ea9f573eac1620962e1afe2596b4fe0cf5a9a1a205f295fb90"
+      "sha256": "e3ac759242e24283ca9249b5ecc17ee23cd28383649728cc9b43eb42357c619c"
     },
     {
       "file": "measurement-waiting-en.png",
       "width": 480,
       "height": 296,
-      "sha256": "be83d90536524e1d2173971d7b8e3da2e479d90af3cb6730937c6ca22ffdebac"
+      "sha256": "5080e0618545b713c8333d2e46701d4088b48fa1d0836cb12ab5e34610968f9e"
     },
     {
       "file": "recording-en.png",
       "width": 480,
       "height": 296,
-      "sha256": "a7138f1ff9fd36d9d447d6864ae5f1f8ed55bbf0f8db5592aa21d748b5c3e26c"
+      "sha256": "4f0dbc957608669385c9298a3f616e488b0494fb09176585e430df21839b4d46"
     },
     {
       "file": "completed-en.png",
       "width": 480,
       "height": 455,
-      "sha256": "a24cf3ef33a621c23b512efd93ca8343abf970b5c80894a47510dfc2255a659a"
+      "sha256": "0c6f063ad51d8efa9bce295eadcd31142f486886bb2b844b4107a2925daba16d"
     },
     {
       "file": "bug-report-en.png",
@@ -163,7 +163,7 @@
       "file": "overview-zh.png",
       "width": 480,
       "height": 296,
-      "sha256": "ffa5759ab8fbc3d201b4944f9feaf74e8eabd701f695ca1854b116422b858427"
+      "sha256": "6bbfeaad3b1ac276eb5ceba499f776c94a040a35ede71bdab80cfc6eaf29a778"
     },
     {
       "file": "storage-zh.png",
@@ -205,25 +205,25 @@
       "file": "ready-zh.png",
       "width": 480,
       "height": 296,
-      "sha256": "2766e7176d7bea9a18d05483e76abcdd4e87d200edda8a14008c4620c4662e60"
+      "sha256": "a411c22998b838bd440fb39a5db2520cc9053d5d9fba426bd0e8de8ec2cd95c0"
     },
     {
       "file": "measurement-waiting-zh.png",
       "width": 480,
       "height": 296,
-      "sha256": "c2cb156fa06740d8f21276afe44f6254cf85e6272120a366c9464838d80d347b"
+      "sha256": "2b072829aec388403b47e5abab0b4f6a3044a51cacb7cfcd805c83a9ec453ae5"
     },
     {
       "file": "recording-zh.png",
       "width": 480,
       "height": 296,
-      "sha256": "5ac2d2c0776761a05c07258486d3bc4735ad05ef78ee32c832c3d9824acdee2d"
+      "sha256": "df6945431bef0e3d6a55fc33a826357e8cf619274ca606e75cd328a04a995b32"
     },
     {
       "file": "completed-zh.png",
       "width": 480,
       "height": 455,
-      "sha256": "2475bb95276de78360090c8f31f7d7d404950c47282767a78880473f415652a3"
+      "sha256": "2c7d236763296e0ba7cabc7a6ff334e949649f6562e0fa71abaf785237e9f3db"
     },
     {
       "file": "bug-report-zh.png",

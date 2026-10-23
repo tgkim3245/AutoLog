@@ -62,6 +62,7 @@ def canoe_worker_main(role, pipe):
                     details["connection_issue"] = issue
                     details["settings_path"] = getattr(error, "settings_path", "")
                     details["running_canoe_pids"] = getattr(error, "process_ids", [])
+                    details["registration_diagnostics"] = getattr(error, "diagnostics", {})
                 elif any(item.get("event") == "canoe.instance_reused"
                          and item.get("monotonic", 0) >= trace_started for item in details.get("diagnostics", [])):
                     details["connection_issue"] = "restart_required"

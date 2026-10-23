@@ -513,6 +513,18 @@ class Runtime:
             else:
                 report.update(next_action_ko="위 항목을 조치한 뒤 연결 확인을 다시 누르세요.",
                               next_action_en="Complete the steps above, then check the connection again.")
+        elif details.get("connection_issue") in {"com_registration_missing", "com_registration_invalid"}:
+            from vil_logging.diagnostics.canoe_setup import registration_guidance
+
+            diagnostics = details.get("registration_diagnostics", {})
+            translated = {language: registration_guidance(diagnostics, language) for language in ("ko", "en", "zh")}
+            report = self._preparation_report(role, "error", translated["ko"][0], translated["en"][0],
+                                               translated[self._settings.language][1])
+            report.update(connection_issue=details["connection_issue"], diagnostic_detail=result.evidence,
+                          registration_diagnostics=diagnostics)
+            for language, (message, detail, action) in translated.items():
+                report.update({f"message_{language}": message, f"detail_{language}": detail,
+                               f"next_action_{language}": action})
         else:
             issue = details.get("connection_issue", "")
             restart = issue == "restart_required"

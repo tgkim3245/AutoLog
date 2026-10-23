@@ -350,3 +350,27 @@ def test_canoe_measurement_waiting_reports_license_workflow_and_history_in_three
     assert runtime._settings.can_logging_block == "1"
     assert read_next(runtime) == 1
     assert runtime._plan is None
+
+
+@pytest.mark.parametrize("issue", ["com_registration_missing", "com_registration_invalid"])
+def test_canoe_registration_failure_explains_repair_in_all_languages(runtime_factory, monkeypatch, issue):
+    from types import SimpleNamespace
+
+    runtime = runtime_factory(demo=False)
+    diagnostics = {"registry_key": "CANoe.Application/CLSID", "registry_modified": False,
+                   "repair_tools": [{"registration_tool": "C:/Installed CANoe/Exec64/RegisterComponents.exe"}]}
+    result = SimpleNamespace(success=False, evidence="Generated COM registration traceback",
+                             details={"connection_issue": issue, "registration_diagnostics": diagnostics})
+    monkeypatch.setattr(runtime, "_request_real", lambda *_args, **_kwargs: {Role.CAN: result})
+    runtime._submit(runtime._prepare_canoe, Role.CAN).result(timeout=3)
+    report = wait_for_message(runtime, "preparation")
+    assert report["status"] == "error" and report["connection_issue"] == issue
+    assert report["diagnostic_detail"] == result.evidence
+    assert report["registration_diagnostics"] == diagnostics
+    for language in ("ko", "en", "zh"):
+        assert "COM" in report[f"message_{language}"]
+        assert "Exec64" in report[f"detail_{language}"]
+        assert diagnostics["repair_tools"][0]["registration_tool"] in report[f"detail_{language}"]
+        assert report[f"next_action_{language}"]
+    assert "설정 파일:" not in report["detail_ko"]
+    assert runtime._plan is None and read_next(runtime) == 1

@@ -114,6 +114,7 @@ details[open] > summary { margin-bottom:14px; }
 <section class="help-block" id="quick-help"><h2 data-guide-html="g075">문제가 생겼나요?</h2>
 <div class="guide-row"><div><p data-guide-html="g076">상단 <b>버그리포트</b>를 누르세요.</p><p data-guide-html="g077">바탕화면에 만들어진 <b>ZIP 파일</b>과 함께, 누른 순서·발생 시각을 <b>Taegon.Kim</b>에게 이메일로 보내 주세요.</p><p class="mini-note" data-guide-html="g078">CANoe 측정이 안 되면 Write 창의 오류도 함께 보내 주세요.</p></div>
 <figure><button class="picture" type="button" aria-label="버그리포트 저장 안내 확대" data-guide-aria-label="g079"><img src="{{IMAGE:bug-report.png}}" data-guide-image="bug-report" alt="최근 개발자 로그 ZIP을 바탕화면에 저장했고 Taegon.Kim에게 이메일로 보내 달라는 버그리포트 안내" loading="lazy" data-guide-alt="g080"></button></figure></div>
+<details id="canoe-registration"><summary data-guide-html="g250">CANoe 창이 열리지 않나요? (버전 설치·제거 후)</summary><p data-guide-html="g251">CANoe가 설치돼 있어도 Windows의 자동 연결(COM) 등록이 없어지거나 제거한 버전을 가리키면 앱에서 열 수 없습니다. cfg·채널·라이선스 확인 전에 실패하는 문제입니다.</p><ol><li data-guide-html="g252">모든 CANoe 작업을 저장하고 창을 닫습니다.</li><li data-guide-html="g253">사용할 CANoe 버전의 설치 폴더에서 <code>Exec64\RegisterComponents.exe</code>를 우클릭해 <b>관리자 권한으로 실행</b>하고 Windows 권한 요청을 승인합니다. 여러 버전이 있으면 사용할 버전 하나만 등록하세요.</li><li data-guide-html="g254">완료 후 One Click Log 설정의 해당 카드에서 <b>연결 확인</b>을 다시 누릅니다. 도구가 없거나 복구가 실패하면 해당 CANoe 설치 복구를 사용하거나 PC 관리자에게 요청하세요.</li></ol><pre><code>C:\Program Files\Vector CANoe 19\Exec64\RegisterComponents.exe</code></pre><p data-guide-html="g255">아래는 CANoe 19의 기본 경로 예시입니다. 실제 설치 위치의 Vector 공식 도구를 실행하세요. One Click Log는 오류를 구분해 도구 경로를 안내하며, 다른 버전을 임의로 선택하거나 COM 등록을 자동 변경하지 않습니다.</p></details>
 <details><summary data-guide-html="g081">‘Zipy 활성화 실패’ 팝업이 나오나요?</summary><div class="guide-row"><div><p data-guide-html="g082">Render 터미널에 <b><code>|6 → e1</code></b>을 입력하고 데이터 활성화를 확인한 뒤 새 기록을 시작하세요.</p><p data-guide-html="g083">기본 규칙은 <code>02:00:00</code> 출처의 2초 평균 100pps 이상을 확인합니다. 시작 유예·미수신 제한은 각각 2초입니다.</p></div><button class="picture" type="button" aria-label="Zipy 활성화 실패 안내 확대" data-guide-aria-label="g084"><img src="{{IMAGE:validation-popup.png}}" data-guide-image="validation-popup" alt="Zipy 데이터 활성화 실패 시 Render 터미널 명령을 안내하는 팝업" loading="lazy" data-guide-alt="g085"></button></div></details>
 <details><summary data-guide-html="g086">Zipy 검사 규칙을 보거나 복원하려면</summary><p data-guide-html="g087"><b>설정 → zipy 유효성검사</b>에서 규칙과 팝업 문구를 수정합니다. 빠진 기본값은 <b>기본 규칙 복원</b>을 누르세요. 변경은 다음 기록부터 적용됩니다.</p><button class="picture" type="button" aria-label="Zipy 유효성검사 설정 확대" data-guide-aria-label="g088"><img src="{{IMAGE:validation.png}}" data-guide-image="validation" alt="기본 Zipy 활성화 실패 규칙과 사용자 안내 문구를 편집하고 기본 규칙을 복원하는 설정" loading="lazy" data-guide-alt="g089"></button></details>
 <p class="mini-note" data-guide-html="g090"><code>.cbf 액세스 거부</code>는 <a href="#defender">Vector 앱 허용</a>, 그 밖의 문제는 아래 상세 설명을 확인하세요.</p></section>
@@ -243,6 +244,7 @@ C:\Program Files\Vector CANoe 19\Exec64\CANoe64.exe</code></pre>
 </section>
 <section id="troubleshooting"><h2 data-guide-html="g205">8. 문제가 생겼을 때</h2>
 <div class="table-wrap"><table><thead><tr><th data-guide-html="g206">표시·증상</th><th data-guide-html="g207">확인 순서</th></tr></thead><tbody>
+<tr><td data-guide-html="g256">CANoe 자동 연결(COM) 등록 누락·손상</td><td data-guide-html="g257"><a href="#canoe-registration">CANoe 등록 복구</a>에 따라 사용할 버전의 공식 등록 도구를 관리자 권한으로 실행한 뒤 연결을 다시 확인합니다. 다른 버전 제거 후 설치 파일이 남아 있어도 등록 복구가 필요할 수 있습니다.</td></tr>
 <tr><td data-guide-html="g208"><code>Error writing binary file ... .cbf</code><br>액세스가 거부되었습니다</td><td data-guide-html="g209"><a href="#defender">2절</a>의 CAPLcompExec·CANoe 앱 허용을 확인하고 CANoe 재시작·재컴파일합니다. 회사 정책으로 막히면 PC 관리자에게 요청하세요.</td></tr>
 <tr><td data-guide-html="g210"><code>Ethernet (missing)</code> / 측정 중단</td><td data-guide-html="g211">cfg가 요구하는 CANoe 버스 옵션과 라이선스를 확인합니다. 채널 매핑·Zipy 선택과 별개입니다.</td></tr>
 <tr><td data-guide-html="g212">cfg 열림 · 측정 시작 대기</td><td data-guide-html="g213">전용 CANoe 창에서 컴파일 오류·라이선스·채널 매핑을 확인한 뒤 F9와 Trace 수신을 확인하고 기록 시작을 누릅니다. 측정 상태는 자동으로 다시 확인합니다.</td></tr>
@@ -273,7 +275,7 @@ C:\Program Files\Vector CANoe 19\Exec64\CANoe64.exe</code></pre>
 <p data-guide-html="g242">전용 CANoe는 이번 실행에서 생성한 프로세스 핸들로 구분해 <b>X 요청 즉시 종료 신호를 보내며 창이 닫힐 때까지 기다리지 않습니다.</b> 원래 cfg를 자동 저장하지 않습니다. 별도로 실행한 다른 CANoe나 Wireshark 창은 종료하지 않습니다. 필요한 채널 매핑·사용자 프로젝트 변경은 기록 전에 직접 저장하세요.</p>
 <p data-guide-html="g243">업데이트할 때는 저장할 기록의 정지·보관을 먼저 완료하고 기존 {{APP_NAME}}를 종료한 뒤 새 배포 폴더 전체를 사용합니다. 0.9.11은 이전 버전의 남은 미완료 이력도 자동 정리합니다. 재실행에서는 cfg 연결·F9·Trace 확인 후 새 기록을 시작합니다. 기존에 완료된 캡처 파일은 유지합니다.</p>
 <p data-guide-html="g244">PC별 설정·번호·이력은 <code>%LOCALAPPDATA%\{{APP_NAME}}</code>에 저장합니다. 새 PC에서 기존 PC 경로·NIC를 그대로 사용할 수 있는지 확인하세요. 사용 중인 PC의 디스크·도구·차량 조건을 짧은 기록으로 검증한 뒤 장시간 시험으로 확장합니다.</p>
-<div class="notice" data-guide-html="g245"><strong>이 배포판의 검증 범위</strong>{{APP_VERSION}}는 가이드 한국어·영어·중국어(간체) 전환, 앱 언어에 맞춰 열기와 언어별 예시 사진을 추가했습니다. 번역 누락·오프라인 렌더링·이동·확대·배포 문서 일치와 기존 캡처/UI 회귀를 자동 검사했습니다. 생성한 localhost 패킷 시험과 실제 차량 시험은 구분합니다. 새 배포본의 실제 VN/케이블 분리·CANoe 창 종료·차량 동시 취득과 고부하·장시간·새 PC 전체 환경 검증은 별도입니다. 파일 검사 성공이 취득 무손실을 증명하지는 않습니다.</div>
+<div class="notice" data-guide-html="g245"><strong>이 배포판의 검증 범위</strong>{{APP_VERSION}}는 CANoe COM 등록 누락·손상을 설정 접근 오류와 구분하고, 한국어·영어·중국어로 공식 등록 복구 방법을 안내합니다. 해당 PC에서 CANoe 19 공식 도구로 등록을 복구한 뒤 독립 COM 창 두 개의 실행과 종료를 확인했습니다. cfg를 열거나 측정·차량 취득을 수행한 시험은 아닙니다. 등록 누락·손상 모의, 기존 캡처/UI 및 배포 가이드 회귀를 자동 검사했습니다. 실제 VN/케이블 분리·차량 동시 취득과 고부하·장시간·새 PC 전체 환경 검증은 별도입니다. 파일 검사 성공이 취득 무손실을 증명하지는 않습니다.</div>
 </section>
 </details>
 <footer data-guide-html="g246">{{APP_NAME}} {{APP_VERSION}} · 사용법 · 개정 {{GUIDE_REVISION}} · {{UPDATED_DATE}}<br>메인의 사용법 버튼에서 다시 열 수 있습니다. 사진의 경로·연결 상태·수신량은 설명용 예시입니다. 상단에서 언어를 바꿀 수 있으며 인터넷 없이 사용할 수 있습니다.</footer>
@@ -330,7 +332,7 @@ zoom.addEventListener('click', event => { if (event.target === zoom) zoom.close(
 function revealSection() {
   const target = document.getElementById(location.hash.slice(1));
   if (!target) return;
-  for (let parent = target.parentElement; parent; parent = parent.parentElement) {
+  for (let parent = target; parent; parent = parent.parentElement) {
     if (parent.tagName === 'DETAILS') parent.open = true;
   }
   requestAnimationFrame(() => target.scrollIntoView());

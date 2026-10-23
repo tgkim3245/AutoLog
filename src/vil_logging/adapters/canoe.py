@@ -212,6 +212,10 @@ class CanoeCapture:
 
     def record_failure(self, action, error):
         """Best-effort read-only failure evidence; never mask the command error."""
+        if self.app is None:
+            self._trace("canoe.command_failed", action=action, error=str(error), block=self.index,
+                        canoe_pid=self.canoe_pid, observed={"application_created": False})
+            return
         observed = {}
         try:
             observed["cfg"] = str(self.app.Configuration.FullName)
@@ -408,7 +412,8 @@ class CanoeCapture:
                 created = self._create_application()
             except CanoeActivationError as error:
                 self._trace("canoe.activation_failed", connection_issue=error.connection_issue,
-                            settings_file=error.settings_path, process_ids=error.process_ids)
+                            settings_file=error.settings_path, process_ids=error.process_ids,
+                            registration_diagnostics=error.diagnostics)
                 raise
             if isinstance(created, ActivatedApplication):
                 app = created.application

@@ -33,6 +33,13 @@ CANoe 측정 대기이면 F9·Trace를 확인한 뒤 주황색 CANoe 측정 확�
    보호 기능 전체를 끌 필요는 없습니다. 허용 후 CANoe를 완전히 재시작하고
    Diag를 재컴파일한 뒤 측정·수동 기록부터 확인하세요.
 
+CANoe 버전을 설치·제거한 뒤 앱에서 CANoe가 열리지 않으면 자동 연결(COM) 등록을 복구하세요.
+모든 CANoe 작업을 저장하고 닫은 뒤, 사용할 버전의 Exec64\RegisterComponents.exe를
+관리자 권한으로 실행하고 앱에서 연결 확인을 다시 누르세요. CANoe 19 기본 경로 예시:
+C:\Program Files\Vector CANoe 19\Exec64\RegisterComponents.exe
+다른 버전은 실제 설치 위치를 확인하세요. 도구가 없으면 해당 CANoe 설치 복구를 사용하세요.
+자세한 절차는 HTML 가이드의 CANoe 등록 복구를 확인하세요.
+
 4. CAN/Diag: cfg 선택·연결 확인 → 전용 CANoe 창에서 컴파일/채널·라이선스 확인
    → F9 측정·Trace 수신 확인 → 메인의 기록 시작/정지. 연결 재확인은 필수가 아닙니다.
    측정을 켜둔 채 기록 시작·정지·다음 기록을 반복하며, 시작 때 측정 상태를 자동 확인합니다.
