@@ -1,6 +1,7 @@
 """One offline illustrated guide shared by source runs and release packaging."""
 
 import base64
+import hashlib
 import json
 import logging
 import re
@@ -103,6 +104,45 @@ def _guide_translations(source: Path, template: str) -> str:
     return json.dumps(languages, ensure_ascii=False).replace("<", "\\u003c")
 
 
+def _guide_annotations(source: Path, photos: list[str], app_version: str) -> str:
+    manifest = json.loads((source / "images/manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("annotations_version") != 1 or manifest.get("app_version") != app_version:
+        raise ValueError("Recapture reviewed guide annotations for this app version.")
+    expected = {name + ("" if language == "ko" else "-" + language) + ".png"
+                for name in photos for language in ("ko", "en", "zh")}
+    records = manifest.get("screenshots", [])
+    if ({row.get("file") for row in records} != expected or len(records) != len(expected)):
+        raise ValueError("Missing or duplicate annotated guide screenshots.")
+    result = {language: {} for language in ("ko", "en", "zh")}
+    for row in records:
+        language, filename = row.get("language"), row["file"]
+        path = source / "images" / filename
+        if path.stat().st_size > 2 * 1024 * 1024:
+            raise ValueError(f"Guide screenshot is too large: {filename}")
+        data = path.read_bytes()
+        width, height = row["width"], row["height"]
+        if (language not in result or hashlib.sha256(data).hexdigest() != row["sha256"] or
+                len(data) < 24 or struct.unpack(">II", data[16:24]) != (width, height)):
+            raise ValueError(f"Guide annotation does not match screenshot: {filename}")
+        steps = row.get("annotations", [])
+        if not steps or len(steps) > 5:
+            raise ValueError(f"Missing guide click instructions: {filename}")
+        for number, step in enumerate(steps, 1):
+            rect = step.get("rect", [])
+            if (step.get("step") != number or step.get("action") not in {"click", "type", "select", "check", "enter"}
+                    or not isinstance(step.get("label"), str) or not 0 < len(step["label"].strip()) <= 80
+                    or len(rect) != 4 or any(type(value) is not int for value in rect)):
+                raise ValueError(f"Invalid guide click instruction: {filename}")
+            x, y, w, h = rect
+            if x < 0 or y < 0 or w <= 0 or h <= 0 or x + w > width or y + h > height:
+                raise ValueError(f"Guide click target outside screenshot: {filename}")
+        suffix = ".png" if language == "ko" else "-" + language + ".png"
+        if not filename.endswith(suffix):
+            raise ValueError(f"Guide screenshot language mismatch: {filename}")
+        result[language][filename[:-len(suffix)]] = {"width": width, "height": height, "steps": steps}
+    return json.dumps(result, ensure_ascii=False).replace("<", "\\u003c")
+
+
 def load_user_documentation(root: Path, app_name: str, app_version: str) -> tuple[dict, dict[str, str]]:
     source = root / "user_guide"
     metadata = json.loads((source / "guide_metadata.json").read_text(encoding="utf-8"))
@@ -138,6 +178,7 @@ def load_user_documentation(root: Path, app_name: str, app_version: str) -> tupl
         if filename == guide_name:
             text = text.replace("{{GUIDE_TRANSLATIONS}}", _guide_translations(source, text))
             photos = re.findall(r'data-guide-image="([a-z_-]+)"', text)
+            text = text.replace("{{GUIDE_ANNOTATIONS}}", _guide_annotations(source, photos, app_version))
             localized_images = {language: {name: "{{IMAGE:" + name + "-" + language + ".png}}"
                                           for name in photos} for language in ("en", "zh")}
             text = text.replace("{{GUIDE_IMAGES}}", json.dumps(localized_images))

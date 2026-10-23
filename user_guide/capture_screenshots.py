@@ -11,6 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["QT_SCALE_FACTOR"] = "1"
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -39,13 +40,32 @@ def capture(app, language, records):
     images = Path(__file__).parent / "images"
     images.mkdir(exist_ok=True)
 
-    def save(name, widget, rect=None):
+    labels = json.loads((Path(__file__).parent / "annotation_labels.json").read_text(encoding="utf-8"))
+
+    def mark(target, action, label):
+        return target, action, labels[label][language]
+
+    def picker(key):
+        return next(button for button in dialog.browse_buttons
+                    if button.parentWidget() is dialog.fields[key].parentWidget())
+
+    def save(name, widget, rect=None, *, annotations):
         app.processEvents()
         pixmap = widget.grab(rect) if rect is not None else widget.grab()
         path = images / (name + ("" if language == "ko" else "-" + language) + ".png")
         assert pixmap.save(str(path))
-        records.append({"file": path.name, "width": pixmap.width(), "height": pixmap.height(),
-                        "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+        crop = rect if rect is not None else widget.rect()
+        steps = []
+        for number, (target, action, label) in enumerate(annotations, 1):
+            bounds = (QRect(target) if isinstance(target, QRect)
+                      else QRect(target.mapTo(widget, QPoint()), target.size()))
+            assert crop.contains(bounds), (name, label, bounds, crop)
+            bounds.translate(-crop.topLeft())
+            steps.append({"step": number, "action": action, "label": label,
+                          "rect": [bounds.x(), bounds.y(), bounds.width(), bounds.height()]})
+        records.append({"file": path.name, "language": language,
+                        "width": pixmap.width(), "height": pixmap.height(),
+                        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "annotations": steps})
 
     window = MainWindow()
     window.resize(480, 660)
@@ -58,7 +78,9 @@ def capture(app, language, records):
     window.show()
     app.processEvents()
     # Actual widgets with example values. No Runtime, worker pool or COM object.
-    save("overview", window, QRect(0, 0, 480, window.logging_button.mapTo(window, QPoint()).y() + 60))
+    main_crop = QRect(0, 0, 480, window.logging_button.mapTo(window, QPoint()).y() + 60)
+    save("overview", window, main_crop, annotations=[mark(window.settings_button, "click", "settings")])
+    save("report-entry", window, main_crop, annotations=[mark(window.bug_report_button, "click", "report")])
     window.set_settings(settings)
     dialog = window.settings_dialog
     dialog.resize(700, 730)
@@ -73,7 +95,9 @@ def capture(app, language, records):
     dialog.tabs.setCurrentIndex(0)
     app.processEvents()
     bottom = dialog.apply_button.mapTo(dialog, QPoint(0, dialog.apply_button.height())).y() + 18
-    save("storage", dialog, QRect(14, 96, dialog.width() - 28, bottom - 96))
+    save("storage", dialog, QRect(14, 96, dialog.width() - 28, bottom - 96), annotations=[
+        mark(picker("output_dir"), "click", "folder"),
+        mark(dialog.fields["prefix"], "type", "prefix"), mark(dialog.apply_button, "click", "apply")])
     for role in (Role.CAN, Role.DIAG):
         dialog.set_preparation_report({"role": role.value, "status": "attention", "readiness_stage": "measurement_waiting",
             "connected_cfg": getattr(settings, role.value + "_cfg"), "selected_block": "1",
@@ -83,8 +107,11 @@ def capture(app, language, records):
             "next_action_zh": "在此 CANoe 窗口检查通道映射，然后确认 F9 和 Trace 接收。"})
     dialog.tabs.setCurrentIndex(1)
     app.processEvents()
-    save("can", dialog._preparation_cards[Role.CAN])
-    save("diag", dialog._preparation_cards[Role.DIAG])
+    for role in (Role.CAN, Role.DIAG):
+        save(role.value, dialog._preparation_cards[role], annotations=[
+            mark(picker(role.value + "_cfg"), "click", "cfg"),
+            mark(dialog.prepare_buttons[role], "click", "connect"),
+            mark(dialog.block_inputs[role.value + "_logging_block"], "select", "block")])
     dialog.tabs.setCurrentIndex(2)
     # Keep screenshots deterministic; no host NIC statistics or external inventory.
     dialog.nic_input.set_sampling(False)
@@ -94,34 +121,46 @@ def capture(app, language, records):
         "message_en": "The selected Ethernet adapter is ready.", "next_action_en": "Close settings and start recording.",
         "message_zh": "所选以太网适配器已就绪。", "next_action_zh": "关闭设置并开始记录。"})
     app.processEvents()
-    save("ethernet", dialog, QRect(14, 96, dialog.width() - 28, dialog.height() - 160))
+    save("ethernet", dialog, QRect(14, 96, dialog.width() - 28, dialog.height() - 160), annotations=[
+        mark(dialog.nic_input, "select", "network"), mark(dialog.prepare_buttons[Role.ETHERNET], "click", "connect")])
     dialog.nic_input._activity = {
         "example-ethernet": {"pps": 18500, "history": [15000, 16500, 18000, 17000, 19000, 18500] * 4},
         "example-wifi": {"pps": 24, "history": [5, 0, 10, 8, 2, 24] * 4}}
     dialog.nic_input.refresh_activity()
     dialog.nic_input.showPopup()
     app.processEvents()
-    save("networks", dialog.nic_input.view().window())
+    view = dialog.nic_input.view()
+    row = view.visualRect(view.model().index(dialog.nic_input.findData("example-ethernet"), 0))
+    row.translate(view.viewport().mapTo(view.window(), QPoint()))
+    row = row.intersected(view.window().rect())
+    graph = QRect(row.x() + int(row.width() * .64), row.y(), int(row.width() * .34), row.height())
+    choice = QRect(row.x() + 2, row.y(), int(row.width() * .60), row.height())
+    save("networks", view.window(), annotations=[mark(graph, "check", "traffic"), mark(choice, "click", "network")])
     dialog.nic_input.hidePopup()
     dialog.tabs.setCurrentIndex(3)
     app.processEvents()
-    save("validation", dialog.validation_panel)
+    panel = dialog.validation_panel
+    save("validation", panel, annotations=[mark(panel.rule_combo, "select", "rule"),
+         mark(panel.fields["popup_message"], "type", "popup"), mark(panel.save_button, "click", "save_rule")])
     dialog.hide()
 
     for role in (Role.CAN, Role.ETHERNET):
         window.set_target(TargetSnapshot(role, connection=ConnectionState.READY))
     window.set_phase(SessionPhase.IDLE)
-    save("ready", window, QRect(0, 0, 480, window.logging_button.mapTo(window, QPoint()).y() + 60))
+    choices = QRect(window.role_checks[Role.CAN].mapTo(window, QPoint()), window.role_checks[Role.CAN].size())
+    choices = choices.united(QRect(window.role_checks[Role.ETHERNET].mapTo(window, QPoint()), window.role_checks[Role.ETHERNET].size()))
+    save("ready", window, main_crop, annotations=[mark(choices, "select", "targets"),
+         mark(window.logging_button, "click", "start")])
     window.set_target(TargetSnapshot(Role.CAN, connection=ConnectionState.UNKNOWN))
     window.set_preparation_report({"role": "can", "status": "attention", "readiness_stage": "measurement_waiting",
         "connected_cfg": settings.can_cfg, "selected_block": "1"})
-    save("measurement-waiting", window, QRect(0, 0, 480, window.logging_button.mapTo(window, QPoint()).y() + 60))
+    save("measurement-waiting", window, main_crop, annotations=[mark(window.logging_button, "click", "measurement")])
     for role in (Role.CAN, Role.ETHERNET):
         window.set_target(TargetSnapshot(role, connection=ConnectionState.READY, recording=RecordingState.RECORDING,
             observation=ObservationState.NORMAL if role == Role.ETHERNET else ObservationState.UNSUPPORTED))
     window.set_phase(SessionPhase.RECORDING)
     window.set_files(["C:/Logs/Drive_1.blf", "C:/Logs/Drive_1.pcap"], "recording")
-    save("recording", window, QRect(0, 0, 480, window.logging_button.mapTo(window, QPoint()).y() + 60))
+    save("recording", window, main_crop, annotations=[mark(window.logging_button, "click", "stop")])
     window.set_settings(replace(settings, next_index=2))
     for role in (Role.CAN, Role.ETHERNET):
         window.set_target(TargetSnapshot(role, connection=ConnectionState.READY, recording=RecordingState.STOPPED))
@@ -131,18 +170,20 @@ def capture(app, language, records):
     window.set_files(["C:/Logs/Drive_1.blf", "C:/Logs/Drive_1.pcap"])
     window.add_event(AppEvent("SESSION_COMPLETED", timestamp="2026-10-23T01:00:00Z"))
     bottom = window.rename_button.mapTo(window, QPoint(0, window.rename_button.height())).y() + 24
-    save("completed", window, QRect(0, 0, 480, bottom))
+    save("completed", window, QRect(0, 0, 480, bottom), annotations=[mark(window.file_names, "check", "files"),
+         mark(window.debug_folder_button, "click", "open_folder"), mark(window.previous_name, "enter", "rename")])
     message = QMessageBox(QMessageBox.Icon.Information, tr("bug_report", language), tr("bug_report_saved", language).format(
         filename="One_Click_Log_BugReport_To_Taegon.Kim_20261023_100000.zip"), QMessageBox.StandardButton.Ok)
     apply_theme(message)
     message.show()
     app.processEvents()
-    save("bug-report", message)
+    save("bug-report", message, annotations=[mark(message.findChild(type(window.file_names), "qt_msgbox_label"), "check", "report_saved")])
     message.close()
     rule = parse_rules(default_rules_json())[0]
     window.show_validation_failure({"session_id": "guide-popup", "rules": [rule.__dict__]})
     app.processEvents()
-    save("validation-popup", window._validation_alerts[0])
+    alert = window._validation_alerts[0]
+    save("validation-popup", alert, annotations=[mark(alert.findChild(type(window.file_names), "qt_msgbox_label"), "check", "render")])
     for alert in window._validation_alerts[:]:
         alert.close()
     window.hide()
@@ -162,7 +203,8 @@ def main():
         capture(app, language, records)
     images = Path(__file__).parent / "images"
     (images / "manifest.json").write_text(json.dumps({"app_version": __version__, "illustrative_data": True,
-        "real_device_capture": False, "screenshots": records}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        "real_device_capture": False, "annotations_version": 1, "screenshots": records},
+        ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({"screenshots": len(records), "app_version": __version__}))
     return 0
 

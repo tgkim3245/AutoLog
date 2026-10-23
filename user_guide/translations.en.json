@@ -10,7 +10,7 @@
   "g009": "Troubleshooting",
   "g010": "<b>Extract the entire ZIP and run <code>{{APP_NAME}}.exe</code>.</b>",
   "g011": "Initially, the gray button says <b>Setup required</b>. Click it or the <b>gear</b> at the top right.",
-  "g012": "Screens use example data. Paths, blocks and network names vary by PC. Click a photo to enlarge it.",
+  "g012": "Red numbers show the action order within each photo. Click, Type, Select and Check identify the action. Follow the red outlines and arrows. Click a photo to enlarge it with its instructions. Paths, blocks and network names vary by PC.",
   "g013": "Enlarge main screen",
   "g014": "Guide, bug report, language and settings controls above the CAN, Diag and Zipy selections",
   "g015": "Open settings using the gear at the top right.",
@@ -243,7 +243,7 @@
   "g242": "Dedicated CANoe processes are identified by handles created in this run. <b>X immediately sends termination signals without waiting for their windows to close.</b> The original cfg is not saved automatically. Independently launched CANoe and Wireshark windows are not closed. Save needed channel mapping and project changes yourself before recording.",
   "g243": "Before updating, finish stopping and archiving any recording you want to keep, close the old {{APP_NAME}}, and use the entire new release folder. Since 0.9.11, old unfinished history is cleaned up automatically. After relaunch, connect the cfg and check F9 and Trace before a new recording. Previously completed captures are retained.",
   "g244": "Per-PC settings, indices and history are stored in <code>%LOCALAPPDATA%\\{{APP_NAME}}</code>. On a new PC, verify old paths and NIC selections. Validate the PC’s disk, tools and vehicle setup with short recordings before longer tests.",
-  "g245": "<strong>Verification scope of this release</strong>The {{APP_VERSION}} internal single-PC package supplies the official Npcap 1.90 installer after size, SHA256 and Nmap signature checks. The build does not run the installer or modify the current PC’s driver. Actual installation, reboot and capture on the new PC require separate testing. Existing COM registration diagnostics, three-language guidance and capture/UI behavior remain. Physical VN/cable removal, simultaneous vehicle capture, sustained high load and investigation of the known Diag omission require separate tests. File validation does not prove lossless capture.",
+  "g245": "<strong>Verification scope of this release</strong>The {{APP_VERSION}} guide adds red arrows, ordered numbers and Click / Type / Check instructions at actual Qt widget positions. Checks cover all three languages, enlarged annotations, target locations and offline rendering. Capture and exit behavior remain unchanged. The internal single-PC package retains the official Npcap installer with signature/hash verification; installation and capture on the new PC require separate testing. Physical VN/cable removal, simultaneous vehicle capture, sustained high load and the known Diag omission require separate tests. File checks do not prove lossless capture.",
   "g246": "{{APP_NAME}} {{APP_VERSION}} · User guide · Revision {{GUIDE_REVISION}} · {{UPDATED_DATE}}<br>Reopen from Guide on the main screen. Paths, connection states and traffic in photos are examples. Switch language above; the guide works offline.",
   "g247": "Enlarged screenshot",
   "g248": "Close · Esc",
@@ -261,5 +261,9 @@
   "g260": "Close One Click Log, right-click <code>installers/Npcap/npcap-1.90.exe</code> in the release folder and choose <b>Run as administrator</b>.",
   "g261": "Read and accept the license in the official installer and complete installation with default options. Reboot first if requested.",
   "g262": "Reopen One Click Log, then use <b>Settings → Ethernet connection → choose network → Check connection</b>.",
-  "g263": "Copying the installer does not install the driver. The user performs installation and approves administrator access. This installer package is for the confirmed single PC inside the same company, not external redistribution. See the included LICENSE.txt and <a href=\"https://npcap.com/#license\">official Npcap terms</a>. If a standard package has no installer, download it from the <a href=\"https://npcap.com/#download\">official site</a>."
+  "g263": "Copying the installer does not install the driver. The user performs installation and approves administrator access. This installer package is for the confirmed single PC inside the same company, not external redistribution. See the included LICENSE.txt and <a href=\"https://npcap.com/#license\">official Npcap terms</a>. If a standard package has no installer, download it from the <a href=\"https://npcap.com/#download\">official site</a>.",
+  "g264": "Enlarge bug report button location",
+  "g265": "Main-screen bug report button marked with a red arrow and Click",
+  "g266": "When a problem occurs, click Bug report here.",
+  "g267": "Find the saved ZIP on your Desktop and email it to Taegon.Kim."
 }

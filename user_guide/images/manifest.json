@@ -2,240 +2,1276 @@
   "app_version": "0.9.21",
   "illustrative_data": true,
   "real_device_capture": false,
+  "annotations_version": 1,
   "screenshots": [
     {
       "file": "overview.png",
+      "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "114b6535cc1a9e4421c952d4ab5fcd6316ff9b64a35633a1b84af7f26bebf63f"
+      "sha256": "114b6535cc1a9e4421c952d4ab5fcd6316ff9b64a35633a1b84af7f26bebf63f",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "설정 열기",
+          "rect": [
+            423,
+            15,
+            39,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "file": "report-entry.png",
+      "language": "ko",
+      "width": 480,
+      "height": 296,
+      "sha256": "114b6535cc1a9e4421c952d4ab5fcd6316ff9b64a35633a1b84af7f26bebf63f",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "문제 발생 시 버그리포트",
+          "rect": [
+            246,
+            17,
+            73,
+            28
+          ]
+        }
+      ]
     },
     {
       "file": "storage.png",
+      "language": "ko",
       "width": 672,
       "height": 284,
-      "sha256": "e903ecb49ae2be72721e64e1476f7a325d9645b6138d4803a2187ab27974837b"
+      "sha256": "e903ecb49ae2be72721e64e1476f7a325d9645b6138d4803a2187ab27974837b",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "저장 폴더 선택",
+          "rect": [
+            597,
+            89,
+            48,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "type",
+          "label": "파일 prefix 입력",
+          "rect": [
+            131,
+            136,
+            514,
+            36
+          ]
+        },
+        {
+          "step": 3,
+          "action": "click",
+          "label": "적용",
+          "rect": [
+            597,
+            232,
+            48,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "can.png",
+      "language": "ko",
       "width": 611,
       "height": 257,
-      "sha256": "25a11312fed29b5200bb5e79f28ca63d50800fa6acfb2d00d92db5c6aa184333"
+      "sha256": "25a11312fed29b5200bb5e79f28ca63d50800fa6acfb2d00d92db5c6aa184333",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "cfg 파일 선택",
+          "rect": [
+            550,
+            44,
+            48,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "연결 확인",
+          "rect": [
+            493,
+            138,
+            105,
+            34
+          ]
+        },
+        {
+          "step": 3,
+          "action": "select",
+          "label": "BLF 기록 블록 선택",
+          "rect": [
+            140,
+            87,
+            458,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "diag.png",
+      "language": "ko",
       "width": 611,
       "height": 257,
-      "sha256": "c42759da22bf5b85eb2d5c9abd4eb9a855bc8847aad61d00adfbcaa2617b6f54"
+      "sha256": "c42759da22bf5b85eb2d5c9abd4eb9a855bc8847aad61d00adfbcaa2617b6f54",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "cfg 파일 선택",
+          "rect": [
+            550,
+            44,
+            48,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "연결 확인",
+          "rect": [
+            493,
+            138,
+            105,
+            34
+          ]
+        },
+        {
+          "step": 3,
+          "action": "select",
+          "label": "BLF 기록 블록 선택",
+          "rect": [
+            140,
+            87,
+            458,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "ethernet.png",
+      "language": "ko",
       "width": 672,
       "height": 570,
-      "sha256": "54cf1c4c9ab655a83bb6097b273709b367ec8807845c315c7c888d21febac3e6"
+      "sha256": "54cf1c4c9ab655a83bb6097b273709b367ec8807845c315c7c888d21febac3e6",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "장비 네트워크 선택",
+          "rect": [
+            139,
+            206,
+            506,
+            36
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "연결 확인",
+          "rect": [
+            554,
+            369,
+            76,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "networks.png",
+      "language": "ko",
       "width": 506,
       "height": 162,
-      "sha256": "828de5ab9715aa818a1529275e91910dfc51cdee4fd59d5bd8a425f4202ac953"
+      "sha256": "828de5ab9715aa818a1529275e91910dfc51cdee4fd59d5bd8a425f4202ac953",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "수신 그래프 확인",
+          "rect": [
+            326,
+            55,
+            169,
+            44
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "장비 네트워크 선택",
+          "rect": [
+            9,
+            55,
+            299,
+            44
+          ]
+        }
+      ]
     },
     {
       "file": "validation.png",
+      "language": "ko",
       "width": 650,
       "height": 493,
-      "sha256": "564e98457b489f8377bce94f157ef1f749e0613b5f61d6487c208ec5996126e9"
+      "sha256": "564e98457b489f8377bce94f157ef1f749e0613b5f61d6487c208ec5996126e9",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "수정할 규칙 선택",
+          "rect": [
+            10,
+            48,
+            478,
+            36
+          ]
+        },
+        {
+          "step": 2,
+          "action": "type",
+          "label": "팝업 안내 문구 입력",
+          "rect": [
+            220,
+            141,
+            404,
+            88
+          ]
+        },
+        {
+          "step": 3,
+          "action": "click",
+          "label": "규칙 저장",
+          "rect": [
+            120,
+            449,
+            520,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "ready.png",
+      "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "6c5dea18cb57e460ed9e673cb1f1f25235ee0746aea17afbc04d2d37fe6736e8"
+      "sha256": "6c5dea18cb57e460ed9e673cb1f1f25235ee0746aea17afbc04d2d37fe6736e8",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "이번에 쓸 대상 체크",
+          "rect": [
+            31,
+            147,
+            392,
+            17
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "기록 시작",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "measurement-waiting.png",
+      "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "133e885bd5978162ee58e661d42b094e29250e32ca1600e931498e673fe58c00"
+      "sha256": "133e885bd5978162ee58e661d42b094e29250e32ca1600e931498e673fe58c00",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "F9·Trace 확인 후 시작",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "recording.png",
+      "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "3733064704f0fad4328f5841a9c458380d6c8f6e09732d2c1a1c49dcb130f44d"
+      "sha256": "3733064704f0fad4328f5841a9c458380d6c8f6e09732d2c1a1c49dcb130f44d",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "기록 정지·저장",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "completed.png",
+      "language": "ko",
       "width": 480,
       "height": 455,
-      "sha256": "8c98e6ca578abf38ad832a53e055f3c6df70885535c31484b2abab31737abb19"
+      "sha256": "8c98e6ca578abf38ad832a53e055f3c6df70885535c31484b2abab31737abb19",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "최종 파일명 확인",
+          "rect": [
+            31,
+            342,
+            418,
+            25
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "로그 폴더 열기",
+          "rect": [
+            344,
+            98,
+            66,
+            28
+          ]
+        },
+        {
+          "step": 3,
+          "action": "enter",
+          "label": "새 이름 입력 → Enter",
+          "rect": [
+            31,
+            396,
+            335,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "bug-report.png",
+      "language": "ko",
       "width": 437,
       "height": 132,
-      "sha256": "1ab625b4d0a39060f015e34232864bf10b6d8e6795a89376cdc9d6a10cf4b5c3"
+      "sha256": "1ab625b4d0a39060f015e34232864bf10b6d8e6795a89376cdc9d6a10cf4b5c3",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "바탕화면 ZIP → 이메일",
+          "rect": [
+            78,
+            11,
+            348,
+            64
+          ]
+        }
+      ]
     },
     {
       "file": "validation-popup.png",
+      "language": "ko",
       "width": 400,
       "height": 110,
-      "sha256": "d4bca1447a0f972bc3025a7ef0367d4fcad2af1a20c775e57c6e27011b6be8ee"
+      "sha256": "d4bca1447a0f972bc3025a7ef0367d4fcad2af1a20c775e57c6e27011b6be8ee",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "Render에서 |6 → e1 입력",
+          "rect": [
+            78,
+            11,
+            311,
+            32
+          ]
+        }
+      ]
     },
     {
       "file": "overview-en.png",
+      "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "5f48b7b2d23edf3026273ea9cca2a66f1738dff60beaf8f4a2dd7b1947a1893e"
+      "sha256": "5f48b7b2d23edf3026273ea9cca2a66f1738dff60beaf8f4a2dd7b1947a1893e",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "Open settings",
+          "rect": [
+            423,
+            15,
+            39,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "file": "report-entry-en.png",
+      "language": "en",
+      "width": 480,
+      "height": 296,
+      "sha256": "5f48b7b2d23edf3026273ea9cca2a66f1738dff60beaf8f4a2dd7b1947a1893e",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "Bug report on failure",
+          "rect": [
+            246,
+            17,
+            73,
+            28
+          ]
+        }
+      ]
     },
     {
       "file": "storage-en.png",
+      "language": "en",
       "width": 672,
       "height": 299,
-      "sha256": "eeb07e829df897a167ee6738738412e0ed256495e74c3af86616ce0e5ceeb66a"
+      "sha256": "eeb07e829df897a167ee6738738412e0ed256495e74c3af86616ce0e5ceeb66a",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "Choose save folder",
+          "rect": [
+            583,
+            104,
+            62,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "type",
+          "label": "Enter file prefix",
+          "rect": [
+            141,
+            151,
+            504,
+            36
+          ]
+        },
+        {
+          "step": 3,
+          "action": "click",
+          "label": "Apply",
+          "rect": [
+            587,
+            247,
+            58,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "can-en.png",
+      "language": "en",
       "width": 611,
       "height": 257,
-      "sha256": "3189880d4e354962de2492bcbc82608b3227a9b31e6f468c08e063ee2c40792a"
+      "sha256": "3189880d4e354962de2492bcbc82608b3227a9b31e6f468c08e063ee2c40792a",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "Choose cfg file",
+          "rect": [
+            536,
+            44,
+            62,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "Check connection",
+          "rect": [
+            512,
+            138,
+            86,
+            34
+          ]
+        },
+        {
+          "step": 3,
+          "action": "select",
+          "label": "Choose BLF block",
+          "rect": [
+            160,
+            87,
+            438,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "diag-en.png",
+      "language": "en",
       "width": 611,
       "height": 257,
-      "sha256": "c9efaf7bdae5a2deed3dfc49d25095bf96b499dd2df4943bcf60d6cf7ae75c2e"
+      "sha256": "c9efaf7bdae5a2deed3dfc49d25095bf96b499dd2df4943bcf60d6cf7ae75c2e",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "Choose cfg file",
+          "rect": [
+            536,
+            44,
+            62,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "Check connection",
+          "rect": [
+            512,
+            138,
+            86,
+            34
+          ]
+        },
+        {
+          "step": 3,
+          "action": "select",
+          "label": "Choose BLF block",
+          "rect": [
+            160,
+            87,
+            438,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "ethernet-en.png",
+      "language": "en",
       "width": 672,
       "height": 570,
-      "sha256": "08a621e7bb90a9764496f6fe9cfed3c55249bd0f50e8e31cf8fd51985c0c4ffe"
+      "sha256": "08a621e7bb90a9764496f6fe9cfed3c55249bd0f50e8e31cf8fd51985c0c4ffe",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "Choose device network",
+          "rect": [
+            143,
+            206,
+            502,
+            36
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "Check connection",
+          "rect": [
+            509,
+            384,
+            121,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "networks-en.png",
+      "language": "en",
       "width": 502,
       "height": 162,
-      "sha256": "32003449e60d3d921a106c929090b1e9beeae792b92af8f78f046de8b6595406"
+      "sha256": "32003449e60d3d921a106c929090b1e9beeae792b92af8f78f046de8b6595406",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "Check incoming traffic",
+          "rect": [
+            323,
+            55,
+            168,
+            44
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "Choose device network",
+          "rect": [
+            9,
+            55,
+            297,
+            44
+          ]
+        }
+      ]
     },
     {
       "file": "validation-en.png",
+      "language": "en",
       "width": 650,
       "height": 493,
-      "sha256": "b3a96741c96f14edbe98c29b7089ecd9f9f9d67d41be9944410c3cfdf688e14c"
+      "sha256": "b3a96741c96f14edbe98c29b7089ecd9f9f9d67d41be9944410c3cfdf688e14c",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "Choose rule to edit",
+          "rect": [
+            10,
+            48,
+            455,
+            36
+          ]
+        },
+        {
+          "step": 2,
+          "action": "type",
+          "label": "Enter popup message",
+          "rect": [
+            250,
+            141,
+            374,
+            88
+          ]
+        },
+        {
+          "step": 3,
+          "action": "click",
+          "label": "Save rule",
+          "rect": [
+            120,
+            449,
+            520,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "ready-en.png",
+      "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "e3ac759242e24283ca9249b5ecc17ee23cd28383649728cc9b43eb42357c619c"
+      "sha256": "e3ac759242e24283ca9249b5ecc17ee23cd28383649728cc9b43eb42357c619c",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "Select capture targets",
+          "rect": [
+            31,
+            147,
+            392,
+            17
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "Start recording",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "measurement-waiting-en.png",
+      "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "5080e0618545b713c8333d2e46701d4088b48fa1d0836cb12ab5e34610968f9e"
+      "sha256": "5080e0618545b713c8333d2e46701d4088b48fa1d0836cb12ab5e34610968f9e",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "After F9 / Trace check",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "recording-en.png",
+      "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "4f0dbc957608669385c9298a3f616e488b0494fb09176585e430df21839b4d46"
+      "sha256": "4f0dbc957608669385c9298a3f616e488b0494fb09176585e430df21839b4d46",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "Stop and save",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "completed-en.png",
+      "language": "en",
       "width": 480,
       "height": 455,
-      "sha256": "0c6f063ad51d8efa9bce295eadcd31142f486886bb2b844b4107a2925daba16d"
+      "sha256": "0c6f063ad51d8efa9bce295eadcd31142f486886bb2b844b4107a2925daba16d",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "Check saved filenames",
+          "rect": [
+            31,
+            342,
+            418,
+            25
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "Open log folder",
+          "rect": [
+            329,
+            98,
+            72,
+            28
+          ]
+        },
+        {
+          "step": 3,
+          "action": "enter",
+          "label": "New name → Enter",
+          "rect": [
+            31,
+            396,
+            344,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "bug-report-en.png",
+      "language": "en",
       "width": 437,
       "height": 148,
-      "sha256": "d979ef5d9b55f807576e87386d4ec28c291baa0abb73d3757bbc349f2fbb0a07"
+      "sha256": "d979ef5d9b55f807576e87386d4ec28c291baa0abb73d3757bbc349f2fbb0a07",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "Desktop ZIP → email",
+          "rect": [
+            78,
+            11,
+            348,
+            80
+          ]
+        }
+      ]
     },
     {
       "file": "validation-popup-en.png",
+      "language": "en",
       "width": 400,
       "height": 110,
-      "sha256": "bc73820f4e91423b55ece95cb13f438d0275bcc1890a27e1199728a99a990be2"
+      "sha256": "bc73820f4e91423b55ece95cb13f438d0275bcc1890a27e1199728a99a990be2",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "Enter |6 → e1 in Render",
+          "rect": [
+            78,
+            11,
+            311,
+            32
+          ]
+        }
+      ]
     },
     {
       "file": "overview-zh.png",
+      "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "6bbfeaad3b1ac276eb5ceba499f776c94a040a35ede71bdab80cfc6eaf29a778"
+      "sha256": "6bbfeaad3b1ac276eb5ceba499f776c94a040a35ede71bdab80cfc6eaf29a778",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "打开设置",
+          "rect": [
+            423,
+            15,
+            39,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "file": "report-entry-zh.png",
+      "language": "zh",
+      "width": 480,
+      "height": 296,
+      "sha256": "6bbfeaad3b1ac276eb5ceba499f776c94a040a35ede71bdab80cfc6eaf29a778",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "出错时生成错误报告",
+          "rect": [
+            257,
+            17,
+            62,
+            28
+          ]
+        }
+      ]
     },
     {
       "file": "storage-zh.png",
+      "language": "zh",
       "width": 672,
       "height": 285,
-      "sha256": "6fab2dbff8c380c3cfd91162cacf00cc08e2ad1981a3a022df91bd0c66b39933"
+      "sha256": "6fab2dbff8c380c3cfd91162cacf00cc08e2ad1981a3a022df91bd0c66b39933",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "选择保存文件夹",
+          "rect": [
+            597,
+            90,
+            48,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "type",
+          "label": "输入文件名前缀",
+          "rect": [
+            111,
+            137,
+            534,
+            36
+          ]
+        },
+        {
+          "step": 3,
+          "action": "click",
+          "label": "应用",
+          "rect": [
+            597,
+            233,
+            48,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "can-zh.png",
+      "language": "zh",
       "width": 611,
       "height": 257,
-      "sha256": "d48955d3208c85aca78dfe8b4961cbec427b42976f958f346351bc5caadbc845"
+      "sha256": "d48955d3208c85aca78dfe8b4961cbec427b42976f958f346351bc5caadbc845",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "选择 cfg 文件",
+          "rect": [
+            550,
+            44,
+            48,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "检查连接",
+          "rect": [
+            493,
+            138,
+            105,
+            34
+          ]
+        },
+        {
+          "step": 3,
+          "action": "select",
+          "label": "选择 BLF 记录模块",
+          "rect": [
+            136,
+            87,
+            462,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "diag-zh.png",
+      "language": "zh",
       "width": 611,
       "height": 257,
-      "sha256": "a78466b9bfac1c8f1ad21b12c0b84950900435f3c6de4645b3bdc179c0f86d7f"
+      "sha256": "a78466b9bfac1c8f1ad21b12c0b84950900435f3c6de4645b3bdc179c0f86d7f",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "选择 cfg 文件",
+          "rect": [
+            550,
+            44,
+            48,
+            34
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "检查连接",
+          "rect": [
+            493,
+            138,
+            105,
+            34
+          ]
+        },
+        {
+          "step": 3,
+          "action": "select",
+          "label": "选择 BLF 记录模块",
+          "rect": [
+            136,
+            87,
+            462,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "ethernet-zh.png",
+      "language": "zh",
       "width": 672,
       "height": 570,
-      "sha256": "8519e617a13263431384e15506a54f137149b7afc6c74546a3813be5d348cafa"
+      "sha256": "8519e617a13263431384e15506a54f137149b7afc6c74546a3813be5d348cafa",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "选择设备网络",
+          "rect": [
+            135,
+            207,
+            510,
+            36
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "检查连接",
+          "rect": [
+            558,
+            370,
+            72,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "networks-zh.png",
+      "language": "zh",
       "width": 510,
       "height": 162,
-      "sha256": "96a38ec412d97b7c9fd1c3fb5036e8bbd23f7e9dd0cff3a86acf7c312ca26257"
+      "sha256": "96a38ec412d97b7c9fd1c3fb5036e8bbd23f7e9dd0cff3a86acf7c312ca26257",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "查看接收曲线",
+          "rect": [
+            328,
+            55,
+            171,
+            44
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "选择设备网络",
+          "rect": [
+            9,
+            55,
+            301,
+            44
+          ]
+        }
+      ]
     },
     {
       "file": "validation-zh.png",
+      "language": "zh",
       "width": 650,
       "height": 492,
-      "sha256": "a8d6e7da75aa9023b252d1eab07b1ee3862f819558c07c352943754637e6230b"
+      "sha256": "a8d6e7da75aa9023b252d1eab07b1ee3862f819558c07c352943754637e6230b",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "选择要编辑的规则",
+          "rect": [
+            10,
+            48,
+            486,
+            36
+          ]
+        },
+        {
+          "step": 2,
+          "action": "type",
+          "label": "输入弹窗提示内容",
+          "rect": [
+            197,
+            141,
+            427,
+            88
+          ]
+        },
+        {
+          "step": 3,
+          "action": "click",
+          "label": "保存规则",
+          "rect": [
+            112,
+            448,
+            528,
+            34
+          ]
+        }
+      ]
     },
     {
       "file": "ready-zh.png",
+      "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "a411c22998b838bd440fb39a5db2520cc9053d5d9fba426bd0e8de8ec2cd95c0"
+      "sha256": "a411c22998b838bd440fb39a5db2520cc9053d5d9fba426bd0e8de8ec2cd95c0",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "select",
+          "label": "勾选本次记录目标",
+          "rect": [
+            31,
+            147,
+            392,
+            17
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "开始记录",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "measurement-waiting-zh.png",
+      "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "2b072829aec388403b47e5abab0b4f6a3044a51cacb7cfcd805c83a9ec453ae5"
+      "sha256": "2b072829aec388403b47e5abab0b4f6a3044a51cacb7cfcd805c83a9ec453ae5",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "确认 F9 / Trace 后开始",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "recording-zh.png",
+      "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "df6945431bef0e3d6a55fc33a826357e8cf619274ca606e75cd328a04a995b32"
+      "sha256": "df6945431bef0e3d6a55fc33a826357e8cf619274ca606e75cd328a04a995b32",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "click",
+          "label": "停止并保存",
+          "rect": [
+            18,
+            236,
+            444,
+            52
+          ]
+        }
+      ]
     },
     {
       "file": "completed-zh.png",
+      "language": "zh",
       "width": 480,
       "height": 455,
-      "sha256": "2c7d236763296e0ba7cabc7a6ff334e949649f6562e0fa71abaf785237e9f3db"
+      "sha256": "2c7d236763296e0ba7cabc7a6ff334e949649f6562e0fa71abaf785237e9f3db",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "确认最终文件名",
+          "rect": [
+            31,
+            342,
+            418,
+            25
+          ]
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "label": "打开日志文件夹",
+          "rect": [
+            333,
+            98,
+            73,
+            28
+          ]
+        },
+        {
+          "step": 3,
+          "action": "enter",
+          "label": "输入新名称 → Enter",
+          "rect": [
+            31,
+            396,
+            351,
+            36
+          ]
+        }
+      ]
     },
     {
       "file": "bug-report-zh.png",
+      "language": "zh",
       "width": 437,
       "height": 132,
-      "sha256": "b2a8a93397691ac43bc3832fc7ba4a594aa8daf9aa436a981d0c6b4c1fdfcdb8"
+      "sha256": "b2a8a93397691ac43bc3832fc7ba4a594aa8daf9aa436a981d0c6b4c1fdfcdb8",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "桌面 ZIP → 发送邮件",
+          "rect": [
+            78,
+            11,
+            348,
+            64
+          ]
+        }
+      ]
     },
     {
       "file": "validation-popup-zh.png",
+      "language": "zh",
       "width": 400,
       "height": 110,
-      "sha256": "0c1b90612d303b91e2356dab747fccdfd3da0f0ec15639070e80fb5488a98ac6"
+      "sha256": "0c1b90612d303b91e2356dab747fccdfd3da0f0ec15639070e80fb5488a98ac6",
+      "annotations": [
+        {
+          "step": 1,
+          "action": "check",
+          "label": "在 Render 输入 |6 → e1",
+          "rect": [
+            78,
+            11,
+            311,
+            32
+          ]
+        }
+      ]
     }
   ]
 }

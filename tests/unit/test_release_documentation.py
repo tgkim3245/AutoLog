@@ -69,11 +69,20 @@ def test_offline_guide_renders_reviewed_version_and_has_working_internal_links(p
     assert catalogs["en"]["g002"] == "Your first recording"
     assert catalogs["zh"]["g002"] == "开始第一次记录"
     photos = json.loads(re.search(r'id="guide-images">(.*?)</script>', html, re.S)[1])
-    assert set(photos) == {"en", "zh"} and all(len(items) == 13 for items in photos.values())
+    assert set(photos) == {"en", "zh"} and all(len(items) == 14 for items in photos.values())
     for images in photos.values():
         for uri in images.values():
             assert uri.startswith("data:image/png;base64,")
             assert base64.b64decode(uri.split(",", 1)[1], validate=True).startswith(b"\x89PNG\r\n\x1a\n")
+    annotations = json.loads(re.search(r'id="guide-annotations">(.*?)</script>', html, re.S)[1])
+    assert set(annotations) == {"ko", "en", "zh"}
+    for language, pictures in annotations.items():
+        assert len(pictures) == 14
+        assert [step["action"] for step in pictures["storage"]["steps"]] == ["click", "type", "click"]
+        assert pictures["recording"]["steps"][0]["action"] == "click"
+        assert pictures["bug-report"]["steps"][0]["action"] == "check"
+        assert pictures["report-entry"]["steps"][0]["action"] == "click"
+        assert all(photo["steps"] for photo in pictures.values())
 
 
 @pytest.mark.parametrize("damage", ["missing", "invalid", "too_large"])
@@ -195,5 +204,26 @@ def test_translation_damage_blocks_release_before_output_is_created(project, tmp
         (folder / "images/storage-en.png").unlink()
     path.write_text(json.dumps(catalog, ensure_ascii=False), encoding="utf-8")
     with pytest.raises((ValueError, FileNotFoundError)):
+        release.build(project, "AutoLog", APP_VERSION, {}, tmp_path / "releases")
+    assert not (tmp_path / "releases").exists()
+
+
+@pytest.mark.parametrize("damage", ["missing", "outside", "step_order", "hash", "language"])
+def test_inaccurate_screenshot_annotations_block_release(project, tmp_path, damage):
+    path = project / "user_guide/images/manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    image = next(row for row in manifest["screenshots"] if row["file"] == "storage.png")
+    if damage == "missing":
+        image.pop("annotations")
+    elif damage == "outside":
+        image["annotations"][0]["rect"] = [image["width"] + 10, 1, 20, 20]
+    elif damage == "step_order":
+        image["annotations"][0]["step"] = 99
+    elif damage == "hash":
+        image["sha256"] = "0" * 64
+    else:
+        image["language"] = "zh"
+    path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError):
         release.build(project, "AutoLog", APP_VERSION, {}, tmp_path / "releases")
     assert not (tmp_path / "releases").exists()
