@@ -102,6 +102,9 @@ TEXT = {
     "monitor_optional": "可选 · 留空则不比较", "monitor_required": "手动输入测试条件", "monitor_integer": "请手动输入整数。",
     "monitor_new": "新规则", "monitor_delete": "删除规则", "monitor_save": "保存规则 · 下次记录生效",
     "monitor_saving": "保存中…", "monitor_limit": "最多支持 16 条规则。", "recovery": "恢复未完成记录",
+    "monitor_restore_default": "恢复默认规则",
+    "monitor_restore_default_help": "恢复 Zipy 默认规则：启动宽限与未接收时限均为 2 秒，并恢复默认提示。其他规则保留。",
+    "monitor_restore_default_limit": "已有 16 条规则，请先删除一条再恢复默认规则。",
     "recovery_count": "待确认 {count} 项", "recovery_help": "请确认外部记录已停止后选择文件。CANoe 测量可继续，但相应记录块必须停止。恢复仅检查文件结构，不能确认数据完整接收。",
     "recovery_stopped": "我已确认相关 CANoe 记录块和 TShark 记录均已停止。",
     "recovery_recheck": "重新检查文件", "recovery_retry_stop": "重试停止当前记录", "recovery_publish": "检查并归档",
@@ -158,6 +161,8 @@ EVENTS = {
     "RECOVERY_ERROR": "恢复失败 · 文件已保留", "APP_READY": "程序已就绪",
     "DEBUG_LOG_ENABLED": "开始保存开发者日志", "DEBUG_LOG_DISABLED": "结束保存开发者日志",
     "DEBUG_LOG_ERROR": "开发者日志错误", "SETTINGS_SAVED": "设置已保存", "PREFERENCES_SAVED": "路径与连接选择已保存",
+    "ZIPY_DEFAULT_RESTORED": "Zipy 默认规则已恢复 · 启动宽限与未接收时限均为 2 秒",
+    "ZIPY_DEFAULT_LIMIT": "已有 16 条规则，无法添加 Zipy 默认规则。请在设置中删除一条，再恢复默认规则。",
     "SETTINGS_ERROR": "设置应用失败", "TARGET_READY": "对象连接已就绪", "TARGET_ATTENTION": "需检查连接设置",
     "TARGET_ERROR": "对象连接错误", "SESSION_PREPARING": "准备采集中", "SESSION_STARTING": "启动采集中",
     "SESSION_RECORDING": "记录中", "SESSION_PARTIAL": "部分对象失败 · 其余继续记录", "SESSION_STOPPING": "停止采集并检查文件中",
@@ -247,7 +252,7 @@ PHRASES = {
 
 TEXT.update({
     "monitor_help": "记录期间发现网络断开、接收规则不满足或记录工具故障时，将停止所有选中目标并保存已关闭文件。目前不支持 CAN/Diag 接收监测。",
-    "monitor_rules_help": "Zipy 默认：来源 MAC 以 02:00:00 开头，2 秒平均至少 100pps。启动宽限 5 秒，3 秒无接收或持续低速则停止本次记录。其他来源仍全部保存，规则可修改或删除，不是采集过滤器。",
+    "monitor_rules_help": "Zipy 默认：来源 MAC 以 02:00:00 开头，2 秒平均至少 100pps。启动宽限 2 秒，2 秒无接收或持续低速则停止本次记录。其他来源仍全部保存，规则可修改、删除或恢复，不是采集过滤器。",
     "monitor_field_source_mac_prefix": "接收来源 MAC 前缀",
     "monitor_field_minimum_pps": "最低接收 pps（0=关闭）",
     "monitor_reason_low_receive_rate": "接收速率持续低于最低值",

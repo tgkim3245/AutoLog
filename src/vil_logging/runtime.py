@@ -185,6 +185,10 @@ class Runtime:
         if upgraded != self._settings.monitor_rules_json:
             self._settings = self._repo.save_preferences({"monitor_rules_json": upgraded})
             log.info("validation.default_popup_upgraded")
+        default_status, self._settings = self._repo.restore_zipy_default_once()
+        log.info("validation.default_checked", extra={"fields": {"status": default_status}})
+        if default_status == "limit":
+            self._event("ZIPY_DEFAULT_LIMIT", level="WARNING")
         from vil_logging.diagnostics.capture_tools import replaces_legacy_managed_tool
         if replaces_legacy_managed_tool(self._settings.tshark_path):
             self._settings = self._repo.save_preferences({"tshark_path": ""})

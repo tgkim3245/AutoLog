@@ -6,8 +6,13 @@ import re
 from dataclasses import asdict, dataclass, replace
 
 MAX_RULES = 16
+DEFAULT_RULE_ID = "zipy-source-020000"
 DEFAULT_RULE_NAME = "Zipy 활성화 실패"
 DEFAULT_POPUP_MESSAGE = "Zipy 데이터 활성화에 실패하였습니다. Render 터미널에 아래의 커맨드를 입력하세요. |6 → e1"
+
+
+class DefaultRuleCapacityError(ValueError):
+    """Restoring a missing default must not displace an existing user rule."""
 
 
 def address(value, *, mac=False):
@@ -109,8 +114,42 @@ def encode_rules(rules) -> str:
 
 def default_rules_json():
     # A presence/rate selector, not an exclusive source allow-list or capture filter.
-    return encode_rules([EthernetRule("zipy-source-020000", DEFAULT_RULE_NAME, 3000, 5000, 1500, 10,
+    return encode_rules([EthernetRule(DEFAULT_RULE_ID, DEFAULT_RULE_NAME, 2000, 2000, 1500, 10,
                                      source_mac_prefix="02:00:00", minimum_pps=100, popup_message=DEFAULT_POPUP_MESSAGE)])
+
+
+def restore_default_rule(document, *, missing_only=False):
+    """Restore the built-in rule without changing other rules or their order."""
+    rules = list(parse_rules(document))
+    index = next((i for i, rule in enumerate(rules) if rule.id == DEFAULT_RULE_ID), None)
+    if index is not None and missing_only:
+        return document
+    default = parse_rules(default_rules_json())[0]
+    if index is None:
+        if len(rules) >= MAX_RULES:
+            raise DefaultRuleCapacityError("Remove a rule before restoring the Zipy default")
+        rules.insert(0, default)
+    else:
+        rules[index] = default
+    return encode_rules(rules)
+
+
+def upgrade_zipy_defaults(document):
+    """Repair old defaults once; remove the user's superseded replacement only.
+
+    Match the complete known replacement, rather than deleting arbitrary rules
+    that happen to use the same source prefix or a similar name.
+    """
+    replacement = EthernetRule("replacement", "zipy 활성화 검사", 1000, 1000, 1000, 10,
+                               source_mac_prefix="02:00:00", popup_message="지피 확인하세요.")
+    rules = []
+    for rule in parse_rules(document):
+        if replace(rule, id=replacement.id) == replacement:
+            continue
+        if rule.id == DEFAULT_RULE_ID and (rule.timeout_ms, rule.grace_ms) == (3000, 5000):
+            rule = replace(rule, timeout_ms=2000, grace_ms=2000, max_delay_ms=min(rule.max_delay_ms, 2000))
+        rules.append(rule)
+    return restore_default_rule(encode_rules(rules), missing_only=True)
 
 
 def upgrade_default_popup(document):
@@ -121,7 +160,7 @@ def upgrade_default_popup(document):
     raw = json.loads(document)["ethernet"]
     updated = []
     for rule, item in zip(rules, raw, strict=True):
-        if rule.id == "zipy-source-020000" and "popup_message" not in item:
+        if rule.id == DEFAULT_RULE_ID and "popup_message" not in item:
             rule = replace(rule, name=DEFAULT_RULE_NAME if rule.name == "Zipy · 02:00:00" else rule.name,
                            popup_message=DEFAULT_POPUP_MESSAGE)
         updated.append(rule)

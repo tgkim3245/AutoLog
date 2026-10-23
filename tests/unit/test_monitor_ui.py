@@ -33,7 +33,7 @@ def test_default_zipy_criteria_are_visible_and_editable_on_first_open(qtbot):
     dialog.set_settings(AppSettings())
     assert dialog.fields["source_mac_prefix"].text() == "02:00:00"
     assert dialog.fields["minimum_pps"].text() == "100"
-    assert dialog.fields["grace_ms"].text() == "5000"
+    assert dialog.fields["grace_ms"].text() == "2000"
 
 
 def test_user_supplied_rule_saved_and_removable_with_no_capture_filter(qtbot):

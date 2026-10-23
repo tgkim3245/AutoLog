@@ -86,6 +86,26 @@ def test_zipy_sparse_prefix_packets_fail_rate_without_a_silence_false_positive()
     assert "missing_flow" not in result["reasons"]
 
 
+def test_zipy_factory_rule_has_two_second_startup_and_silence_deadlines():
+    from vil_logging.monitors.rules import default_rules_json
+    clock = Clock()
+    monitor = engine(clock, parse_rules(default_rules_json()))
+    clock.advance(1.999)
+    assert "missing_flow" not in row(monitor)["reasons"]
+    clock.advance(.001)
+    assert "missing_flow" in row(monitor)["reasons"]
+    clock = Clock()
+    monitor = engine(clock, parse_rules(default_rules_json()))
+    for _ in range(300):
+        monitor.feed(clock.packet())
+        monitor.feed(clock.packet())
+        clock.advance(.01)
+    clock.advance(1.98)
+    assert "missing_flow" not in row(monitor)["reasons"]
+    clock.advance(.02)
+    assert "missing_flow" in row(monitor)["reasons"]
+
+
 def test_detected_failure_stays_latched_when_receive_recovers_before_next_ui_poll():
     clock = Clock()
     monitor = engine(clock)

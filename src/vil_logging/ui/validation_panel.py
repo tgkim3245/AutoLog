@@ -15,7 +15,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from vil_logging.monitors.rules import MAX_RULES, EthernetRule, encode_rules, parse_rules
+from vil_logging.monitors.rules import (
+    DEFAULT_RULE_ID,
+    MAX_RULES,
+    DefaultRuleCapacityError,
+    EthernetRule,
+    encode_rules,
+    parse_rules,
+    restore_default_rule,
+)
 
 from .i18n import tr
 from .theme import ThemedComboBox
@@ -65,6 +73,7 @@ class ValidationPanel(QWidget):
         self._locked = self._updating = False
         self._drafts = {}
         self._document = None
+        self._restore_document = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         self.rules_hint = QLabel()
@@ -104,7 +113,13 @@ class ValidationPanel(QWidget):
         self.save_button = QPushButton()
         self.save_button.setProperty("variant", "primary")
         self.save_button.clicked.connect(self._save_rule)
-        layout.addWidget(self.save_button)
+        actions = QHBoxLayout()
+        self.restore_button = QPushButton()
+        self.restore_button.setObjectName("zipyRestoreDefaultButton")
+        self.restore_button.clicked.connect(self._restore_default)
+        actions.addWidget(self.restore_button)
+        actions.addWidget(self.save_button, 1)
+        layout.addLayout(actions)
         self.set_language("ko")
         self._render_rules()
 
@@ -119,14 +134,18 @@ class ValidationPanel(QWidget):
                 "popup_message", "source_mac_prefix", "minimum_pps", "protocol", "destination_ip",
                 "destination_mac", "expected_ip", "expected_mac"} else "monitor_required", language))
         for button, key in ((self.new_button, "monitor_new"), (self.delete_button, "monitor_delete"),
-                            (self.save_button, "monitor_save")):
+                            (self.save_button, "monitor_save"), (self.restore_button, "monitor_restore_default")):
             button.setText(tr(key, language))
+        self.restore_button.setToolTip(tr("monitor_restore_default_help", language))
 
     def set_settings(self, settings):
         if settings.monitor_rules_json == self._document:
             return
         first_load = self._document is None
         self._document = settings.monitor_rules_json
+        if self._document == self._restore_document:
+            self._editing_id = DEFAULT_RULE_ID
+            self._restore_document = None
         try:
             self._rules = list(parse_rules(self._document))
             self.set_error("")
@@ -161,13 +180,13 @@ class ValidationPanel(QWidget):
         values = self._drafts.get(self._editing_id, asdict(rule) if rule else {})
         for key, field in self.fields.items():
             _set_field_text(field, str(values.get(key, "")))
-        self.delete_button.setEnabled(not self._locked and bool(rule))
+        self.delete_button.setEnabled(not self._locked and self._restore_document is None and bool(rule))
 
     def _new_rule(self):
         self.rule_combo.setCurrentIndex(0)
 
     def _save_rule(self):
-        if self._locked:
+        if self._locked or self._restore_document is not None:
             return
         try:
             values = {key: _field_text(field).strip() for key, field in self.fields.items()}
@@ -189,16 +208,39 @@ class ValidationPanel(QWidget):
             self.set_error(str(error))
 
     def set_error(self, text):
+        if self._restore_document is not None:
+            self._restore_document = None
+            self.set_locked(self._locked)
         self.error_label.setText(text)
         self.error_label.setVisible(bool(text))
 
     def _delete_rule(self):
-        if not self._locked and self._editing_id:
+        if not self._locked and self._restore_document is None and self._editing_id:
             document = encode_rules([rule for rule in self._rules if rule.id != self._editing_id])
             self.preferences_changed.emit({"monitor_rules_json": document})
 
+    def _restore_default(self):
+        if self._locked or self._restore_document is not None:
+            return
+        try:
+            document = restore_default_rule(self._document or "")
+            if document == self._document:
+                self._drafts.pop(DEFAULT_RULE_ID, None)
+                self._editing_id = DEFAULT_RULE_ID
+                self._render_rules()
+                self.set_error("")
+                return
+            self.set_error(tr("monitor_saving", self._language))
+            self._restore_document = document
+            self.set_locked(self._locked)
+            self.preferences_changed.emit({"monitor_rules_json": document})
+        except DefaultRuleCapacityError:
+            self.set_error(tr("monitor_restore_default_limit", self._language))
+        except (ValueError, TypeError) as error:
+            self.set_error(str(error))
+
     def set_locked(self, locked):
         self._locked = locked
-        for widget in (*self.fields.values(), self.rule_combo, self.new_button, self.save_button):
-            widget.setEnabled(not locked)
-        self.delete_button.setEnabled(not locked and bool(self._editing_id))
+        for widget in (*self.fields.values(), self.rule_combo, self.new_button, self.save_button, self.restore_button):
+            widget.setEnabled(not locked and self._restore_document is None)
+        self.delete_button.setEnabled(not locked and self._restore_document is None and bool(self._editing_id))

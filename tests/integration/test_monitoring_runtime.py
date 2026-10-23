@@ -97,6 +97,31 @@ def events(runtime):
     return runtime._submit(runtime._repo.recent_events).result(5)
 
 
+def test_existing_profile_is_repaired_before_capture_and_not_repaired_again(tmp_path):
+    from vil_logging.monitors.rules import DEFAULT_RULE_ID, parse_rules
+    repository = Repository(tmp_path / "state.sqlite3")
+    repository.load_settings(str(tmp_path))
+    repository.save_preferences({"monitor_rules_json": encode_rules([
+        EthernetRule("replacement", "zipy 활성화 검사", 1000, 1000, 1000, 10,
+                     source_mac_prefix="02:00:00", popup_message="지피 확인하세요.")])})
+    repository.close()
+    runtime = Runtime(tmp_path)
+    try:
+        runtime.initialize().result(5)
+        rules = parse_rules(runtime._settings.monitor_rules_json)
+        assert len(rules) == 1 and rules[0].id == DEFAULT_RULE_ID
+        assert rules[0].grace_ms == rules[0].timeout_ms == 2000
+        runtime.save_preferences({"monitor_rules_json": encode_rules([])}).result(5)
+    finally:
+        runtime.close_for_test()
+    runtime = Runtime(tmp_path)
+    try:
+        runtime.initialize().result(5)
+        assert parse_rules(runtime._settings.monitor_rules_json) == ()
+    finally:
+        runtime.close_for_test()
+
+
 def test_quality_warns_once_without_stopping_and_archives_evidence(real):
     runtime, tools = real
     tools.quality = {"performance": {"disk_free_bytes": 100, "sampled_epoch": time.time()},

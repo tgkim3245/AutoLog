@@ -282,6 +282,11 @@ TEXT.update({
     "monitor_delete": ("규칙 삭제", "Remove rule"),
     "monitor_save": ("규칙 저장 · 다음 기록부터 적용", "Save rule · apply on next capture"),
     "monitor_saving": ("저장 중…", "Saving…"),
+    "monitor_restore_default": ("기본 규칙 복원", "Restore default"),
+    "monitor_restore_default_help": ("Zipy 기본 규칙을 시작 유예 2초·미수신 제한 2초와 기본 안내 문구로 복원합니다. 다른 규칙은 유지합니다.",
+                                     "Restore the built-in Zipy rule with 2s grace, 2s timeout and its default message. Other rules are preserved."),
+    "monitor_restore_default_limit": ("규칙이 16개입니다. 하나를 삭제한 뒤 기본 규칙을 복원하세요.",
+                                      "There are 16 rules. Remove one before restoring the default."),
     "monitor_limit": ("규칙은 최대 16개입니다.", "Up to 16 rules are supported."),
     "recovery": ("미완료 기록 복구", "Capture recovery"),
     "recovery_count": ("미완료 확인 {count}건", "Review {count} incomplete items"),
@@ -312,8 +317,8 @@ TEXT.update({
 })
 
 TEXT.update({
-    "monitor_rules_help": ("기본 Zipy 기준: Source MAC 02:00:00 시작, 2초 평균 100pps 이상. 시작 유예 5초, 3초 미수신 또는 저속 지속 시 함께 정지합니다. 다른 Source도 저장하며 이 조건은 캡처 필터가 아닙니다. 기준은 수정·삭제할 수 있습니다.",
-                           "Default Zipy rule: Source MAC begins 02:00:00, at least 100pps averaged over 2 seconds. After 5s grace, 3s silence or sustained low rate stops the session. Other sources are saved too. Rules are editable and are not capture filters."),
+    "monitor_rules_help": ("기본 Zipy 기준: Source MAC 02:00:00 시작, 2초 평균 100pps 이상. 시작 유예 2초, 2초 미수신 또는 저속 지속 시 함께 정지합니다. 다른 Source도 저장하며 이 조건은 캡처 필터가 아닙니다. 기준은 수정·삭제·복원할 수 있습니다.",
+                           "Default Zipy rule: Source MAC begins 02:00:00, at least 100pps averaged over 2 seconds. After 2s grace, 2s silence or sustained low rate stops the session. Other sources are saved too. Rules are editable and can be restored; they are not capture filters."),
     "monitor_field_source_mac_prefix": ("수신 Source MAC 접두사", "Receive source MAC prefix"),
     "monitor_field_minimum_pps": ("최소 수신 pps (0=사용 안 함)", "Minimum receive pps (0=off)"),
     "monitor_reason_low_receive_rate": ("기준보다 낮은 수신량 지속", "Receive rate remains below the minimum"),
@@ -368,6 +373,9 @@ EVENTS = {
     "DEBUG_LOG_DISABLED": ("개발자 로그 파일 저장 종료", "Developer log file disabled"),
     "DEBUG_LOG_ERROR": ("개발자 로그 파일 오류", "Developer log file error"),
     "SETTINGS_SAVED": ("설정 저장 완료", "Settings saved"),
+    "ZIPY_DEFAULT_RESTORED": ("Zipy 기본 규칙 복원 완료 · 시작 유예·미수신 제한 각 2초", "Zipy default restored · 2s grace and 2s timeout"),
+    "ZIPY_DEFAULT_LIMIT": ("규칙이 16개여서 Zipy 기본 규칙을 추가하지 못했습니다. 설정에서 하나를 삭제하고 기본 규칙을 복원하세요.",
+                           "The Zipy default could not be added because there are 16 rules. Remove one in settings, then restore the default."),
     "PREFERENCES_SAVED": ("선택한 경로·환경 저장 완료", "Connection and location choices saved"),
     "SETTINGS_ERROR": ("설정 적용 실패", "Settings could not be applied"),
     "TARGET_READY": ("대상 연결 준비 완료", "Target preparation complete"),

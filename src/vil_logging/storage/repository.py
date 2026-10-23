@@ -81,6 +81,8 @@ class Repository:
             self._initialize()
             self._connection.execute("CREATE TABLE IF NOT EXISTS hardware_references "
                                      "(role TEXT PRIMARY KEY, cfg TEXT NOT NULL, document TEXT NOT NULL)")
+            self._connection.execute("CREATE TABLE IF NOT EXISTS settings_migrations "
+                                     "(name TEXT PRIMARY KEY, applied_utc TEXT NOT NULL)")
         except BaseException:
             self._connection.close()
             raise
@@ -195,6 +197,37 @@ class Repository:
                 settings = AppSettings(output_dir=default_output_dir)
                 self._write_settings(connection, settings)
         return settings
+
+    def restore_zipy_default_once(self) -> tuple[str, AppSettings]:
+        """Repair pre-0.9.17 profiles once, preserving future intentional edits/deletion.
+
+        The rule, settings version, event and migration marker commit together.
+        Keep the v2 settings document unchanged for older-release compatibility.
+        """
+        from vil_logging.monitors.rules import (
+            DEFAULT_RULE_NAME,
+            DefaultRuleCapacityError,
+            upgrade_zipy_defaults,
+        )
+        with self._transaction("restore_zipy_default_once") as connection:
+            current = self._read_settings()
+            if current is None:
+                raise RepositoryError("Load settings before restoring the Zipy default")
+            migration = "zipy-default-rule-v1"
+            if connection.execute("SELECT 1 FROM settings_migrations WHERE name=?", (migration,)).fetchone():
+                return "already_applied", current
+            try:
+                document = upgrade_zipy_defaults(current.monitor_rules_json)
+            except DefaultRuleCapacityError:
+                return "limit", current
+            status = "present"
+            if document != current.monitor_rules_json:
+                current = replace(current, monitor_rules_json=document, version=current.version + 1)
+                self._write_settings(connection, current)
+                self._insert_event(connection, AppEvent("ZIPY_DEFAULT_RESTORED", params={"rule": DEFAULT_RULE_NAME}))
+                status = "restored"
+            connection.execute("INSERT INTO settings_migrations VALUES(?,?)", (migration, utc_now()))
+            return status, current
 
     def save_settings(self, settings: AppSettings, roles: tuple[Role, ...]) -> AppSettings:
         self._check_owner()
