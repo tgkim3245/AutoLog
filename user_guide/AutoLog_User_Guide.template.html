@@ -323,8 +323,6 @@ function annotatePhoto(photo, language) {
   const svg = svgElement('svg', {class:'photo-annotations', viewBox:`0 0 ${width} ${height}`, 'aria-hidden':'true'});
   svg.style.fontFamily = "'Malgun Gothic','Microsoft YaHei','Segoe UI',sans-serif";
   svg.append(svgElement('rect', {x:info.width, y:0, width:rail, height, fill:'#fff9f8'}));
-  svg.append(svgElement('text', {x:info.width+18,y:23,fill:'#a51c2b','font-size':13,'font-weight':700},
-    {ko:'빨간 번호 순서대로',en:'FOLLOW THE RED NUMBERS',zh:'按照红色编号操作'}[language]));
   const descriptions = [];
   info.steps.forEach(step => {
     const [x,y,w,h] = step.rect;
