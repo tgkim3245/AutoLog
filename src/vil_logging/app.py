@@ -266,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
     def show_user_guide():
         from vil_logging.documentation import open_user_guide
         try:
-            open_user_guide()
+            open_user_guide(window._language)
         except Exception as error:
             debug.exception("user_guide.open_failed", error)
             QMessageBox.warning(window, tr("user_guide", window._language),
@@ -385,10 +385,14 @@ def main(argv: list[str] | None = None) -> int:
 
         class GuideProbe(QObject):
             path = None
+            language = None
 
             @Slot(QUrl)
             def handle(self, url):
+                from PySide6.QtCore import QUrlQuery
+
                 self.path = Path(url.toLocalFile())
+                self.language = QUrlQuery(url).queryItemValue("lang")
 
         guide_probe = GuideProbe()
         expected_guide = user_guide_path()
@@ -398,6 +402,7 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             QDesktopServices.unsetUrlHandler("file")
         assert guide_probe.path == expected_guide
+        assert guide_probe.language == window._language
         assert "data:image/png;base64," in expected_guide.read_text(encoding="utf-8")
         debug.log("smoke.user_guide_verified", local_html=True, embedded_photos=True)
         smoke_timer = QTimer()

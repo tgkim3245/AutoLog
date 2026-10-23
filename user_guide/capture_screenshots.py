@@ -35,27 +35,21 @@ from vil_logging.ui.main_window import MainWindow  # noqa: E402
 from vil_logging.ui.theme import apply_theme  # noqa: E402
 
 
-def main():
-    app = QApplication([])
-    app.setStyle("Fusion")
-    for font in ("malgun.ttf", "malgunbd.ttf", "segoeui.ttf"):
-        QFontDatabase.addApplicationFont("C:/Windows/Fonts/" + font)
-    app.setFont(QFont("Malgun Gothic", 9))
+def capture(app, language, records):
     images = Path(__file__).parent / "images"
     images.mkdir(exist_ok=True)
-    records = []
 
     def save(name, widget, rect=None):
         app.processEvents()
         pixmap = widget.grab(rect) if rect is not None else widget.grab()
-        path = images / (name + ".png")
+        path = images / (name + ("" if language == "ko" else "-" + language) + ".png")
         assert pixmap.save(str(path))
         records.append({"file": path.name, "width": pixmap.width(), "height": pixmap.height(),
                         "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
 
     window = MainWindow()
     window.resize(480, 660)
-    settings = AppSettings(prefix="Drive", output_dir="C:/Logs", next_index=1,
+    settings = AppSettings(language=language, prefix="Drive", output_dir="C:/Logs", next_index=1,
                            can_cfg="C:/Project/CAN.cfg", diag_cfg="C:/Project/Diag.cfg",
                            can_logging_block="1", diag_logging_block="1", nic_id="example-ethernet",
                            tshark_path="C:/One Click Log/tools/Wireshark/tshark.exe")
@@ -71,10 +65,10 @@ def main():
     dialog.show()
     app.processEvents()
     discovery = {"tshark": {"status": "ready", "version": "TShark (Wireshark) 4.6.9"},
-                 "npcap": {"status": "ready", "message_ko": "Npcap 드라이버를 확인했습니다."},
+                 "npcap": {"status": "ready", "message_ko": "Npcap 드라이버를 확인했습니다.", "message_en": "Npcap driver found.", "message_zh": "已找到 Npcap 驱动程序。"},
                  "interfaces": [
-                     {"id": "example-ethernet", "name": "이더넷", "description": "장비 연결 어댑터", "status": "up", "capture_available": True},
-                     {"id": "example-wifi", "name": "Wi-Fi", "description": "무선 네트워크", "status": "up", "capture_available": True}]}
+                     {"id": "example-ethernet", "name": {"ko": "이더넷", "en": "Ethernet", "zh": "以太网"}[language], "description": {"ko": "장비 연결 어댑터", "en": "Equipment adapter", "zh": "设备适配器"}[language], "status": "up", "capture_available": True},
+                     {"id": "example-wifi", "name": "Wi-Fi", "description": {"ko": "무선 네트워크", "en": "Wireless network", "zh": "无线网络"}[language], "status": "up", "capture_available": True}]}
     dialog.set_connection_discovery(discovery)
     dialog.tabs.setCurrentIndex(0)
     app.processEvents()
@@ -84,7 +78,9 @@ def main():
         dialog.set_preparation_report({"role": role.value, "status": "attention", "readiness_stage": "measurement_waiting",
             "connected_cfg": getattr(settings, role.value + "_cfg"), "selected_block": "1",
             "blocks": [{"id": "1", "name": "CAN_Logging" if role == Role.CAN else "Logging", "format": "blf", "compatible": True}],
-            "next_action_ko": "이 CANoe 창에서 채널 매핑을 확인하고 F9 → Trace 수신을 확인하세요."})
+            "next_action_ko": "이 CANoe 창에서 채널 매핑을 확인하고 F9 → Trace 수신을 확인하세요.",
+            "next_action_en": "Check channel mapping, then F9 and Trace in this CANoe window.",
+            "next_action_zh": "在此 CANoe 窗口检查通道映射，然后确认 F9 和 Trace 接收。"})
     dialog.tabs.setCurrentIndex(1)
     app.processEvents()
     save("can", dialog._preparation_cards[Role.CAN])
@@ -94,7 +90,9 @@ def main():
     dialog.nic_input.set_sampling(False)
     dialog.set_connection_discovery(discovery)
     dialog.set_preparation_report({"role": "ethernet", "status": "ready",
-        "message_ko": "선택한 이더넷의 캡처 준비를 확인했습니다.", "next_action_ko": "설정을 닫고 기록 시작을 누르세요."})
+        "message_ko": "선택한 이더넷의 캡처 준비를 확인했습니다.", "next_action_ko": "설정을 닫고 기록 시작을 누르세요.",
+        "message_en": "The selected Ethernet adapter is ready.", "next_action_en": "Close settings and start recording.",
+        "message_zh": "所选以太网适配器已就绪。", "next_action_zh": "关闭设置并开始记录。"})
     app.processEvents()
     save("ethernet", dialog, QRect(14, 96, dialog.width() - 28, dialog.height() - 160))
     dialog.nic_input._activity = {
@@ -134,8 +132,8 @@ def main():
     window.add_event(AppEvent("SESSION_COMPLETED", timestamp="2026-10-23T01:00:00Z"))
     bottom = window.rename_button.mapTo(window, QPoint(0, window.rename_button.height())).y() + 24
     save("completed", window, QRect(0, 0, 480, bottom))
-    message = QMessageBox(QMessageBox.Icon.Information, "버그리포트", tr("bug_report_saved", "ko").format(
-        filename="One_Click_Log_BugReport_To_Taegon.Kim_날짜_시각.zip"), QMessageBox.StandardButton.Ok)
+    message = QMessageBox(QMessageBox.Icon.Information, tr("bug_report", language), tr("bug_report_saved", language).format(
+        filename="One_Click_Log_BugReport_To_Taegon.Kim_20261023_100000.zip"), QMessageBox.StandardButton.Ok)
     apply_theme(message)
     message.show()
     app.processEvents()
@@ -148,11 +146,24 @@ def main():
     for alert in window._validation_alerts[:]:
         alert.close()
     window.hide()
+    window.deleteLater()
+    app.processEvents()
+    return 0
+
+
+def main():
+    app = QApplication([])
+    app.setStyle("Fusion")
+    for font in ("malgun.ttf", "malgunbd.ttf", "segoeui.ttf", "msyh.ttc"):
+        QFontDatabase.addApplicationFont("C:/Windows/Fonts/" + font)
+    app.setFont(QFont("Malgun Gothic", 9))
+    records = []
+    for language in ("ko", "en", "zh"):
+        capture(app, language, records)
+    images = Path(__file__).parent / "images"
     (images / "manifest.json").write_text(json.dumps({"app_version": __version__, "illustrative_data": True,
         "real_device_capture": False, "screenshots": records}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"screenshots": len(records), "app_version": __version__}))
-    window.deleteLater()
-    app.processEvents()
     return 0
 
 

@@ -2,6 +2,7 @@ import base64
 import hashlib
 import importlib.util
 import json
+import re
 import shutil
 import zipfile
 from html.parser import HTMLParser
@@ -60,6 +61,19 @@ def test_offline_guide_renders_reviewed_version_and_has_working_internal_links(p
     # Photos, styles and interactions are embedded, with no online dependencies.
     assert all(tag in {"img", "script"} and (tag != "script" or "src" not in attrs)
                for tag, attrs in guide.assets)
+    html = documents["AutoLog_User_Guide.html"]
+    catalogs = json.loads(re.search(r'id="guide-translations">(.*?)</script>', html, re.S)[1])
+    assert set(catalogs) == {"ko", "en", "zh"}
+    assert all(entries.keys() == catalogs["ko"].keys() and all(entries.values())
+               for entries in catalogs.values())
+    assert catalogs["en"]["g002"] == "Your first recording"
+    assert catalogs["zh"]["g002"] == "开始第一次记录"
+    photos = json.loads(re.search(r'id="guide-images">(.*?)</script>', html, re.S)[1])
+    assert set(photos) == {"en", "zh"} and all(len(items) == 13 for items in photos.values())
+    for images in photos.values():
+        for uri in images.values():
+            assert uri.startswith("data:image/png;base64,")
+            assert base64.b64decode(uri.split(",", 1)[1], validate=True).startswith(b"\x89PNG\r\n\x1a\n")
 
 
 @pytest.mark.parametrize("damage", ["missing", "invalid", "too_large"])
@@ -136,3 +150,33 @@ def test_release_zip_contains_guides_with_matching_hashes(project, tmp_path, mon
             assert packaged == (output / "AutoLog" / item["name"]).read_bytes()
             assert len(packaged) == item["bytes"]
             assert hashlib.sha256(packaged).hexdigest() == item["sha256"]
+
+
+@pytest.mark.parametrize("damage", ["missing", "empty", "extra", "link", "markup", "placeholder", "source", "unmarked", "photo"])
+def test_translation_damage_blocks_release_before_output_is_created(project, tmp_path, damage):
+    folder = project / "user_guide"
+    path = folder / "translations.en.json"
+    catalog = json.loads(path.read_text(encoding="utf-8"))
+    if damage == "missing":
+        del catalog["g002"]
+    elif damage == "empty":
+        catalog["g002"] = " "
+    elif damage == "extra":
+        catalog["unexpected"] = "Extra"
+    elif damage == "link":
+        catalog["g018"] = catalog["g018"].replace("#defender", "https://example.invalid")
+    elif damage == "markup":
+        catalog["g002"] += "<script>alert(1)</script>"
+    elif damage == "placeholder":
+        catalog["g001"] = catalog["g001"].replace("{{APP_VERSION}}", "old-version")
+    elif damage in {"source", "unmarked"}:
+        template = folder / "AutoLog_User_Guide.template.html"
+        text = template.read_text(encoding="utf-8")
+        text = text.replace("처음 기록하기", "바뀐 사용법") if damage == "source" else text.replace("</header>", "<p>번역이 빠진 새 설명</p></header>")
+        template.write_text(text, encoding="utf-8")
+    elif damage == "photo":
+        (folder / "images/storage-en.png").unlink()
+    path.write_text(json.dumps(catalog, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises((ValueError, FileNotFoundError)):
+        release.build(project, "AutoLog", APP_VERSION, {}, tmp_path / "releases")
+    assert not (tmp_path / "releases").exists()

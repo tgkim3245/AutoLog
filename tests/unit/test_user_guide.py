@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QUrlQuery
 from PySide6.QtGui import QDesktopServices, QFont, QFontDatabase
 from PySide6.QtTest import QSignalSpy
 
@@ -52,18 +53,20 @@ def test_source_run_renders_the_same_illustrated_guide_without_a_build(tmp_path,
 
 
 @pytest.mark.parametrize("accepted", [True, False])
-def test_opener_passes_a_proper_local_file_url_and_reports_browser_failure(tmp_path, monkeypatch, accepted):
+@pytest.mark.parametrize("language,expected", [("ko", "ko"), ("en", "en"), ("zh", "zh"), ("unknown", "ko")])
+def test_opener_passes_a_proper_local_file_url_and_reports_browser_failure(tmp_path, monkeypatch, accepted, language, expected):
     path = tmp_path / "한글 경로" / "One Click Log_User_Guide.html"
     calls = []
     monkeypatch.setattr(documentation, "user_guide_path", lambda: path)
     monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: calls.append(url) or accepted)
     if accepted:
-        documentation.open_user_guide()
+        documentation.open_user_guide(language)
     else:
         with pytest.raises(OSError, match="browser"):
-            documentation.open_user_guide()
+            documentation.open_user_guide(language)
     assert len(calls) == 1 and calls[0].isLocalFile()
     assert Path(calls[0].toLocalFile()) == path
+    assert QUrlQuery(calls[0]).queryItemValue("lang") == expected
 
 
 @pytest.mark.parametrize("language,label", [("ko", "사용법"), ("en", "Guide"), ("zh", "使用说明")])
