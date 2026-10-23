@@ -263,6 +263,16 @@ def main(argv: list[str] | None = None) -> int:
     sys.excepthook = exception_hook
     threading.excepthook = thread_exception_hook
     window.bug_report_requested.connect(export_bug_report)
+    def show_user_guide():
+        from vil_logging.documentation import open_user_guide
+        try:
+            open_user_guide()
+        except Exception as error:
+            debug.exception("user_guide.open_failed", error)
+            QMessageBox.warning(window, tr("user_guide", window._language),
+                                tr("user_guide_failed", window._language))
+
+    window.user_guide_requested.connect(show_user_guide)
     window.settings_applied.connect(lambda settings: runtime.apply_naming(settings, window.selected_roles()))
     window.preferences_changed.connect(runtime.save_preferences)
     window.prepare_requested.connect(runtime.prepare)
@@ -369,6 +379,27 @@ def main(argv: list[str] | None = None) -> int:
              "validation_passed": False, "icon_passed": False,
              "canoe_requested": False, "canoe_passed": False}
     if args.smoke_test:
+        from PySide6.QtCore import QObject, Slot
+
+        from vil_logging.documentation import user_guide_path
+
+        class GuideProbe(QObject):
+            path = None
+
+            @Slot(QUrl)
+            def handle(self, url):
+                self.path = Path(url.toLocalFile())
+
+        guide_probe = GuideProbe()
+        expected_guide = user_guide_path()
+        QDesktopServices.setUrlHandler("file", guide_probe, "handle")
+        try:
+            window.user_guide_button.click()
+        finally:
+            QDesktopServices.unsetUrlHandler("file")
+        assert guide_probe.path == expected_guide
+        assert "data:image/png;base64," in expected_guide.read_text(encoding="utf-8")
+        debug.log("smoke.user_guide_verified", local_html=True, embedded_photos=True)
         smoke_timer = QTimer()
         smoke_timer.setInterval(100)
 

@@ -1,0 +1,79 @@
+{
+  "app_version": "0.9.18",
+  "illustrative_data": true,
+  "real_device_capture": false,
+  "screenshots": [
+    {
+      "file": "overview.png",
+      "width": 480,
+      "height": 296,
+      "sha256": "48d8f1acf616e5688ae4d23cd466dcb115a15398a96eced8d57bbf379b2d5568"
+    },
+    {
+      "file": "storage.png",
+      "width": 672,
+      "height": 284,
+      "sha256": "e903ecb49ae2be72721e64e1476f7a325d9645b6138d4803a2187ab27974837b"
+    },
+    {
+      "file": "can.png",
+      "width": 611,
+      "height": 257,
+      "sha256": "25a11312fed29b5200bb5e79f28ca63d50800fa6acfb2d00d92db5c6aa184333"
+    },
+    {
+      "file": "diag.png",
+      "width": 611,
+      "height": 257,
+      "sha256": "c42759da22bf5b85eb2d5c9abd4eb9a855bc8847aad61d00adfbcaa2617b6f54"
+    },
+    {
+      "file": "ethernet.png",
+      "width": 672,
+      "height": 570,
+      "sha256": "54cf1c4c9ab655a83bb6097b273709b367ec8807845c315c7c888d21febac3e6"
+    },
+    {
+      "file": "networks.png",
+      "width": 506,
+      "height": 162,
+      "sha256": "828de5ab9715aa818a1529275e91910dfc51cdee4fd59d5bd8a425f4202ac953"
+    },
+    {
+      "file": "validation.png",
+      "width": 650,
+      "height": 493,
+      "sha256": "564e98457b489f8377bce94f157ef1f749e0613b5f61d6487c208ec5996126e9"
+    },
+    {
+      "file": "ready.png",
+      "width": 480,
+      "height": 296,
+      "sha256": "992234fef1d95380aa6e4ec66fa44a559e433991b2b32f9b1f579613308527ae"
+    },
+    {
+      "file": "recording.png",
+      "width": 480,
+      "height": 296,
+      "sha256": "cdf5a397418b68cda9fc03f78fef44c52325df1b05ad7c564a351a92352db7ad"
+    },
+    {
+      "file": "completed.png",
+      "width": 480,
+      "height": 455,
+      "sha256": "85cff663eae3854bbe5aac2ac771b95105fa8276ac3cb50437668ef8a764628f"
+    },
+    {
+      "file": "bug-report.png",
+      "width": 400,
+      "height": 148,
+      "sha256": "ef0bc3c7f27585c5a030140bb26d456be4ea00bd4b16d6a276c03070366d0e23"
+    },
+    {
+      "file": "validation-popup.png",
+      "width": 400,
+      "height": 110,
+      "sha256": "d4bca1447a0f972bc3025a7ef0367d4fcad2af1a20c775e57c6e27011b6be8ee"
+    }
+  ]
+}

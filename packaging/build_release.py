@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tomllib
 import zipfile
-from datetime import date, datetime
+from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -122,35 +122,12 @@ def write_json(path: Path, value: dict) -> None:
 
 def load_user_documentation(root: Path, app_name: str, app_version: str) -> tuple[dict, dict[str, str]]:
     """Require reviewed documentation before reserving/building a release."""
-    source = root / "user_guide"
-    metadata = json.loads((source / "guide_metadata.json").read_text(encoding="utf-8"))
-    required = {"reviewed_app_version", "revision", "updated", "language"}
-    if not isinstance(metadata, dict) or set(metadata) != required or any(
-            not isinstance(value, str) for value in metadata.values()):
-        raise ValueError("Invalid user guide metadata.")
-    if metadata["reviewed_app_version"] != app_version:
-        raise ValueError(f"Review the user guide for {app_name} {app_version} and update guide_metadata.json.")
-    updated = date.fromisoformat(metadata["updated"])
-    if (metadata["language"] != "ko" or updated.isoformat() != metadata["updated"] or
-            not re.fullmatch(re.escape(metadata["updated"]) + r"\.[1-9][0-9]*", metadata["revision"])):
-        raise ValueError("Invalid user guide revision/date/language.")
-    guide_name = f"{app_name}_User_Guide.html"
-    variables = {"APP_NAME": app_name, "APP_VERSION": app_version,
-                 "GUIDE_REVISION": metadata["revision"], "UPDATED_DATE": metadata["updated"],
-                 "GUIDE_FILENAME": guide_name}
-    documents = {}
-    for template, filename in (("AutoLog_User_Guide.template.html", guide_name),
-                               ("distribution_notice.template.txt", "START_HERE.txt")):
-        text = (source / template).read_text(encoding="utf-8")
-        for key in ("APP_VERSION", "GUIDE_REVISION", "UPDATED_DATE"):
-            if "{{" + key + "}}" not in text:
-                raise ValueError(f"The user guide template {template} must include {key}.")
-        for key, value in variables.items():
-            text = text.replace("{{" + key + "}}", value)
-        if re.search(r"\{\{.*?\}\}", text, flags=re.S):
-            raise ValueError(f"Unresolved user guide placeholder in {template}.")
-        documents[filename] = text
-    return metadata, documents
+    # build.cmd also works without an editable package installation.
+    source_root = str(Path(__file__).resolve().parents[1] / "src")
+    if source_root not in sys.path:
+        sys.path.insert(0, source_root)
+    from vil_logging.documentation import load_user_documentation as render
+    return render(root, app_name, app_version)
 
 
 def write_user_documentation(package: Path, metadata: dict, documents: dict[str, str]) -> dict:

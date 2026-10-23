@@ -164,6 +164,10 @@ TEXT = {
     "events_empty": ("기록된 알림이 없습니다.", "No events recorded."),
     "debug_folder": ("로그 폴더", "Log folder"),
     "bug_report": ("버그리포트", "Bug report"),
+    "user_guide": ("사용법", "Guide"),
+    "user_guide_help": ("사진으로 따라 하는 사용가이드를 브라우저로 엽니다.", "Open the illustrated user guide in your browser."),
+    "user_guide_failed": ("사용가이드를 열지 못했습니다. 배포 ZIP 전체를 다시 풀고 실행하거나, EXE 옆의 One Click Log_User_Guide.html을 직접 열어 주세요.",
+                           "Could not open the user guide. Extract the complete release ZIP again, or open One Click Log_User_Guide.html beside the EXE."),
     "bug_report_title": ("버그리포트", "Bug report"),
     "bug_report_saved": (
         "최근 개발자 로그를 ZIP으로 압축해 바탕화면에 저장했습니다.\n파일명: {filename}\n"

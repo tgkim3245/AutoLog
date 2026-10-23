@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import importlib.util
 import json
@@ -36,7 +37,7 @@ class GuideLinks(HTMLParser):
         if tag == "a" and "href" in attrs:
             self.links.append(attrs["href"])
         if tag in {"script", "img", "link", "iframe"}:
-            self.assets.append(attrs)
+            self.assets.append((tag, attrs))
 
 
 def test_offline_guide_renders_reviewed_version_and_has_working_internal_links(project):
@@ -50,7 +51,27 @@ def test_offline_guide_renders_reviewed_version_and_has_working_internal_links(p
     guide.feed(documents["AutoLog_User_Guide.html"])
     assert {link[1:] for link in guide.links if link.startswith("#")} <= guide.ids
     assert "defender" in guide.ids
-    assert not guide.assets  # No online script, stylesheet or image is needed to read it.
+    pictures = [attrs for tag, attrs in guide.assets if tag == "img" and "src" in attrs]
+    assert len(pictures) >= 8
+    for image in pictures:
+        assert image["src"].startswith("data:image/png;base64,")
+        assert base64.b64decode(image["src"].split(",", 1)[1], validate=True).startswith(b"\x89PNG\r\n\x1a\n")
+        assert image.get("alt")
+    # Photos, styles and interactions are embedded, with no online dependencies.
+    assert all(tag in {"img", "script"} and (tag != "script" or "src" not in attrs)
+               for tag, attrs in guide.assets)
+
+
+@pytest.mark.parametrize("damage", ["missing", "invalid", "too_large"])
+def test_missing_or_invalid_screenshot_blocks_build_before_reserving_output(project, tmp_path, damage):
+    image = project / "user_guide/images/storage.png"
+    if damage == "missing":
+        image.unlink()
+    else:
+        image.write_bytes(b"not a PNG" if damage == "invalid" else b"x" * (2 * 1024 * 1024 + 1))
+    with pytest.raises((FileNotFoundError, ValueError)):
+        release.build(project, "AutoLog", APP_VERSION, {}, tmp_path / "releases")
+    assert not (tmp_path / "releases").exists()
 
 
 def test_stale_guide_blocks_build_before_creating_a_release(project, tmp_path):

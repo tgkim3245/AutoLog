@@ -57,6 +57,8 @@ TEXT = {
     "phase_short_partial": "部分记录中", "phase_short_stopping": "停止中", "phase_short_completed": "已结束",
     "phase_short_failed": "失败", "phase_short_incomplete": "待确认", "events_empty": "暂无活动。",
     "debug_folder": "日志文件夹", "bug_report": "问题报告", "bug_report_title": "问题报告",
+    "user_guide": "使用说明", "user_guide_help": "在浏览器中打开图文使用指南。",
+    "user_guide_failed": "无法打开使用指南。请重新完整解压发行 ZIP，或手动打开 EXE 旁的 One Click Log_User_Guide.html。",
     "bug_report_saved": "已将最近的开发者日志压缩为 ZIP 并保存到桌面。\n文件名：{filename}\n请通过电子邮件将此文件发送给 Taegon.Kim。",
     "bug_report_failed": "无法保存开发者日志。\n{error}",
     "debug_help": "开发者日志持续循环保存。点击问题报告可将最近日志导出到桌面。",
