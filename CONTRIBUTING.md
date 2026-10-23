@@ -101,3 +101,7 @@ git push
 ```
 
 한 커밋에는 한 가지 목적의 변경을 담고, 제품 동작 변경은 해당 `docs/hotfix_*.md` 또는 개발 기록을 함께 갱신합니다. `.gitignore`는 산출물과 실제 BLF/PCAP 캡처·진단 로그를 제외합니다. `outputs/README.md`만 산출물 폴더의 안내로 추적합니다.
+
+## 확인된 사내 PC 1대용 Npcap 동봉
+
+`build.cmd --include-npcap-internal`은 `-internal` 표시의 별도 배포 폴더/ZIP을 만들고 Npcap 1.90 공식 설치 파일을 `installers/Npcap`에 넣는다. 사용자가 같은 회사 내부 PC 1대를 확인한 배포용이며 일반 빌드는 Npcap을 포함하지 않는다. Npcap 무료 설치 대수와 외부 재배포 권한은 별개이며 외부 배포에는 해당 권한이 필요하다. `packaging/npcap.lock.json`의 파일 크기/SHA256과 Windows Authenticode의 Nmap 서명을 확인한다. 설치기를 추출/실행하지 않고 원본 그대로 복사하며 LICENSE와 세 언어 설치 안내, 해시 목록을 함께 넣는다. 대상 PC의 사용자가 관리자 권한으로 공식 설치창을 진행한다. 기설치된 개발 PC에는 설치하지 않는다. 바이너리를 Git에 올리거나 외부 배포 ZIP으로 전용하지 않는다.

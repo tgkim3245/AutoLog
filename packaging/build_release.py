@@ -146,6 +146,13 @@ def bundle_capture_tools(root, package, cache, work, logger):
     return module.bundle_wireshark(root, package, cache, work, logger)
 
 
+def bundle_npcap_installer(root, package, cache, logger):
+    spec = importlib.util.spec_from_file_location("autolog_npcap_bundle", root / "packaging/npcap_bundle.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.bundle_npcap(root, package, cache, logger)
+
+
 def new_output_directory(root: Path, name: str) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     for suffix in range(1000):
@@ -161,10 +168,12 @@ def new_output_directory(root: Path, name: str) -> Path:
 def build(
     root: Path, app_name: str, app_version: str, packages: dict,
     output_root: Path | None = None,
+    *, include_npcap_internal: bool = False,
 ) -> Path:
     guide_metadata, documents = load_user_documentation(root, app_name, app_version)
     built_at = datetime.now().astimezone()
-    build_id = f"{app_name}-{app_version}_{built_at:%Y%m%d_%H%M%S}"
+    label = "-internal" if include_npcap_internal else ""
+    build_id = f"{app_name}-{app_version}{label}_{built_at:%Y%m%d_%H%M%S}"
     location_note = None
     if output_root is not None:
         output = new_output_directory(output_root.expanduser().resolve(), build_id)
@@ -200,6 +209,7 @@ def build(
         "python": sys.version.split()[0],
         "packages": packages,
         "git": git_state(root),
+        "distribution_scope": "internal-single-pc" if include_npcap_internal else "standard",
     }
     try:
         write_json(output / "build_info.json", info)
@@ -229,8 +239,10 @@ def build(
             raise RuntimeError("The build did not produce the expected EXE and _internal folder.")
         documentation = write_user_documentation(package, guide_metadata, documents)
         capture_tools = bundle_capture_tools(root, package, output.parent / "tool-cache", work, logger)
+        npcap = (bundle_npcap_installer(root, package, output.parent / "tool-cache", logger)
+                 if include_npcap_internal else None)
         package_info = dict(info, status="succeeded", exe_sha256=sha256(executable),
-                            documentation=documentation, capture_tools=capture_tools)
+                            documentation=documentation, capture_tools=capture_tools, npcap_installer=npcap)
         write_json(package / "build_info.json", package_info)
         archive = output / f"{output.name}.zip"
         logger.info("Creating %s", archive.name)
@@ -265,6 +277,8 @@ def main() -> int:
     parser.add_argument("--no-pause", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--check", action="store_true", help="Check version and tools without building.")
     parser.add_argument("--output-root", type=Path, help="Choose the parent folder for build results.")
+    parser.add_argument("--include-npcap-internal", action="store_true",
+                        help="Include the signed Npcap installer for the confirmed same-company single PC.")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     try:
@@ -275,7 +289,8 @@ def main() -> int:
             print(json.dumps({"app_name": app_name, "version": app_version, "packages": packages,
                               "python": sys.executable, "documentation": guide_metadata}, indent=2))
             return 0
-        build(root, app_name, app_version, packages, args.output_root)
+        build(root, app_name, app_version, packages, args.output_root,
+              include_npcap_internal=args.include_npcap_internal)
         return 0
     except (Exception, KeyboardInterrupt) as error:
         print(f"Build error: {error}", file=sys.stderr)

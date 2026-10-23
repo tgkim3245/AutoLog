@@ -108,3 +108,5 @@ git ls-files src
 - [초기 구현 검토 — 과거 기록](docs/requirements_implementation_review.md), [검증 계획](docs/validation_plan.md)
 - [시험 PC 준비 항목](docs/test_pc_setup.md), [공식 사용자 가이드](user_guide/README.md)
 - [개발 이력](docs/development_log.md), [로컬 산출물 안내](outputs/README.md)
+
+같은 회사 내부 PC 1대용 [Npcap 설치 파일 동봉](docs/npcap_internal_installer.md)은 `build.cmd --include-npcap-internal`로 만들며, 설치 파일·라이선스·설치 안내를 ZIP에 포함합니다. 대상 PC에서 한 번 관리자 설치가 필요합니다. 일반 빌드에는 포함하지 않습니다.

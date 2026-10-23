@@ -21,3 +21,5 @@
 `build_info.json`에는 배포에 포함한 두 문서의 파일명·바이트 수·SHA256과 적용 버전·문서 개정·갱신일을 기록한다. 같은 SW 버전에서 문서만 바뀌면 SW 번호는 유지하고 문서 개정과 빌드 시각으로 구분한다.
 
 기존 `user_guide_draft.md`는 이 안내로 통합했다. `outline.md`와 `performance_notes.md`는 발표/성과 자료이며 배포 사용자 가이드에 포함하지 않는다.
+
+Npcap 설치 파일은 확인된 같은 회사 내부 PC 1대용 빌드(`build.cmd --include-npcap-internal`)에서만 `installers/Npcap`에 포함한다. 일반 빌드는 포함하지 않으며 가이드는 두 경우를 구분한다. 공식 고정 버전·크기/SHA256·서명을 검증하고 설치를 실행하지 않는다. 실제 파일은 Git에 넣지 않는다.

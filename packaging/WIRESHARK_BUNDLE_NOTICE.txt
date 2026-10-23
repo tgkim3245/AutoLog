@@ -20,7 +20,10 @@ the vendor build-recipe archive, and the upstream dependency packages.
 These source files are for license compliance and rebuilding the external tools;
 end users do not need to compile them to run One Click Log.
 
-Npcap and USBPcap drivers/installers are NOT included. A suitable Npcap installation
+Npcap and USBPcap drivers/installers are NOT included in this Wireshark CLI directory.
+An explicitly requested internal single-PC package may supply an unmodified Npcap
+installer separately in ../../installers/Npcap/. See that folder's license and instructions.
+A suitable Npcap installation
 is required for live capture on Windows. Driver installation is separate and may
 require administrator permission. One Click Log does not install or modify drivers.
 

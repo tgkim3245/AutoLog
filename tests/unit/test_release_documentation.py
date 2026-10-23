@@ -115,7 +115,8 @@ def test_missing_or_unresolved_notice_blocks_documentation(project):
         release.load_user_documentation(project, "AutoLog", APP_VERSION)
 
 
-def test_release_zip_contains_guides_with_matching_hashes(project, tmp_path, monkeypatch):
+@pytest.mark.parametrize("internal", [False, True])
+def test_release_zip_contains_guides_with_matching_hashes(project, tmp_path, monkeypatch, internal):
     class Packager:
         def __init__(self, command, **_kwargs):
             output = Path(command[command.index("--distpath") + 1]) / "AutoLog"
@@ -136,13 +137,29 @@ def test_release_zip_contains_guides_with_matching_hashes(project, tmp_path, mon
     monkeypatch.setattr(release, "bundle_capture_tools", lambda *_args: {
         "version": "fixture", "directory": "tools/Wireshark", "drivers_included": False})
     monkeypatch.setattr(release, "git_state", lambda _root: {"commit": "fixture", "dirty": False})
-    output = release.build(project, "AutoLog", APP_VERSION, {}, tmp_path / "releases")
+    calls = []
+
+    def installer(_root, package, _cache, _logger):
+        calls.append(package)
+        folder = package / "installers/Npcap"
+        folder.mkdir(parents=True)
+        (folder / "npcap-fixture.exe").write_bytes(b"installer fixture, never executed")
+        return {"scope": "internal-single-pc", "path": "installers/Npcap/npcap-fixture.exe"}
+
+    monkeypatch.setattr(release, "bundle_npcap_installer", installer)
+    output = release.build(project, "AutoLog", APP_VERSION, {}, tmp_path / "releases",
+                           include_npcap_internal=internal)
     info = json.loads((output / "build_info.json").read_text(encoding="utf-8"))
     with zipfile.ZipFile(output / info["archive"]) as archive:
         assert archive.testzip() is None
         embedded = json.loads(archive.read("AutoLog/build_info.json"))
         assert embedded["documentation"] == info["documentation"]
         assert embedded["capture_tools"] == info["capture_tools"]
+        assert embedded["npcap_installer"] == info["npcap_installer"]
+        assert info["distribution_scope"] == ("internal-single-pc" if internal else "standard")
+        assert bool(calls) == internal
+        assert ("-internal_" in output.name) == internal
+        assert ("AutoLog/installers/Npcap/npcap-fixture.exe" in archive.namelist()) == internal
         files = info["documentation"]["files"]
         assert {item["name"] for item in files} == {"START_HERE.txt", "AutoLog_User_Guide.html"}
         for item in files:
