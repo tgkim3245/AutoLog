@@ -25,7 +25,7 @@ TEXT = {
     "hardware_mismatch_short": "通道不匹配", "hardware_unavailable_short": "检查通道",
     "events_all": "全部", "events_warning": "警告·错误", "events_error": "错误",
     "title": "日志采集", "subtitle": "CAN · Diag · Zipy 控制", "settings": "设置",
-    "packets": "数据包", "environment": "环境检查", "exit": "退出程序", "show": "打开窗口",
+    "exit": "退出程序", "show": "打开窗口",
     "next_files": "下次采集文件名", "current_files": "正在记录", "previous_files": "上次记录文件",
     "incomplete_files": "待检查文件", "previous_name": "新文件名（不含扩展名）", "rename": "重命名",
     "delete": "删除上次日志", "file_manager": "文件管理", "file_operations": "操作记录",
@@ -76,16 +76,15 @@ TEXT = {
     "prepare": "准备连接", "apply": "应用", "close": "关闭", "quality": "记录质量",
     "save_first": "请先应用设置，再准备连接。", "invalid_index": "请输入大于或等于 0 的整数编号。",
     "locked": "记录处理期间无法更改对象和设置。", "ready_tip": "连接准备与记录选择互相独立。",
-    "pause": "暂停显示", "filter": "显示过滤", "packet_hint": "最近 1,000 条。过滤、暂停和关闭不影响原始记录。",
-    "packet_counts": "最近 {count} / 1,000 条", "packet_filter_placeholder": "按 IP、MAC 或协议搜索",
-    "time": "接收时间", "source": "源 IP / MAC", "destination": "目标 IP / MAC", "protocol": "协议", "length": "长度",
+
+
+
     "idle": "待机", "preparing": "准备中 · 点击请求取消", "starting": "启动中 · 点击请求取消",
     "recording": "记录中 · 点击停止", "partial": "部分记录中 · 点击停止", "stopping": "停止并检查文件中",
     "completed": "已归档", "failed": "失败", "incomplete": "停止或归档待确认 · 文件已保留", "disconnected": "未连接",
     "connecting": "连接中", "ready": "准备就绪", "error": "错误", "unknown": "无法确认",
     "not_monitored": "未监测", "not_configured": "未设置监测", "normal": "接收正常", "warning": "观测警告",
     "stopped": "已停止", "unsupported": "不支持监测", "monitor_title": "通信监测",
-    "monitor_help": "仅在所选对象实际记录时监测。警告不会停止记录。当前不支持 CAN·Diag 接收监测。",
     "monitor_rules_help": "请手动输入 Zipy 监测条件。目标与协议选择数据流，再比较预期来源。来源比较需要目标条件。条件留空则观测全部网卡流量，不限制保存的数据包。最多 16 条规则。",
     "monitor_status": "接收状态", "monitor_rules": "监测条件", "monitor_target_rule": "对象 · 规则",
     "monitor_last": "最后接收时间", "monitor_samples": "数据流包数",
@@ -258,7 +257,6 @@ PHRASES = {
 }
 
 TEXT.update({
-    "monitor_help": "记录期间发现网络断开、接收规则不满足或记录工具故障时，将停止所有选中目标并保存已关闭文件。目前不支持 CAN/Diag 接收监测。",
     "monitor_rules_help": "Zipy 默认：来源 MAC 以 02:00:00 开头，2 秒平均至少 100pps。启动宽限 2 秒，2 秒无接收或持续低速则停止本次记录。其他来源仍全部保存，规则可修改、删除或恢复，不是采集过滤器。",
     "monitor_field_source_mac_prefix": "接收来源 MAC 前缀",
     "monitor_field_minimum_pps": "最低接收 pps（0=关闭）",

@@ -1,107 +1,105 @@
 # 개발 안내
 
-## 프로젝트 기준
+기준 SW 0.9.21 · 검토 2026-10-25
 
-- 제품명은 **One Click Log**이며 Python 패키지와 import 경로는 기존 호환성을 위해 `vil_logging`을 사용합니다.
-- 앱 코드는 `src/vil_logging/` 아래에서 관리합니다. Python 화면 코드는 `src/vil_logging/ui/`, HTML 화면 시안은 `docs/design/wireframe.html`에 있습니다.
-- 장비가 필요 없는 검사는 `tests/unit/`과 `tests/integration/`에 둡니다. 실제 CANoe, NIC, TShark 장비 검증은 `tests/hardware/`에 분리합니다.
-- `.venv/`, `outputs/`, 로컬 설정과 업무 원본은 Git에 올리지 않습니다. 배포·검증 결과가 필요하면 `outputs/`에 보관하고, 재현 가능한 절차와 요약을 문서에 기록합니다.
-- 사용자 PC별 설정은 `%LOCALAPPDATA%\AutoLog`에 저장합니다. 비밀값, CANoe 구성 원본, 실제 캡처·진단 로그를 저장소에 추가하지 않습니다.
+제품명은 One Click Log이며 내부 Python 패키지명 `vil_logging`은 유지합니다. 앱 소스는 `src/vil_logging`, 개발 보조 명령은 `tools`, 실제 배포 가이드는 `user_guide`입니다. [폴더별 책임](docs/reference/project_structure.md)과 [문서 목차](docs/README.md)를 따릅니다.
 
-## Windows 개발 환경
+## 개발 환경
 
-Python 3.14 x64가 필요합니다. 프로젝트 루트에서 PowerShell로 로컬 가상환경을 준비합니다.
+Python 3.14 x64의 일반 빌드를 사용합니다. 정확한 의존성은 `requirements.lock`, 허용 범위는 `pyproject.toml`을 기준으로 합니다. 환경 정리 작업을 이유로 기존 Python·CANoe·Npcap을 삭제하거나 업그레이드하지 않습니다.
 
 ```powershell
 py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.lock
 .\.venv\Scripts\python.exe -m pip install -e .
+.\run_demo.cmd
 ```
 
-`run.cmd`는 프로젝트 `.venv`를 우선 사용합니다. 모의 화면은 `run_demo.cmd`, 일반 앱은 `run.cmd`로 실행합니다. 로컬 환경이 준비되지 않은 PC에서는 `run.cmd`가 기존 `%LOCALAPPDATA%` 개발 환경도 찾습니다.
+`run.cmd`와 `build.cmd`는 프로젝트 가상환경을 우선 사용하고 기존 AppData 개발 환경도 찾습니다. 일반 앱 프로필은 `%LOCALAPPDATA%\One Click Log`, 모의 앱은 그 아래 `demo`로 분리합니다. 검증 명령은 새 `--data-dir`를 사용하고 실제 사용자 프로필을 시험 fixture로 쓰지 않습니다.
 
 ## 변경 확인
 
-코드 변경 후 장비 없는 기본 검사와 정적 검사를 실행합니다.
-
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -p no:cacheprovider
-.\.venv\Scripts\python.exe -m ruff check src tests
+.\.venv\Scripts\python.exe -m ruff check src tests packaging tools
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe tools/check_docs.py
+.\.venv\Scripts\python.exe tools/build_vehicle_test_document.py --check
 ```
 
-`tests/hardware/` 검사는 차량 장비가 연결된 시험 PC에서 선택하여 수행합니다. 기본 검사에서는 실제 CANoe 설정 파일과 차량 네트워크를 열지 않습니다.
+기본 pytest 범위는 `tests/unit`과 `tests/integration`입니다. COM 대역·생성 파일·테스트 자식 프로세스 결과를 실제 CANoe/VN/차량 수신 성공으로 표현하지 않습니다. `tests/hardware/verify_ethernet_ui.py`도 명시적으로 실행하는 localhost UI 검사이며 이름만으로 물리 NIC 시험으로 간주하지 않습니다.
+
+소스 실행 smoke는 `run.cmd --smoke-test --smoke-debug-log`로 수행할 수 있습니다. 실제 수신·정지·재실행은 [48개 실차 TC](docs/testing/vehicle_test_plan.md)와 [CANoe 준비 점검](docs/testing/licensed_canoe_validation.md)에 따릅니다.
 
 ## 명시적 localhost 검증
 
-실제 TShark를 사용하지만 물리 NIC와 CANoe는 열지 않습니다. 사용할 설치 경로를 명시해야 하며 일반 앱에서 기억한 프로필을 변경하지 않습니다. `--data-dir`는 아직 없는 새 폴더를 지정합니다.
+실제 TShark를 쓰지만 물리 NIC·업무 cfg는 열지 않습니다. 사용할 도구를 명시하고 아직 없는 새 폴더를 지정합니다.
 
 ```powershell
-.\.venv\Scripts\python.exe -m vil_logging --verify-ethernet --tshark "C:\Program Files\Wireshark\tshark.exe" --data-dir "$env:TEMP\AutoLog-ethernet-new"
+.\run.cmd --verify-ethernet --tshark "C:\Program Files\Wireshark\tshark.exe" --data-dir "$env:TEMP\OneClickLog-ethernet-new"
+.\run.cmd --verify-file-management --data-dir "$env:TEMP\OneClickLog-files-new"
 ```
 
-`--verify-monitoring`, `--verify-recovery`, `--verify-load`도 `--tshark`가 필요합니다. `--verify-file-management`는 외부 도구 없이 생성된 파일만 사용합니다. 차량 시험은 [라이선스 CANoe 검증](docs/licensed_canoe_validation.md)을 따릅니다.
+`--verify-monitoring`, `--verify-recovery`, `--verify-load`도 TShark 전체 경로가 필요합니다. 경로는 기존 설치본 또는 배포물의 `tools/Wireshark/tshark.exe`를 실제로 확인해 지정합니다. 생성된 결과와 원본은 Git 제외 폴더에 둡니다.
 
 ## 빌드
 
-개발 환경을 준비한 뒤 루트의 **`build.cmd`를 더블클릭**하면 Windows 배포 폴더와 ZIP을 자동으로 만듭니다. 현재 작업 디렉터리와 관계없이 프로젝트 경로를 찾고, `run.cmd`처럼 프로젝트 가상환경 또는 기존 AppData 개발 환경을 사용합니다.
-
 ```powershell
 .\build.cmd
-# 환경과 버전만 확인하는 자동화용 실행
 .\build.cmd --no-pause --check
+.\build.cmd --output-root "D:\OneClickLog_Builds"
+# 확인된 사내 PC 1대용 별도 패키지
+.\build.cmd --include-npcap-internal
 ```
 
-**SW 버전은 `src/vil_logging/__init__.py`의 `__version__` 한 곳에서 변경합니다.** 프로젝트 패키지 버전, 앱 표시 버전, EXE 파일 속성과 출력 폴더명이 같은 값을 사용합니다. 빌드 시 버전을 자동 증가시키지는 않습니다.
+Documents 안에서는 기본 `%USERPROFILE%\Downloads\OneClickLog_Builds`, 그 외에는 프로젝트 `outputs`를 사용하며 쓰기가 보호돼 있으면 다운로드 위치를 사용합니다. 실제 위치는 빌드 화면에서 확인합니다. 예시 빌드 ID와 구조는 다음과 같습니다.
 
 ```text
-AutoLog-0.4.5_20261018_153000/
-├─ AutoLog/
-│  ├─ AutoLog.exe
-│  ├─ _internal/
-│  ├─ START_HERE.txt
-│  ├─ AutoLog_User_Guide.html
-│  └─ build_info.json
-├─ AutoLog-0.4.5_20261018_153000.zip
-├─ AutoLog-0.4.5_20261018_153000.zip.sha256.txt
-├─ build_info.json
-└─ build.log
+One Click Log-0.9.21_YYYYMMDD_HHMMSS/
+  One Click Log/
+    One Click Log.exe
+    _internal/
+    tools/Wireshark/
+    licenses/
+    third_party_sources/
+    One Click Log_User_Guide.html
+    START_HERE.txt
+    build_info.json
+  One Click Log-0.9.21_YYYYMMDD_HHMMSS.zip
+  One Click Log-0.9.21_YYYYMMDD_HHMMSS.zip.sha256.txt
+  build_info.json
+  build.log
 ```
 
-폴더명 뒤 날짜·시각은 같은 버전의 재빌드를 구분합니다. 기존 결과는 덮어쓰지 않습니다. EXE와 `_internal/`·`tools/`·`licenses/`·`third_party_sources/`를 포함한 `AutoLog/` 전체 또는 생성한 ZIP을 배포합니다. `build_info.json`에는 SW 버전, 빌드 시각, Git 커밋·미커밋 변경 여부와 해시를 기록합니다. 오류 원문은 해당 폴더의 `build.log`에서 확인합니다.
+EXE와 동봉 폴더 전체 또는 ZIP을 전달합니다. SW 버전은 `src/vil_logging/__init__.py` 한 곳에서 변경합니다. 같은 버전 재빌드도 기존 산출물을 덮어쓰지 않습니다. Git 커밋·작업 트리 변경 여부·도구/문서 해시는 build_info에 기록됩니다. 코드나 문서를 수정해도 이전 EXE/ZIP이 자동 갱신되지는 않습니다.
 
-0.9.12부터 Wireshark CLI 도구를 빌드에 동봉합니다. 첫 빌드는 `packaging/wireshark.lock.json`의 HTTPS 주소에서 고정 버전의 공식 MSI·소스 아카이브·vendor build recipe를 내려받습니다. 이후에는 산출물 루트의 `tool-cache/`에서 크기/SHA256이 일치하는 파일을 재사용해 오프라인 빌드할 수 있습니다. 캐시 파일이 변했거나 다운로드가 불완전하면 빌드를 실패 처리합니다. 버전 업데이트 시 공식 서명 해시 목록과 소스/의존성을 검토해 lock을 갱신합니다. 외부 바이너리를 Git에 커밋하거나 시스템의 사용자 Wireshark 폴더를 그대로 복사하지 않습니다.
+Wireshark CLI는 `packaging/wireshark.lock.json`의 고정 버전·크기·SHA256과 vendor 자료로 준비하고 캐시 검증 후 재사용합니다. Wireshark GUI·드라이버를 일반 빌드에 설치하지 않습니다. Npcap 설치기 동봉은 [확인된 내부 PC 범위](docs/guides/npcap_internal_installer.md)의 명시적 옵션이며 실제 설치는 대상 PC 사용자가 합니다. 외부 도구·라이선스 자료를 임의 삭제하지 않습니다.
 
-`packaging/wireshark_bundle.py`는 검증한 MSI를 작업 폴더에 관리 추출하고 CLI 3개·필요한 DLL·stock plugin·프로토콜 자료를 선별합니다. Wireshark GUI와 Npcap/USBPcap 설치기·드라이버는 제외합니다. 제한된 PATH로 세 도구의 버전 실행을 확인하고 라이선스/소스와 `bundle_manifest.json`을 패키지에 넣습니다. 이 추출은 제품 설치나 드라이버 설치를 하지 않습니다. 라이브 캡처에는 해당 PC의 Npcap이 별도로 필요합니다.
+## 문서와 가이드 유지
 
-프로젝트가 사용자 `Documents` 안에 있으면 보호 폴더 쓰기를 시도하지 않고 `%USERPROFILE%\Downloads\AutoLog_Builds\` 아래에 저장합니다. 그 외에는 프로젝트 `outputs/`를 사용하며, 폴더 쓰기 보호가 확인되면 다운로드 위치를 사용합니다. 이 PC에서 확인된 제어된 폴더 액세스 차단도 이 방식으로 처리하며 보안 설정은 변경하지 않습니다. 실제 결과 경로는 실행 화면과 빌드 로그에 표시합니다. 위치를 직접 정하려면 `build.cmd --output-root "D:\AutoLog_Builds"`를 사용합니다.
+현재 정책은 `docs/reference`, 설치/오류 안내는 `docs/guides`, 검증 절차는 `docs/testing`에 둡니다. 버전별 변경·배포 검증은 `docs/updates`, 초기 개발/계획은 `docs/archive`에 둡니다. 과거 기록에 현재 구현을 덮어쓰지 말고 현재 문서로 연결합니다.
 
-빌드 로직은 `packaging/build_release.py`, PyInstaller 사양은 `packaging/app.spec`입니다. 중간 분석 파일은 선택된 산출물 위치의 `build/<빌드명>/`에 남겨 빌드 오류 확인에 사용합니다. 실행·빌드 결과는 Git에서 제외합니다. 배포 전 실행 흐름과 장비 연동을 확인하고 검증 범위를 릴리스 문서에 기록합니다.
+사용자에게 보이는 동작·설정·준비 조건·파일/복구·실제 검증 범위가 바뀌면 [공식 관리 흐름](user_guide/README.md)에 따라 HTML 원본·세 언어 번역·배포 안내·메타데이터·이력을 함께 검토합니다. 가이드 검토 버전 불일치, 누락된 사진/번역/좌표, 치환자·해시 오류는 빌드 차단 사유입니다. 검사를 우회하지 않습니다.
 
-## 배포용 사용자 가이드 갱신
+[실차 TC Markdown](docs/testing/vehicle_test_plan.md)을 고치면 다음 명령으로 입력형 HTML을 재생성합니다. 기존 회차 결과는 JSON으로 별도 보존합니다.
 
-사용자 동작·도구/라이선스·Defender 허용 앱·파일/복구·검증 범위가 바뀌면 [공식 가이드 관리 원본](user_guide/README.md)을 같은 변경에서 수정합니다. HTML 템플릿과 배포 안내문을 검토하고 `guide_metadata.json`의 적용 SW 버전·문서 개정·갱신일, `CHANGELOG.md`를 함께 갱신합니다. `AGENTS.md`에도 이 유지 규칙을 기록했습니다.
+```powershell
+.\.venv\Scripts\python.exe tools/build_vehicle_test_document.py
+```
 
-빌드는 `AutoLog_User_Guide.html`과 `START_HERE.txt`를 EXE 옆과 ZIP에 넣습니다. `build_info.json`의 `documentation`에 적용 버전·개정·갱신일·파일별 크기/SHA256을 기록합니다. 가이드 누락·검토 버전 불일치·잘못된 개정 정보·남은 템플릿 치환자는 빌드 전에 오류로 처리하며 `--check`에서도 확인합니다. 문서만 변경한 경우 SW 버전은 유지하고 문서 개정과 새로운 빌드 시각으로 구분합니다.
+문서 링크와 생성물 최신성도 위 검사로 확인합니다. 개발용 `.venv`·캐시·`outputs`와 사용자 캡처·DB·실제 로그/ZIP·업무 cfg는 커밋하지 않습니다. 성과 수치도 측정 근거 없이 채우지 않습니다.
 
-배포 전 두 문서를 압축 해제본에서 열어 읽고, HTML의 목차·Defender 절차·실제 사용 절차와 버전 표시를 확인하세요. 과거 개발 초안이나 발표 자료는 사용자 안내 대신 배포하지 않습니다.
+## Git 반영
 
-## Git 작업
-
-이 프로젝트는 이미 `origin`이 AutoLog 저장소로 연결되어 있습니다. 기존 작업 폴더에서 `git init`이나 `git remote add origin`을 반복하지 않습니다. `git ls-files src`로 앱 코드가 추적되는지 확인할 수 있습니다.
-
-작업 전후에 `git status --short --branch`를 확인합니다. `??`는 새로 생겼지만 아직 커밋에 포함하지 않은 파일입니다. 실제 변경한 파일을 선택하여 스테이징하고, 변경 내용을 확인한 뒤 커밋합니다. 아래 `git add`는 소스·검사·문서를 수정한 경우의 예시입니다.
+기존 저장소의 origin을 사용하며 다시 초기화하지 않습니다. 작업 시작/종료 시 상태를 확인하고 변경 파일만 스테이징합니다. 테스트·문서 이동·링크 수정은 같은 변경에서 검증합니다.
 
 ```powershell
 git status --short --branch
-git add -- src tests docs README.md
+git add -- AGENTS.md README.md CONTRIBUTING.md docs tools src tests user_guide outputs/README.md
 git diff --cached --check
 git diff --cached --stat
-git commit -m "Describe the change"
-git push
+git commit -m "Describe the final change"
+git push origin main
 ```
 
-한 커밋에는 한 가지 목적의 변경을 담고, 제품 동작 변경은 해당 `docs/hotfix_*.md` 또는 개발 기록을 함께 갱신합니다. `.gitignore`는 산출물과 실제 BLF/PCAP 캡처·진단 로그를 제외합니다. `outputs/README.md`만 산출물 폴더의 안내로 추적합니다.
-
-## 확인된 사내 PC 1대용 Npcap 동봉
-
-`build.cmd --include-npcap-internal`은 `-internal` 표시의 별도 배포 폴더/ZIP을 만들고 Npcap 1.90 공식 설치 파일을 `installers/Npcap`에 넣는다. 사용자가 같은 회사 내부 PC 1대를 확인한 배포용이며 일반 빌드는 Npcap을 포함하지 않는다. Npcap 무료 설치 대수와 외부 재배포 권한은 별개이며 외부 배포에는 해당 권한이 필요하다. `packaging/npcap.lock.json`의 파일 크기/SHA256과 Windows Authenticode의 Nmap 서명을 확인한다. 설치기를 추출/실행하지 않고 원본 그대로 복사하며 LICENSE와 세 언어 설치 안내, 해시 목록을 함께 넣는다. 대상 PC의 사용자가 관리자 권한으로 공식 설치창을 진행한다. 기설치된 개발 PC에는 설치하지 않는다. 바이너리를 Git에 올리거나 외부 배포 ZIP으로 전용하지 않는다.
+삭제할 때는 추적 파일의 실제 사용처와 대체 문서를 확인합니다. demo worker·복구 코드·CLI 진단·테스트 fixture는 사용자 화면에 없다는 이유만으로 제거하지 않습니다. 로컬 산출물이나 사용자 원본을 정리 대상에 섞지 않습니다.

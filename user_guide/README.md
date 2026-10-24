@@ -12,7 +12,7 @@
 - [배포 안내문 원본](distribution_notice.template.txt)
 - [적용 버전·문서 개정](guide_metadata.json)
 - [문서 변경 이력](CHANGELOG.md)
-- [화면 사진](images/)과 [재촬영 스크립트](capture_screenshots.py)
+- [화면 사진](images)과 [재촬영 스크립트](capture_screenshots.py)
 - [사진별 안내 문구 번역](annotation_labels.json): Click·입력·선택·확인 옆의 짧은 설명
 
 원본과 사진을 함께 관리한다. UI·연결/설치 조건·보안 허용 앱·기록/파일/복구 절차·알려진 제한이 바뀌면 해당 안내와 이력을 같은 변경에서 갱신한다. 소프트웨어 버전이 바뀌면 실제 적용 여부를 검토한 뒤 `reviewed_app_version`과 문서 개정을 갱신한다. 문서 버전이 맞지 않거나 원본이 누락되면 빌드를 중단한다. 완성 문서를 직접 수정하지 말고 관리 원본을 고친 뒤 다시 빌드한다.
@@ -23,6 +23,6 @@
 
 `build_info.json`에는 배포에 포함한 두 문서의 파일명·바이트 수·SHA256과 적용 버전·문서 개정·갱신일을 기록한다. 같은 SW 버전에서 문서만 바뀌면 SW 번호는 유지하고 문서 개정과 빌드 시각으로 구분한다.
 
-기존 `user_guide_draft.md`는 이 안내로 통합했다. `outline.md`와 `performance_notes.md`는 발표/성과 자료이며 배포 사용자 가이드에 포함하지 않는다.
+위치 변경만 안내하던 옛 개발 초안은 제거했다. 발표 구성·성과 측정 양식은 [docs/presentation](../docs/presentation/README.md)에서 별도 관리하며 배포 가이드에 포함하지 않는다. 실차 시험 절차·결과 양식은 [docs/testing](../docs/testing/validation_plan.md), 버전별 개발 변경은 [docs/updates](../docs/updates/README.md)를 따른다.
 
 Npcap 설치 파일은 확인된 같은 회사 내부 PC 1대용 빌드(`build.cmd --include-npcap-internal`)에서만 `installers/Npcap`에 포함한다. 일반 빌드는 포함하지 않으며 가이드는 두 경우를 구분한다. 공식 고정 버전·크기/SHA256·서명을 검증하고 설치를 실행하지 않는다. 실제 파일은 Git에 넣지 않는다.

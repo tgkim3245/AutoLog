@@ -4,16 +4,18 @@
 
 | 경로 | 내용 |
 | --- | --- |
-| `AutoLog-<버전>_<날짜_시각>/` | `build.cmd`가 생성한 버전별 EXE 폴더, 배포 ZIP, 해시, 빌드 정보와 로그 |
+| `One Click Log-<버전>_<날짜_시각>/` | `build.cmd`가 생성한 버전별 EXE 폴더, 배포 ZIP, 해시, 빌드 정보와 로그 |
 | `stage*/`, `hotfix-*/` | 과거 버전의 EXE 배포 폴더, 검증 JSON, 화면 이미지 |
 | `Auto_Log-0.4.4/` | 이전 이름으로 만든 0.4.4 배포 폴더와 ZIP |
 | `setup/` | Wireshark·Npcap 등 외부 도구 설치 파일 |
 | `build/<빌드명>/` | 해당 빌드의 PyInstaller 중간 분석 파일 |
 
-실제 수정 대상은 루트의 `src/vil_logging/`입니다. 여기 있는 이전 EXE는 소스를 수정해도 갱신되지 않습니다. 새 배포본은 루트의 `build.cmd`를 실행해 만듭니다. `AutoLog.exe`와 `_internal/`을 포함한 배포 폴더 전체 또는 생성된 ZIP을 함께 전달합니다.
+실제 수정 대상은 루트의 `src/vil_logging/`입니다. 여기 있는 이전 EXE는 소스를 수정해도 갱신되지 않습니다. 새 배포본은 루트의 `build.cmd`를 실행해 만듭니다. `One Click Log.exe`와 `_internal/`을 포함한 배포 폴더 전체 또는 생성된 ZIP을 함께 전달합니다.
 
-프로젝트가 사용자 Documents 안에 있거나 쓰기가 보호된 PC에서는 새 결과가 `%USERPROFILE%\Downloads\AutoLog_Builds\`에 저장됩니다. 따라서 이 PC에서 새 빌드를 실행하면 이 폴더의 과거 결과 대신 다운로드 위치에 새 버전 폴더가 생깁니다. 실제 결과 경로는 빌드 화면에서 확인합니다.
+프로젝트가 사용자 Documents 안에 있거나 쓰기가 보호된 PC에서는 새 결과가 `%USERPROFILE%\Downloads\OneClickLog_Builds\`에 저장됩니다. 따라서 이 PC에서 새 빌드를 실행하면 이 폴더의 과거 결과 대신 다운로드 위치에 새 버전 폴더가 생깁니다. 실제 결과 경로는 빌드 화면에서 확인합니다.
 
 과거 산출물에는 해당 버전의 검증 근거도 있으므로 이번 구조 정리에서는 보존했습니다. 원격 저장소를 새로 복제하면 과거 배포본과 검증 자료는 내려받아지지 않습니다.
 
 실제 차량 캡처는 사용자가 앱에서 고른 저장 위치에, 버그리포트 ZIP은 바탕화면에 저장됩니다. 개발 실행의 상시 진단 로그는 루트 `developer_logs/`, 배포 실행의 진단 로그는 EXE 옆 `developer_logs/`에 저장됩니다.
+
+새 문서·소스 검사는 `repository_cleanup_20261025/` 같은 작업별 폴더에 남길 수 있다. 이러한 로컬 검사 보고서·화면·결과 JSON과 실제 진단 ZIP은 Git에 포함하지 않는다. 문서 생성 도구는 `tools/`, 관리 원본과 최종 시험서는 `docs/testing/`을 사용한다.

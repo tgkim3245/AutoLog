@@ -32,6 +32,11 @@ data/raw/
 outputs/*
 !outputs/README.md
 developer_logs/
+*BugReport*.zip
+One_Click_Log_TestResults_*.json
+One_Click_Log_developer.jsonl*
+state.sqlite3*
+history_archive/
 .vil_work/
 
 # Editor and OS temporary files

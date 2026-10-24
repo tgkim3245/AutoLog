@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>One Click Log 실차 시험서 48 TC</title><style>
+:root{font-family:"Malgun Gothic","맑은 고딕",Arial,sans-serif;color:#172b3b;background:#edf2f5;font-size:15px;line-height:1.75}
+*{box-sizing:border-box}body{margin:0}main{max-width:1060px;margin:auto;padding:36px 42px 80px;background:white}
+h1{font-size:30px;line-height:1.4;font-weight:750;color:#111;margin:0 0 20px}h2{font-size:23px;line-height:1.5;margin:45px 0 18px;color:#183e55}h3{font-size:19px;line-height:1.5;margin:0 0 12px;color:#123f55}
+p{margin:12px 0}li{padding:3px 0}ul,ol{padding-left:24px}code{font-family:Consolas,monospace;font-size:.94em;overflow-wrap:anywhere;background:#f0f4f6;padding:1px 4px}
+.table-scroll{overflow-x:auto;margin:20px 0}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;vertical-align:top;border:1px solid #cbd6dd;padding:10px 12px;overflow-wrap:anywhere}th{background:#eaf2f6;color:#183e55}
+.testcase{border:1px solid #cbd8df;border-radius:8px;padding:22px 24px;margin:22px 0 28px;scroll-margin-top:25px}.testcase ul{margin:8px 0 16px}.testcase li{margin:6px 0}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.toolbar button,.toolbar label{border:0;background:#164b65;color:white;font:inherit;font-size:14px;border-radius:5px;padding:9px 16px;cursor:pointer}.toolbar input{display:none}.toolbar button:focus-visible,.toolbar label:focus-within{outline:3px solid #e3ae36}
+.panel{padding:22px;background:#f3f7fa;border-radius:8px;margin:24px 0}.panel h2{margin:0 0 12px;font-size:21px}.panel p{font-size:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px}.full{grid-column:1/-1}
+label.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#304e60}input,select,textarea{width:100%;min-width:0;font:inherit;font-size:14px;color:#172b3b;background:white;border:1px solid #9bafbc;border-radius:4px;padding:8px 10px}textarea{resize:vertical;min-height:76px;overflow:hidden;line-height:1.65}input:focus,select:focus,textarea:focus{outline:2px solid #29758e;outline-offset:1px}
+.result-form{background:#f2f7f9;border-radius:5px;padding:16px}.result-form h4{font-size:15px;margin:0 0 10px}.muted{color:#536e7d;font-size:13px}.statusbar{font-size:14px;font-weight:650;color:#174961;margin:10px 0}.tc-nav{display:flex;flex-wrap:wrap;gap:8px}.tc-nav a{color:#164b65;background:white;border:1px solid #b1c5d0;border-radius:4px;padding:3px 9px;text-decoration:none;font-size:13px}.save-note{background:#fff6dc;padding:10px 14px;border-radius:5px}#notice{min-height:24px;color:#244c61;font-weight:600}
+@media(max-width:650px){main{padding:22px 18px 50px}h1{font-size:25px}h2{font-size:21px}.grid{grid-template-columns:1fr}.testcase{padding:17px 14px}.panel{padding:16px}.full{grid-column:auto}table{min-width:560px}}
+@media print{@page{size:A4;margin:16mm}body,main{background:white}main{max-width:none;padding:0}body{font-size:10pt;line-height:1.6}h1{font-size:21pt}h2{font-size:15pt;break-after:avoid}h3{font-size:12pt;break-after:avoid}.toolbar,.tc-nav,#notice,.save-note{display:none}.testcase{border:1px solid #bbb;padding:12px;margin:15px 0;break-inside:auto}.result-form{break-inside:avoid}table{font-size:9pt;min-width:0}tr{break-inside:avoid}thead{display:table-header-group}.table-scroll{overflow:visible}input,textarea,select{font-size:9pt;border-color:#bbb}li{break-inside:avoid}code{overflow-wrap:anywhere}}
+</style></head><body><main id="top"><h1>One Click Log 실차 시험서</h1>
+<p>기준 SW 0.9.21 · 개정 2026-10-25.1 · 검토일 2026-10-25 · 시간대 Asia/Seoul</p>
+<p>이 시험서는 실제 PC·장비·차량에서 기록, 데이터 확인, 이상 정지와 재실행을 검증하는 절차다. 모든 TC의 초기 결과는 미실행이다. 정상 파일 보관과 실제 수신 무손실은 별도로 판정한다. 정차 정상 기록부터 확인한 뒤 이상·장시간 시험으로 넓힌다.</p>
+<p>버그리포트 ZIP과 TC별 실제 결과를 함께 전달하면 명령 순서·상태 전이·오류·보관 과정을 분석할 수 있다. 프레임 누락·신호·진단 왕복은 해당 BLF·PCAP/PCAPNG와 비교 기준도 필요하다. ZIP만으로 모든 시험의 수행 여부와 무손실을 확정할 수는 없다.</p>
+<section class="panel" aria-label="현장 시험 결과 입력"><h2>현장 결과 입력</h2><p class="save-note">입력은 HTML 파일에 저장되지 않습니다. 새로고침·종료 전에 JSON을 저장하세요. ZIP·캡처 파일은 별도로 보관하고 전달하세요.</p><div class="toolbar"><button id="export" type="button">결과 JSON 저장</button><button id="choose-import" type="button">결과 JSON 불러오기</button><input id="import" type="file" accept=".json,application/json" hidden><button id="print" type="button">인쇄</button></div><div id="environment" class="grid"></div><p id="notice" role="status" aria-live="polite">아직 입력한 결과가 없습니다. 모든 TC는 Not Run입니다.</p><p id="summary" class="statusbar"></p><nav id="tc-nav" class="tc-nav" aria-label="TC 바로가기"></nav></section><h2>시험서 사용 방법</h2>
+<p>HTML 시험서를 인터넷 없이 브라우저에서 연다. 상단 환경과 각 TC의 결과를 입력하고 <strong>결과 JSON 저장</strong>을 누른다. HTML 자체에는 입력값이 저장되지 않는다. 새로고침·종료 전에 JSON을 저장하고 다음 작업 때 불러온다. 같은 TC를 재시험하면 이전 JSON을 먼저 별도로 남기고 회차를 바꾼다. 입력 자료는 서버로 전송하지 않는다. 결과 JSON은 증빙 이름을 기록하며 ZIP·캡처를 첨부하지 않는다.</p>
+<p>문서 이동 전 2026-10-24.1의 같은 48 TC 결과 JSON도 불러올 수 있다. 시험 문서 수정은 새 회차의 실제 결과를 대신하지 않는다.</p>
+<p>텍스트로 작성할 때는 <code>vehicle_test_result_template.md</code>를 회차별 복사해 사용한다. 실제 결과·차량 캡처·업무 cfg·개인 경로는 Git 밖의 승인된 자료 폴더에 보관한다.</p>
+<h2>진행 순서와 공통 조건</h2>
+<div class="table-scroll"><table><thead><tr><th>단계</th><th>환경과 범위</th><th>진행 조건</th></tr></thead><tbody>
+<tr><td>A</td><td>정차 실차의 준비·단독·조합·반복·데이터 검사</td><td>안전한 정차, 기존 차량 시험 절차 확보</td></tr>
+<tr><td>B</td><td>TC에 지정한 정차 또는 격리 벤치의 오류·종료 시험</td><td>정상 기록 통과, 영향 없는 시험 자료·장비 사용</td></tr>
+<tr><td>C</td><td>정차 장시간 또는 승인된 시험로의 60분·대용량·주행</td><td>A 통과, 저장 공간 확보, 운전자와 PC 조작 담당자 분리</td></tr>
+</tbody></table></div>
+<p>물리 분리는 PC 캡처 전용 링크나 격리 벤치에서만 한다. 차량 제어용 CAN선·전원·공용 스위치를 임의로 분리하지 않는다. 주행 중 운전자가 PC를 조작하거나 오류 주입·강제 종료·설정 변경을 하지 않는다. 기존 승인된 진단 절차만 사용하며 새로운 차량 제어 명령을 만들지 않는다.</p>
+<p>P0는 본 시험 범위 필수, P1은 확장·회귀 확인, P2는 격리 내구·오류 시험이다. 조건이 없으면 P0도 Blocked로 남긴다. 첫 시험은 TC-01~07, TC-09~16, TC-19~20, TC-43~44 순서를 권장한다. 설정·분석 포함 약 2~3시간을 계획하고 60분 시험·오류 복구 시간은 별도로 잡는다. 이 시간은 성능 보장값이 아니다.</p>
+<ol>
+<li>실제 EXE 버전·빌드 ID와 배포 ZIP 또는 EXE SHA256을 기록하고 배포물·build_info.json을 보존한다. 시험서와 EXE 버전 차이도 남긴다.</li>
+<li>Windows 빌드, CANoe 버전·옵션·라이선스, Vector 드라이버·장비 별칭, cfg 별칭·BLF 블록·채널 매핑·DBC·ECU SW 버전을 기록한다. CAN·Diag는 서로 다른 cfg를 사용한다.</li>
+<li>Zipy NIC 이름·안정 식별자·포트, TShark·Npcap 버전, 저장 형식과 실제 유효성검사 규칙을 기록한다. 기본은 Source MAC 접두사 <code>02:00:00</code>, 시작 유예 2초, 미수신 제한 2초, 2초 평균 최소 100pps다. 저장된 사용자 규칙이 우선하므로 화면 값을 확인한다.</li>
+<li>쓰기 가능한 로컬 시험 폴더·고유 prefix·시작 번호를 정한다. 초기 여유는 10 GiB 이상을 계획하되 실제 속도에 따라 늘린다. 앱의 저용량 경고 기준 1 GiB와 구분한다.</li>
+<li>CANoe 컴파일·라이선스·채널·F9·Trace 수신을 확인한다. 사용자 cfg 변경은 직접 저장한다. 앱이 이미 진행 중인 수동 기록을 대신 정지할 것으로 기대하지 않는다.</li>
+<li>PC 시계를 맞추고 시간대를 남긴다. 현장 시각은 <code>2026-10-24T14:32:10+09:00</code>처럼 기록한다. JSONL은 UTC이므로 분석 시 환산한다.</li>
+<li>TC마다 회차·시작/종료/이상 시각·선택 대상·prefix/번호·실제 결과·증빙 이름을 남긴다. 반복 시험은 매 회차의 번호·소요시간·파일 결과를 별도 행으로 기록한다.</li>
+</ol>
+<p><strong>정상 절차 N:</strong> 필요한 대상만 선택 → 연결·F9·Trace 확인 → 시작 → 60초 유지 → 메인 정지 → 보관 결과 대기 → 외부 reader로 실제 파일 읽기. 기본 파일명은 CAN <code>prefix_N.blf</code>, Diag <code>prefix_Diag_N.blf</code>, Zipy <code>prefix_N.pcap</code> 또는 <code>.pcapng</code>다. 선택한 대상만 만들고 같은 세션은 번호를 공유한다. 번호를 예약한 구간은 실패해도 재사용하지 않는다. 세 대상의 시작·종료 timestamp가 완전히 같다고 가정하지 않는다.</p>
+<p><strong>이상 절차 F:</strong> 현재 코드는 선택 NIC 단절·Zipy 기준 위반·기록 도구 오류/상태 확인 실패 시 선택한 전체 기록을 정지한다. 대상·원인을 알리고 정상적으로 닫힌 파일을 검사·보관하되 전체 성공으로 표시하지 않는다. 일부 파일 보관 실패는 파일별로 남긴다. 원인 복구 후 새 번호로 수동 재시작한다. 한 대상 실패 후 다른 대상의 계속 기록은 현재 기대 동작이 아니다.</p>
+<p><strong>시간 측정:</strong> 조작/이상 발생 → 정지 요청 → 도구 정지 → 파일 보관 완료를 분리한다. 2초 규칙값은 평균 창·폴링·파일 정리 시간을 포함한 총 완료 제한이 아니다. Zipy 관측 확인 불가 지속 기준은 5초, X guard는 약 1초다. 시작 60초·정지 30초 동안 변화가 없으면 지연 관찰로 기록하고 증거를 확보한다. 이 관찰 기준은 구현 timeout 사양이나 자동 Fail 기준이 아니다.</p>
+<p><strong>결과:</strong> Not Run 미실행 / Pass 기대 결과 확인 / Fail 불일치 / Blocked 사전조건 부족 / N/A 미적용. 원본 분석이 남았으면 관련 데이터 검증 TC는 Pass로 올리지 않는다.</p>
+<h2>준비와 연결</h2>
+<article class="testcase" id="TC-01"><h3>TC-01 배포물과 진단 저장 준비</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 5분 · 시험 배포물 확보.</li>
+<li>절차: ZIP 전체를 쓰기 가능한 폴더에 푼다. EXE와 사용법을 열고 버전·빌드 ID를 기록한다. 버그리포트를 저장한다.</li>
+<li>기대: 앱·오프라인 가이드와 버전이 대응한다. EXE 옆 developer_logs의 JSONL과 바탕화면 ZIP이 생성된다. 캡처는 자동 시작되지 않는다.</li>
+<li>증빙·복구: 빌드 정보·최초 ZIP·저장 위치. 진단 저장 실패부터 해결한다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-02"><h3>TC-02 준비 부족과 대상 미선택</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 3분 · 기존 설정 메모, 기록 정지.</li>
+<li>절차: 연결 미확인 상태를 본다. 필수 경로 하나를 비워 안내를 확인한다. 모든 대상 선택을 해제하고 시작을 시도한다.</li>
+<li>기대: 환경 설정 필요/연결 확인 필요와 필요한 탭을 안내한다. 대상 없음으로 실제 기록·최종 파일이 생기지 않는다.</li>
+<li>증빙·복구: 버튼·메시지·전후 번호·ZIP. 원래 경로와 대상을 복구한다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-03"><h3>TC-03 CAN 연결과 채널 기준</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 5분 · 승인된 CAN cfg 복사본·장비·라이선스.</li>
+<li>절차: cfg 연결, BLF 블록·실제 창·채널·장비 대조, F9·Trace 확인. 사용하는 경우 채널 기준을 저장하고 재확인한다.</li>
+<li>기대: 의도한 전용 CANoe·블록과 연결된다. 조회 불가를 매핑 정상으로 단정하지 않는다. 저장 기준 불일치/확인 불가면 시작을 차단한다.</li>
+<li>증빙·복구: 블록·채널·Trace와 ZIP. 실제 기준을 확인한 뒤 정상 시험으로 간다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-04"><h3>TC-04 Diag 독립 연결과 중복 cfg</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 5분 · 다른 cfg 두 개, 교체 전 측정·기록 정지.</li>
+<li>절차: CAN·Diag 연결의 창·PID·블록을 대조한다. 같은 카드 연결을 반복한다. 시험 복사본에서 같은 cfg를 양쪽에 지정해 동시 시작을 시도한다.</li>
+<li>기대: 역할이 독립 창에 대응하고 같은 카드 재확인으로 불필요한 창이 늘지 않는다. 같은 cfg의 양쪽 동시 취득은 거부된다.</li>
+<li>증빙·복구: 창/역할 대응·거부 메시지·ZIP. 서로 다른 cfg·F9·Trace로 복구한다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-05"><h3>TC-05 Zipy NIC와 기본 형식</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 4분 · 캡처 전용 NIC·Npcap 준비.</li>
+<li>절차: 동봉 TShark·실제 NIC·기본 pcap을 선택하고 연결 확인한다. 목록에 다른 NIC가 있어도 의도한 식별자를 대조한다.</li>
+<li>기대: 선택 NIC가 표시와 연결 결과에 일치한다. 인터넷이나 다른 NIC 트래픽으로 차량 수신을 판단하지 않는다. 연결 확인만으로 최종 파일을 만들지 않는다.</li>
+<li>증빙·복구: 도구·NIC·규칙·형식과 ZIP. Windows 네트워크 설정은 변경하지 않는다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-06"><h3>TC-06 F9 대기에서 시작</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 3분 · cfg·블록 정상, 측정 중지가 허용되는 시험 구성.</li>
+<li>절차: 측정 정지 안내를 본다. CANoe에서 F9·Trace 확인 후 연결 확인을 다시 누르지 않고 주황색 시작으로 N을 수행한다.</li>
+<li>기대: 현재 측정을 재검사해 기록한다. cfg·블록·라이선스 불일치는 이 경로로 우회하지 않는다.</li>
+<li>증빙·복구: 전후 버튼·F9·원본·ZIP.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-07"><h3>TC-07 기존 수동 기록과 사용자 구성 보존</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 5분 · 수동 기록이 허용되는 시험 블록, 업무 기록과 분리.</li>
+<li>절차: 선택 블록 수동 기록 중 앱 시작을 시도한다. 수동 기록만 정지하고 측정은 유지해 재연결 없이 N을 수행한다. 다른 블록·cfg를 비교한다.</li>
+<li>기대: 기존 수동 기록을 대신 멈추거나 덮어쓰지 않는다. 같은 cfg·블록의 수동 파일명 변경 후 시작을 허용한다. 다른 블록·측정 유지, cfg 자동 저장/재로드 없음.</li>
+<li>증빙·복구: 수동/앱 파일·거부 메시지·ZIP. 사용자 직접 저장 변경과 자동 변경을 구분한다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-08"><h3>TC-08 설정 유지와 사라진 NIC</h3>
+<ul>
+<li>조건: P1 · 정차 또는 격리 벤치 · 약 5분 · 정상 보관 완료, 설정·번호 메모.</li>
+<li>절차: 종료·재실행해 설정을 본다. 격리 환경에서 선택 캡처 어댑터를 제거한 뒤 재실행해 목록·시작 차단을 확인한다.</li>
+<li>기대: 저장 경로·prefix·번호·규칙을 유지한다. 사라진 NIC를 첫 항목이나 다른 NIC로 자동 대체하지 않는다. 연결·F9·Trace는 재확인한다.</li>
+<li>증빙·복구: 전후 설정·ZIP. NIC를 복구·재선택한다.</li>
+</ul>
+</article>
+<h2>대상 조합</h2>
+<p>각 조합은 독립 실행해 N을 적용한다. 아래 N은 해당 실행 번호이며 미선택 대상의 측정을 임의로 바꾸지 않는다.</p>
+<article class="testcase" id="TC-09"><h3>TC-09 CAN 단독</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초 · CAN 수신 정상.</li>
+<li>절차: CAN만 선택하고 N을 수행한다.</li>
+<li>기대: prefix_N.blf 한 개. 실제 CAN 채널·프레임·시간 범위를 읽을 수 있고 Diag·Zipy 파일은 없다.</li>
+<li>증빙·복구: 원본·프레임 수·첫/끝 시각·ZIP. CAN 측정 유지 확인.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-10"><h3>TC-10 Diag 단독</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초 · Diag 수신 정상.</li>
+<li>절차: Diag만 선택하고 N을 수행한다.</li>
+<li>기대: prefix_Diag_N.blf 한 개. 기대 채널·프레임을 읽고 다른 대상 파일은 없다.</li>
+<li>증빙·복구: 원본·reader 결과·ZIP. 연결 성공만으로 무수신 파일을 Pass 처리하지 않는다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-11"><h3>TC-11 Zipy 단독</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초 · 실제 수신이 저장 규칙 만족.</li>
+<li>절차: Zipy만 선택하고 N을 수행한다.</li>
+<li>기대: prefix_N.pcap 한 개. 실제 패킷·Source·시간 범위를 읽고 BLF는 없다.</li>
+<li>증빙·복구: 원본·패킷 수·구간·ZIP.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-12"><h3>TC-12 CAN과 Diag</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초 · 별도 cfg 두 개의 수신·매핑 확인.</li>
+<li>절차: CAN·Diag만 선택해 N 수행. 전용 창·블록과 파일을 대조한다.</li>
+<li>기대: 같은 번호의 두 BLF. 역할이 뒤바뀌지 않고 두 CANoe 측정 유지. 무손실 판정은 TC-20에서 분리한다.</li>
+<li>증빙·복구: BLF 쌍·매핑·ZIP.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-13"><h3>TC-13 CAN과 Zipy</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초 · 두 대상 실제 수신 정상.</li>
+<li>절차: CAN·Zipy만 선택해 N 수행.</li>
+<li>기대: 같은 번호의 CAN BLF·PCAP. 각 원본이 읽히고 Diag 파일은 없다.</li>
+<li>증빙·복구: 두 원본·구간·ZIP.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-14"><h3>TC-14 Diag와 Zipy</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초 · 두 대상 실제 수신 정상.</li>
+<li>절차: Diag·Zipy만 선택해 N 수행.</li>
+<li>기대: 같은 번호의 Diag BLF·PCAP. 각 원본이 읽히고 CAN 파일은 없다.</li>
+<li>증빙·복구: 두 원본·구간·ZIP.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-15"><h3>TC-15 세 대상 동시</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초 · 각 단독 시험 통과.</li>
+<li>절차: CAN·Diag·Zipy 모두 선택해 N 수행. 단계별 대상 상태·소요시간 기록.</li>
+<li>기대: 같은 번호의 BLF 두 개와 PCAP 한 개가 실제 역할·채널 내용으로 읽힌다. 보관 완료 후 다음 번호가 한 번 증가한다.</li>
+<li>증빙·복구: 세 원본·각 구간·프레임/패킷 수·ZIP. 파일명만으로 동시 취득을 판정하지 않는다.</li>
+</ul>
+</article>
+<h2>반복과 데이터 완전성</h2>
+<article class="testcase" id="TC-16"><h3>TC-16 측정 유지 중 세 대상 10회</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초씩 10회 · TC-15 통과, 공간 확보.</li>
+<li>절차: F9를 유지하고 기록·정지·보관을 10회 반복한다. 매회 보관 완료 후 다음 시작. 번호·소요시간·파일 결과를 회차별 기록한다.</li>
+<li>기대: 10세션·30원본 완결. 중복·역행·덮어쓰기·두 번째 시작 차단 없이 연결/F9 재시작을 매번 요구하지 않는다.</li>
+<li>증빙·복구: 회차 표·전체 원본·첫/마지막 및 오류 직후 ZIP. 실패 후 증거부터 확보한다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-17"><h3>TC-17 짧은 구간과 중복 클릭</h3>
+<ul>
+<li>조건: P1 · 정차 실차 · 5초씩 10회 · 정상 수신.</li>
+<li>절차: 5초 기록·정지·보관 반복. 한 회는 시작 직후 상태에 따른 취소, 다른 회는 처리 중 재클릭을 관찰한다. X는 사용하지 않는다.</li>
+<li>기대: 문구·상태에 맞게 취소/정지하며 중복 세션이 없다. 예약 전 취소와 예약 후 실패를 구분하고 예약된 번호는 재사용하지 않는다.</li>
+<li>증빙·복구: 클릭 시각·문구·회차별 번호/파일·ZIP. 취소 구간을 정상 파일 수에 합산하지 않는다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-18"><h3>TC-18 대상과 prefix 전환</h3>
+<ul>
+<li>조건: P1 · 정차 실차 · 약 5분 · 모든 변경은 보관 완료 뒤.</li>
+<li>절차: CAN+Zipy → 세 대상 → Diag만으로 짧게 기록. prefix를 새 시험 이름으로 바꾸어 한 구간 추가.</li>
+<li>기대: 선택 대상만 파일 생성. prefix 변경으로 번호가 자동 초기화되지 않는다. 기록 중 대상·저장 설정 변경은 차단된다.</li>
+<li>증빙·복구: 구간별 선택·prefix·번호·파일·ZIP. 원래 설정 복구.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-19"><h3>TC-19 승인된 진단 동작의 왕복</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 5분 · 담당자가 평소 사용하는 승인된 절차만 사용.</li>
+<li>절차: CAN+Diag 또는 세 대상 기록 중 동일 진단 동작 5회와 시각을 기록. 보관 후 양쪽 BLF의 요청·응답을 확인한다.</li>
+<li>기대: 실제 요청·정상/부정 응답·timeout이 구간 안 조작 이력과 대응한다. 누락·미완료·실패를 숨기지 않는다. 앱 completed와 진단 성공은 별도 판정.</li>
+<li>증빙·복구: 조작 시각 표·동시 BLF·Write 오류·ZIP. 보안 값·업무 payload를 공개 문서/Git에 쓰지 않는다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-20"><h3>TC-20 CAN과 Diag 프레임 누락 비교</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 60초 이상 3구간과 사후 분석 · 동일 버스의 비교 가능한 수신 매핑 확인.</li>
+<li>절차: 동시 기록 3구간. 공통 메시지로 시간차 보정 후 겹치는 내부 구간의 ID·형식·payload·주기·alive counter 비교. 시작/끝 경계·TX/RX 관점 차이는 분리.</li>
+<li>기대: 설명되지 않는 한쪽 프레임 누락/counter gap이 없다. 있으면 시간·ID·건수·최대 공백을 Fail로 기록. 두 logger 모두 놓친 데이터는 이 비교로 검출할 수 없어 절대 무손실은 단정하지 않는다.</li>
+<li>증빙·복구: 원본 쌍·매핑·시간 보정·비교 범위·통계·ZIP. 다른 버스면 N/A와 독립 기준 logger 사용. 기존 제공 표본의 약 39ms·155프레임 누락 재발을 확인하되 원인 확정과 구분한다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-21"><h3>TC-21 PCAP과 PCAPNG</h3>
+<ul>
+<li>조건: P1 · 정차 실차 · 약 4분 · Zipy 정상 수신.</li>
+<li>절차: pcap 한 구간 보관 후 pcapng 한 구간 기록. Wireshark/capinfos로 실제 형식을 본다. 형식 변경 후 직전 파일 이름 변경도 확인.</li>
+<li>기대: 선택 형식·확장자 일치. 이전 파일을 자동 변환하거나 확장자만 바꾸지 않는다. 이름 변경에도 원래 형식 유지.</li>
+<li>증빙·복구: 두 원본·형식 검사·ZIP. 기본 형식으로 복구.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-22"><h3>TC-22 기준 외 Source의 원본 저장</h3>
+<ul>
+<li>조건: P1 · 정차 또는 벤치 · 약 3분 · 기준·다른 Source의 기존 승인 트래픽 동시 존재.</li>
+<li>절차: 규칙을 만족하는 정상 기록에서 Source별 실제 패킷을 reader로 확인. 차량망에 새 패킷을 주입하지 않는다.</li>
+<li>기대: 유효성검사는 캡처 필터가 아니며 다른 Source도 저장된다. 비교할 트래픽이 없으면 Blocked.</li>
+<li>증빙·복구: Source별 건수·PCAP·규칙·ZIP.</li>
+</ul>
+</article>
+<h2>이상 감지와 정지</h2>
+<article class="testcase" id="TC-23"><h3>TC-23 Zipy 시작부터 필수 수신 없음</h3>
+<ul>
+<li>조건: P0 · 정차 또는 벤치 · 약 3분 · 링크 정상, 필요한 데이터만 안전하게 비활성인 기존 조건.</li>
+<li>절차: 실제 규칙 확인 후 세 대상 시작. 무수신을 유지하고 팝업·정지·보관 시각 기록.</li>
+<li>기대: 시작 유예 후 미수신 감지와 F 처리. Zipy 원인 표시, 전체 선택 기록 정지. 규칙값과 실제 지연을 함께 남긴다.</li>
+<li>증빙·복구: 규칙·링크·팝업·파일별 결과·ZIP. 기존 승인 활성화 절차 후 새 구간 확인.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-24"><h3>TC-24 링크 유지 중 필수 수신 중단</h3>
+<ul>
+<li>조건: P0 · 격리 벤치 또는 영향 없는 정차 조건 · 약 4분 · 필요한 흐름만 중단 가능.</li>
+<li>절차: 정상 세 대상 10초 후 필수 Source 수신을 기존 절차로 중단. 링크·다른 트래픽 유지. 감지 직후 복구해도 정지하는지 관찰.</li>
+<li>기대: 필수 흐름 위반으로 F 처리. 복구가 이미 확인된 위반을 지우지 않고 같은 세션을 자동 재시작하지 않는다.</li>
+<li>증빙·복구: 중단/복구 시각·PCAP·팝업·ZIP. 수신 확인 후 새 기록.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-25"><h3>TC-25 캡처 전용 Ethernet 링크 분리</h3>
+<ul>
+<li>조건: P0 · 정차 캡처 전용 링크 또는 벤치 · 약 4분 · 차량 제어/공용망 무영향 확인.</li>
+<li>절차: 세 대상 기록 중 PC 캡처 전용 케이블만 분리. 감지·정지·보관을 본 뒤 복구.</li>
+<li>기대: 선택 NIC 단절로 F 처리. 다른 NIC 정상 트래픽 때문에 계속 기록하지 않는다. 복구 후 새 기록 가능.</li>
+<li>증빙·복구: 분리 시각·NIC·대상별 결과·ZIP. 주행 중 수행 금지.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-26"><h3>TC-26 Zipy 저수신량 경계</h3>
+<ul>
+<li>조건: P1 · 격리 벤치 · 약 10분 · 승인된 수신량 제어·실측 가능 환경.</li>
+<li>절차: 충분한 정상 pps로 시작 후 0은 아니지만 하한 미만인 수신을 기준 지속시간보다 길게 유지. 별도 회차는 짧은 저수신 후 복구.</li>
+<li>기대: 지속 저수신은 F 처리. 짧은 저수신은 평균 창·지속시간에 따라 판정한다. 정확히 100pps 추정치만으로 경계 판정을 하지 않는다.</li>
+<li>증빙·복구: 실제 pps·시간·규칙·PCAP·ZIP. 환경 없으면 Blocked, 차량망 주입 금지.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-27"><h3>TC-27 CANoe 측정 중지</h3>
+<ul>
+<li>조건: P0 · 정차 또는 벤치 · 약 4분 · 측정 정지가 차량 제어에 영향 없는 cfg.</li>
+<li>절차: 정상 세 대상 기록 중 CAN 창의 F9로 측정을 끈다. Diag·Zipy·팝업·정리를 관찰.</li>
+<li>기대: CAN 측정 중지 원인으로 F 처리. 팝업 확인을 기다리지 않고 정리. 보관 파일과 실패 상태를 함께 기록.</li>
+<li>증빙·복구: 중지 시각·대상별 파일·팝업·ZIP. F9·Trace 복구 후 새 기록.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-28"><h3>TC-28 Diag 선택 기록 블록 중지</h3>
+<ul>
+<li>조건: P0 · 정차 또는 벤치 · 약 4분 · 선택 블록 수동 정지가 허용되는 시험 구성.</li>
+<li>절차: 세 대상 기록 중 Diag의 앱 소유 BLF 블록만 수동 정지한다. 다른 블록은 조작하지 않는다.</li>
+<li>기대: Diag 기록 중지 원인으로 F 처리. CAN 측정 유지와 구간 기록 정지를 구분한다.</li>
+<li>증빙·복구: 블록·중지 시각·대상별 파일·ZIP. 정상 상태 재확인 후 새 구간.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-29"><h3>TC-29 도구 종료와 응답 확인 불가</h3>
+<ul>
+<li>조건: P2 · 격리 벤치 전용 · 약 10분 · 시험 프로세스·역할 식별, 업무 자료 분리.</li>
+<li>절차: 별도 회차에서 이번 시험의 CANoe 하나나 캡처 도구 비정상 종료를 재현한다. 응답 정체도 재현 가능하면 별도 회차로 기록. 등록정보·드라이버·보안 설정은 변경하지 않는다.</li>
+<li>기대: 오류/기록 확인 불가를 정상 수신으로 보이지 않고 F 처리. Zipy 관측 불가 지속이면 5초 기준과 실제 정지 시각을 비교. 다른 프로세스는 정리 대상 아님.</li>
+<li>증빙·복구: PID·역할·시각·팝업·파일별 결과·ZIP. 재연결·수신 복구 후 새 구간.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-30"><h3>TC-30 CAN 무수신 감지의 현재 한계</h3>
+<ul>
+<li>조건: P1 · 격리 벤치 기존 무수신 조건 · 약 3분 · CANoe 측정·기록은 유지, 실차 배선 조작 금지.</li>
+<li>절차: CAN 또는 Diag 기록 중 Trace 무수신·측정·기록·앱 상태를 동시에 확인.</li>
+<li>기대: 실제 CAN 수신 감시 미지원이므로 자동 팝업이 없을 수 있다. 무수신 파일을 정상 통신 성공으로 판정하지 않는다. 이 TC Pass는 한계 확인이며 감지 기능 통과가 아님.</li>
+<li>증빙·복구: Trace·앱 상태·BLF·ZIP. 정상 수신으로 복구해 정상 시험.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-31"><h3>TC-31 실패 팝업과 새 기록</h3>
+<ul>
+<li>조건: P0 · 정차 또는 벤치 · 약 4분 · 안전하게 재현 가능한 이상 한 가지.</li>
+<li>절차: 실패 팝업을 열어둔 채 정리 진행·중복 알림을 본다. 원인 복구·팝업 정리 후 새 기록.</li>
+<li>기대: 팝업이 파일 정리를 막지 않고 같은 세션/동일 실패를 반복 표시하지 않는다. 동시 실패는 대상을 함께 표시. 새 번호 기록이 성공해도 이전 실패 이력은 유지.</li>
+<li>증빙·복구: 팝업·보관 시각·전후 번호·ZIP.</li>
+</ul>
+</article>
+<h2>파일 관리와 저장 오류</h2>
+<article class="testcase" id="TC-32"><h3>TC-32 직전 완료 파일 이름 변경</h3>
+<ul>
+<li>조건: P1 · 시험 완료 파일 · 약 3분 · 세 대상 원본 별도 복사.</li>
+<li>절차: 한글·공백 포함 시험 이름으로 바꾸고 Enter 적용. 실제 파일·다음 번호·읽기를 확인.</li>
+<li>기대: 같은 제목으로 대응하며 Diag 구분과 원래 확장자 유지. 다음 번호와 파일 내용은 유지.</li>
+<li>증빙·복구: 전후 이름·해시·작업 이력·ZIP. 업무 원본 사용 금지.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-33"><h3>TC-33 이름 변경 충돌과 잠금</h3>
+<ul>
+<li>조건: P1 · 시험 폴더 · 약 5분 · 백업·무해한 충돌 파일·잠금 재현 환경.</li>
+<li>절차: 기존 제목으로 이름 변경. 별도 회차에서 파일 하나를 외부 도구로 잠근 뒤 변경. 잠금 해제 후 실제 경로와 이력 대조.</li>
+<li>기대: 덮어쓰기 없이 충돌·잠김·부분 결과 표시. 강제 잠금 해제/다른 프로그램 종료로 밀어붙이지 않는다. 잠금 미재현은 Blocked.</li>
+<li>증빙·복구: 해시·경로·파일별 결과·ZIP. 재시도 전 실제 경로 확인.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-34"><h3>TC-34 삭제 취소와 확인</h3>
+<ul>
+<li>조건: P1 · 폐기 가능한 시험 파일 · 약 3분 · 보존 복사본 확보.</li>
+<li>절차: 직전 로그 지우기 취소로 파일 유지 확인 후 다시 확인·실행. 같은 폴더 무관한 파일도 비교.</li>
+<li>기대: 취소는 원본 유지. 확인 대상만 삭제하고 부분 실패는 표시. 번호를 되돌리거나 외부 파일을 지우지 않는다.</li>
+<li>증빙·복구: 전후 목록·작업 이력·ZIP. 실제 업무 원본으로 시험하지 않는다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-35"><h3>TC-35 번호와 최종 파일 충돌</h3>
+<ul>
+<li>조건: P0 · 시험 폴더 · 약 5분 · 기록 정지, 기존 파일 백업.</li>
+<li>절차: 다음 예상 이름의 무해한 파일을 두고 설정 적용/시작을 시도. 설정 적용 후 시작 직전 충돌도 별도 회차. 충돌 제거 후 새 기록.</li>
+<li>기대: 기존 파일 바이트 유지·차단 안내. 예약 전 차단은 미소비, 예약 후 실패는 번호 재사용 금지. 수동 번호 변경도 덮어쓰기를 허용하지 않음.</li>
+<li>증빙·복구: 기존 해시·전후 번호·메시지·ZIP. 시험 충돌 파일만 정리.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-36"><h3>TC-36 저장 접근 실패와 보관 재시도</h3>
+<ul>
+<li>조건: P1 · 격리 시험 볼륨 · 약 10분 · 원본 백업, 시스템/업무 볼륨 분리.</li>
+<li>절차: 쓸 수 없는 시험 위치로 시작. 별도 회차에서 원본 보호가 가능한 보관 실패 조건을 재현. 앱을 닫지 않고 접근 복구 후 정지·보관 재시도 안내 수행.</li>
+<li>기대: 시작 불가와 보관 실패를 구분하고 완료로 오인시키지 않는다. 파일별 실제 경로·결과 확인. 기록을 살리려면 X를 누르지 않는다.</li>
+<li>증빙·복구: 오류·임시/최종 경로·ZIP. 보안 기능 변경 금지, 미재현 항목 Blocked.</li>
+</ul>
+</article>
+<h2>종료와 재실행</h2>
+<article class="testcase" id="TC-37"><h3>TC-37 정상 보관 후 종료</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 5분 · 보관 완료·사용자 cfg 직접 저장.</li>
+<li>절차: 완료 해시·번호를 남기고 메인 X. 앱·전용 CANoe 종료 후 같은 폴더 재실행, 연결·F9·Trace 확인과 새 기록.</li>
+<li>기대: 완료 파일·설정·번호 유지. 전용 CANoe 종료, 트레이/백그라운드 잔류 없음. 이전 완료 세션으로 새 기록 차단 없음.</li>
+<li>증빙·복구: 전후 해시·프로세스·번호·전후 ZIP.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-38"><h3>TC-38 기록 중 X와 중단 구간 폐기</h3>
+<ul>
+<li>조건: P0 · 정차 또는 벤치 · 약 5분 · 폐기 가능한 구간, 완료 파일 백업, cfg 직접 저장.</li>
+<li>절차: 세 대상 기록 중 ZIP 저장 후 X. 종료 소요시간 측정. 재실행해 파일·중단 이력·번호·새 시작 확인.</li>
+<li>기대: X는 정상 보관이 아니다. 전용 도구·CANoe 종료와 미완료 소유 구간 폐기. 재실행 정리, 완료/외부 파일 유지, 예약 번호 유지. 잠긴 소유 파일은 정리 재시도하되 새 기록 차단 없음.</li>
+<li>증빙·복구: X 직전/재실행 직후 ZIP·파일 목록·번호·시간. 살려야 할 기록에는 적용하지 않는다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-39"><h3>TC-39 지연 중 X와 무관한 창 보호</h3>
+<ul>
+<li>조건: P2 · 격리 벤치 · 약 10분 · 정체 재현, 별도의 무관한 도구 창 식별.</li>
+<li>절차: 연결/정리 지연 중 X. 별도 회차에서 닫기 입력이 가능할 때 반복 X. 전용 도구와 별도 Wireshark 등의 잔류 비교. 기존 CANoe로 연결 차단 시 우회하지 않는다.</li>
+<li>기대: guard 약 1초 뒤 강제 종료 시도, 반복 X는 즉시 요청. 실제 종료시간 측정. 무관한 프로세스 일괄 종료 금지. 마지막 진단은 유실 가능.</li>
+<li>증빙·복구: PID 소유 구분·시각·영상/화면·재실행 ZIP. 미재현은 Blocked.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-40"><h3>TC-40 예기치 않은 앱 종료</h3>
+<ul>
+<li>조건: P1 · 격리 벤치 · 약 5분 · 폐기 가능한 시험 세션.</li>
+<li>절차: 사전 ZIP 후 시험 앱 프로세스만 비정상 종료. 잔류 도구·CANoe 실제 상태 확인·필요 수동 정리 후 재실행·수신 확인·새 기록.</li>
+<li>기대: 비정상 종료의 정상 도구 정지/진단 flush는 보장되지 않는다. 재실행은 중단 소유 구간 폐기·번호/완료 파일 유지. 잔류 도구 문제와 복구를 별도 기록.</li>
+<li>증빙·복구: 종료 방식·프로세스·전후 ZIP·파일·번호. X 정책 시험과 구분.</li>
+</ul>
+</article>
+<h2>장시간과 부하</h2>
+<article class="testcase" id="TC-41"><h3>TC-41 세 대상 60분과 1 GiB 초과</h3>
+<ul>
+<li>조건: P0 · 정차 장시간 또는 승인 시험로 · 60분 이상 · TC-15·16·20 통과, 용량·PC 전원 확보.</li>
+<li>절차: 세 대상 60분 이상 기록. 0/5/15/30/60분 CPU·메모리·디스크 여유·UI 반응 기록. 자연 트래픽에서 Zipy 1 GiB 초과까지 필요하면 연장. 정상 정지 후 전체 파일 읽기 검사.</li>
+<li>기대: 멈춤·비정상 종료·관측 오류·설명되지 않는 손상 없이 보관. drop·메모리 증가 추세도 기록. 60분과 1 GiB는 별도 판정하며 미달은 미검증. 실측 없이 무손실·메모리 상한 보장 금지.</li>
+<li>증빙·복구: 시간별 자원 표·전후 ZIP·전체 원본·reader/drop 통계. 비교 가능한 데이터 누락도 분석.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-42"><h3>TC-42 저용량 경고와 디스크 오류</h3>
+<ul>
+<li>조건: P2 · 크기를 제한한 격리 시험 볼륨 전용 · 약 10분 · OS/업무 데이터 분리.</li>
+<li>절차: 캡처 볼륨 여유 1 GiB 이하에서 경고 확인. 1.25 GiB 초과로 복구해 회복 이력 확인. 실제 쓰기 실패도 제한 볼륨에서 별도 회차.</li>
+<li>기대: 저용량 경고가 자동 삭제/안전 정지를 보장하지 않는다. 실제 도구 오류가 확인되면 F 처리·파일별 결과 기록. 다른 볼륨의 진단 저장 오류와 구분.</li>
+<li>증빙·복구: 실제 여유 바이트·오류·파일·ZIP. 시스템 디스크 채우기/업무 파일 삭제 금지.</li>
+</ul>
+</article>
+<h2>버그리포트와 진단</h2>
+<article class="testcase" id="TC-43"><h3>TC-43 기록 전중후 ZIP 스냅샷</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 4분 · 진단 저장 정상.</li>
+<li>절차: 기록 전·기록 중·보관 후 각 1회 내보내기. ZIP의 JSONL·존재하는 백업·manifest와 크기/SHA256 대조.</li>
+<li>기대: 고유 새 ZIP, 자동 전송 없음. 원본 로그·기존 ZIP 유지. 저장 이후 사건은 이전 ZIP에 추가되지 않음. 캡처·cfg·DB·화면 전체는 자동 첨부하지 않음.</li>
+<li>증빙·복구: ZIP 3개·시각·검증·기록 연속성. 내보내기 중 지연/수신 영향도 결함으로 기록.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-44"><h3>TC-44 같은 폴더 재실행과 이어 쓰기</h3>
+<ul>
+<li>조건: P0 · 정차 실차 · 약 4분 · 동일 배포 폴더.</li>
+<li>절차: 짧은 기록 후 ZIP·종료. 같은 폴더 재실행 후 새 ZIP. 두 실행 PID·app.startup·UTC 범위 비교.</li>
+<li>기대: 순환 여유 안에서는 두 실행 이력이 함께 남음. 재실행만으로 초기화·보관 한도 초기화·자동 ZIP 생성 없음. 정상 종료 flush 시도, 강제 종료 마지막 사건 보장 없음.</li>
+<li>증빙·복구: 전후 ZIP·PID·시각·크기. 이미 회전된 이력을 재실행 삭제로 단정하지 않는다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-45"><h3>TC-45 진단 순환 한도와 이전 ZIP</h3>
+<ul>
+<li>조건: P2 · 격리 PC의 충분한 자연 사용 로그 · 시간 가변 · 사전 ZIP 보존.</li>
+<li>절차: 실제로 회전했을 때 현재 파일과 .1~.4·재실행 후 파일 수·전후 이벤트 범위를 비교. 시험 때문에 대량 진단/차량 패킷을 주입하지 않는다.</li>
+<li>기대: 약 5 MiB씩 현재+4백업, 약 25 MiB 최근 내용. .1 최근, .4 가장 오래된 백업. 일수 보장 없음. 이전 ZIP은 별도로 유지하고 앱 자동 정리 없음.</li>
+<li>증빙·복구: 파일별 바이트·시각·전후 ZIP. 회전 미발생은 Blocked, 코드 검사로 현장 Pass를 대신하지 않는다.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-46"><h3>TC-46 진단 또는 ZIP 저장 실패</h3>
+<ul>
+<li>조건: P1 · 격리 시험 폴더/제한 볼륨 · 약 5분 · 정상 캡처 저장소와 분리.</li>
+<li>절차: 재현 가능한 시험 권한/용량 조건에서 진단 저장 실패 관찰. ZIP 바탕화면 실패는 자연 발생 또는 격리 계정에서만 재현. 보안 정책은 변경하지 않는다.</li>
+<li>기대: 진단 오류를 화면에 알리되 이 오류만으로 취득 중단 안 함. ZIP 실패를 성공으로 표시하지 않음. 시작 파일 열기 실패는 버튼 비활성 가능, 후속 쓰기 실패는 버튼만으로 정상 판단 금지.</li>
+<li>증빙·복구: 오류 화면·캡처 결과. ZIP 없으면 가능한 developer_logs 전체 사본과 시각 전달. 미재현 항목 Blocked.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-47"><h3>TC-47 오프라인과 실행 폴더 변경</h3>
+<ul>
+<li>조건: P1 · 정차 또는 벤치 · 약 5분 · 유효한 오프라인 CANoe 라이선스, 정상 보관 후 종료.</li>
+<li>절차: 원래 인터넷 없는 환경에서 정상 기록. 배포 폴더 전체 복사본을 다른 쓰기 가능한 위치에서 실행해 연결·기록·ZIP 확인. 캡처 NIC는 인터넷 차단 목적으로 끊지 않는다.</li>
+<li>기대: 실행 중 다운로드 없이 기록. 새 위치의 동봉 도구 사용·로컬 설정/번호 유지. 진단은 새 EXE 옆이므로 이전 위치 로그는 새 ZIP에 자동 병합되지 않음.</li>
+<li>증빙·복구: 구/신 위치 구분·도구·전후 ZIP·번호. 업데이트 증거는 양쪽 보존.</li>
+</ul>
+</article>
+<article class="testcase" id="TC-48"><h3>TC-48 승인된 실제 주행 조건</h3>
+<ul>
+<li>조건: P1 · 승인 시험로 · 약 15분 또는 기존 시나리오 · 정차 정상/반복/데이터 확인 통과, 담당자 분리.</li>
+<li>절차: 출발 전 기록·수신·용량 확인 후 기존 주행 절차 수행. PC는 동승 담당자만 조작. 이상 시 기존 중단 절차 후 정차해 증거 저장. 오류 주입 없음.</li>
+<li>기대: 실제 데이터가 기대 채널·구간에 저장되고 정상 정지 후 읽힌다. 차량 동작·기록 누락·앱 오류·PC 전원을 구분해 남긴다.</li>
+<li>증빙·복구: 주행 이벤트 시각·원본·ZIP. 차량 식별/위치는 승인 자료 폴더에만 보관.</li>
+</ul>
+</article>
+<h2>판정과 결함 기록</h2>
+<p>Pass는 해당 TC가 요구하는 조작·파일·데이터 증거 확인 후 선택한다. 파일 존재나 버튼 반응만으로 Pass를 주지 않는다. P0 Fail은 원인 분리·수정/환경 복구 후 해당 TC와 TC-15·16·20·37을 영향에 맞게 재시험한다. Blocked·N/A는 사유를 남기고 별도 집계한다. 이번 문서의 실차 시험 결과는 전부 미실행이다.</p>
+<p>결함 ID는 BUG-시험회차-일련번호로 TC와 연결한다. 중요도 예시는 S1 데이터 손실/덮어쓰기/무관한 프로세스 종료, S2 기록·정지·재실행 불가/실제 누락, S3 복구 가능한 표시·관리 오류다. 팀 기준이 있으면 우선한다. 재현율은 시도 횟수와 실패 횟수를 함께 기록한다.</p>
+<p>오류 직후 TC/회차·현지 시각/시간대·선택 대상·prefix/번호·누른 순서·기대/실제 결과·오류 원문·ZIP 이름을 남긴다. 가능하면 종료 전 ZIP과 재실행 직후 ZIP을 각각 저장한다. 보관 실패 기록을 살리려면 X 전에 임시/최종 상태를 확인한다.</p>
+<div class="table-scroll"><table><thead><tr><th>증상</th><th>기본 자료</th><th>추가 확인</th></tr></thead><tbody>
+<tr><td>연결·시작·정지·보관 실패</td><td>TC 결과·오류 직후 ZIP·메시지</td><td>CANoe Write·파일별 실제 위치/크기·필요 시 최소 재현 cfg</td></tr>
+<tr><td>CAN/Diag 누락·진단 이상</td><td>동시 BLF·조작 시각·ZIP</td><td>매핑·DBC/ECU 버전·공통 ID·독립 기준/비교 범위</td></tr>
+<tr><td>Zipy 수신·내용 이상</td><td>PCAP/PCAPNG·규칙·ZIP</td><td>실제 NIC·Source·장비 상태·별도 기준 캡처</td></tr>
+<tr><td>응답 없음·종료 불가</td><td>마지막 조작/시각·ZIP 또는 로그 사본</td><td>화면/영상·잔류 프로세스·필요 시 Windows 오류/dump</td></tr>
+<tr><td>번호·파일·재실행 이상</td><td>전후 번호/목록·전후 ZIP</td><td>DB는 ZIP에 없으므로 필요 시 앱 종료 후 승인 방식으로 별도 증거 확보</td></tr>
+</tbody></table></div>
+<p>원본과 ZIP은 변경하지 않은 사본으로 전달하고 업무 데이터 공유 가능 범위를 확인한다. 운영 경로·오류 문자열이 포함될 수 있다. 분석은 확인 사실·추정 원인·추가 확인을 구분한다. 순환 교체됐거나 저장 실패한 진단을 완전히 복원할 수는 없다.</p>
+<h2>현재 버그리포트 저장 로직</h2>
+<div class="table-scroll"><table><thead><tr><th>항목</th><th>현재 동작</th></tr></thead><tbody>
+<tr><td>활성화</td><td>정상 앱 실행 시작 때 상시 켜짐, 체크박스 없음</td></tr>
+<tr><td>배포 경로</td><td>실행 EXE 옆 developer_logs</td></tr>
+<tr><td>소스 경로</td><td>기본 프로젝트 루트 developer_logs. 소스 명시적 --data-dir/smoke는 시험 데이터 아래. 배포 EXE는 EXE 위치 우선</td></tr>
+<tr><td>파일</td><td>One_Click_Log_developer.jsonl와 백업 .1~.4</td></tr>
+<tr><td>기본 용량</td><td>회전 기준 5×1024×1024바이트, 현재+4백업으로 약 25 MiB. 레코드 단위 회전이므로 엄격한 디스크 상한은 아님</td></tr>
+<tr><td>보관 시간</td><td>일수 기준 없음. 기록량에 따라 교체되므로 몇 시간/며칠 보장 불가</td></tr>
+<tr><td>재실행</td><td>같은 폴더의 같은 파일에 추가, 기존 회전 한도 유지. 실행별 전체 기록을 영구 저장하지 않음</td></tr>
+<tr><td>메모리 큐</td><td>최대 4096건 비동기. 꽉 차면 일부 진단 누락 가능, 누락 수/오류 기록·화면 표시 시도</td></tr>
+<tr><td>종료</td><td>정상 close는 큐 배출·flush. X guard/강제 종료/전원 차단은 끝부분 보존 보장 불가</td></tr>
+<tr><td>ZIP 시점</td><td>버그리포트 버튼을 눌렀을 때만 생성. 오류/종료마다 자동 생성하지 않음</td></tr>
+<tr><td>ZIP 위치</td><td>Windows가 알려주는 바탕화면. OneDrive 등으로 이동된 바탕화면도 이 위치를 따름</td></tr>
+<tr><td>ZIP 이름</td><td>One_Click_Log_BugReport_To_Taegon.Kim_날짜_시각_고유번호.zip</td></tr>
+<tr><td>생성 순서</td><td>큐 flush → 회전 파일 잠금 → 임시 ZIP에 로그/백업/manifest 복사 → CRC·개별 크기/SHA256 검증 → 최종 파일명 확정</td></tr>
+<tr><td>생성 뒤</td><td>이후 진단은 원본에 계속 저장. 이전 ZIP은 고정된 스냅샷. 압축률에 따라 크기 변동</td></tr>
+<tr><td>ZIP 보관 한도</td><td>내보낸 ZIP의 수량·기간·용량 자동 제한/삭제 없음. 사용자가 보관·정리</td></tr>
+<tr><td>자동 전송</td><td>없음. 사용자가 직접 전달</td></tr>
+<tr><td>포함</td><td>UTC·PID·스레드·버전·명령/상태·경로·오류·traceback. 바이트/지정 payload 필드 가림</td></tr>
+<tr><td>자동 미포함</td><td>BLF·PCAP·PCAPNG·cfg 전체·DB·스크린샷·Windows dump. 일반 문자열/경로의 완전 익명화 기능은 아님</td></tr>
+<tr><td>폴더 변경</td><td>새 EXE 위치에 새 로그 집합. 이전 폴더 로그 자동 이관/합침 없음</td></tr>
+</tbody></table></div>
+<p>캡처·진단 순환 로그·내보낸 ZIP·설정 이력 DB는 서로 다른 저장물이다. 캡처는 지정 저장 폴더에 보관하고 25 MiB 진단 한도를 적용하지 않는다. 설정·다음 번호·이력 DB 기본 위치는 <code>%LOCALAPPDATA%/One Click Log/state.sqlite3</code>다. DB 메타데이터는 시작 때 기본 90일·이벤트 10000건·완료 세션 1000건 기준으로 일부를 history_archive의 jsonl.gz에 검증 저장한 뒤 정리한다. 최근 이벤트 500건·완료 세션 100건과 미완료/실패/진행 중·보호 이력은 유지한다. 이 정리는 캡처 원본을 지우지 않으며 DB·아카이브도 ZIP에 자동 포함하지 않는다.</p>
+<h2>구현 근거와 확인 범위</h2>
+<ul>
+<li>src/vil_logging/__init__.py: 기준 SW 0.9.21.</li>
+<li>src/vil_logging/app.py: 진단 활성화·경로·Windows 바탕화면·오류 표시·종료 연결.</li>
+<li>src/vil_logging/diagnostics/debug_log.py: 5 MiB·4백업·4096 큐·가림·스냅샷·검증·flush.</li>
+<li>src/vil_logging/runtime.py: 준비·번호 예약·전체 이상 정지·파일 보관·재실행 정리.</li>
+<li>src/vil_logging/exit_guard.py: 약 1초 제한·반복 X.</li>
+<li>src/vil_logging/monitors/rules.py: 현재 기본 규칙값.</li>
+<li>src/vil_logging/diagnostics/capture_quality.py: 1 GiB 경고·1.25 GiB 회복.</li>
+<li>src/vil_logging/storage/retention.py: DB 보관·아카이브.</li>
+<li>docs/analysis/diag_log_analysis_2026_10_23.md: 제공 Diag 표본의 누락 관측·미확정 원인.</li>
+<li>user_guide/AutoLog_User_Guide.template.html: 사용자 흐름·현재 수신 감지 한계.</li>
+</ul>
+<p>이번 작업은 시험 설계·기록 양식 작성이다. 실제 차량/VN 장비를 연결해 위 TC를 수행한 결과는 아니다.</p><section class="panel"><h2>종합 판정 기록</h2><label class="field">미해결 결함 · 데이터 무손실과 60분 및 1 GiB 개별 판정 · 다음 시험 범위 · 판단자와 판단일<textarea id="conclusion" rows="4"></textarea></label><div class="toolbar"><button id="export-bottom" type="button">결과 JSON 저장</button><a href="#top">문서 처음으로</a></div></section></main><script>
+'use strict';
+const meta={"schema": "one-click-log-vehicle-test-results-v1", "document_revision": "2026-10-25.1", "reference_app_version": "0.9.21", "source_sha256": "bb0a078707c12147723a918fb24edc9439639355da5a5da96213623021d46c51"};
+const fields=[['run_id','시험 회차 ID'],['tester','시험자'],['date_timezone','시험일과 시간대'],['actual_version_build','실제 EXE 버전과 빌드 ID'],['artifact_hash','배포 ZIP 또는 EXE SHA256'],['pc_windows','PC 별칭과 Windows 빌드'],['vehicle_ecu','차량 별칭과 ECU SW 버전'],['canoe_vector','CANoe 옵션·Vector 드라이버와 장비'],['can_config','CAN cfg 별칭·BLF 블록·채널'],['diag_config','Diag cfg 별칭·BLF 블록·채널'],['comparison_reference','동일 버스 비교 근거와 DBC 버전'],['nic','NIC 이름·식별자·포트'],['capture_tools','TShark와 Npcap 버전'],['zipy_rules','실제 Zipy 규칙·시간·최소 pps'],['storage','저장 위치 별칭·prefix·최초 번호'],['capacity','초기 여유와 예상 기록량'],['scenario','환경과 승인된 시험 시나리오']];
+const statuses=['Not Run','Pass','Fail','Blocked','N/A'];
+const cases=[...document.querySelectorAll('article.testcase')].map(el=>({id:el.id,title:el.querySelector('h3').textContent,definition:el.innerText}));
+const environment=document.getElementById('environment');
+function field(parent,key,label,type='input',full=false){const wrap=document.createElement('label');wrap.className='field'+(full?' full':'');const cap=document.createElement('span');cap.textContent=label;const control=document.createElement(type);control.dataset.field=key;control.setAttribute('aria-label',label);if(type==='input')control.type='text';if(type==='textarea')control.rows=2;wrap.append(cap,control);parent.append(wrap);return control;}
+fields.forEach(([key,label])=>field(environment,key,label,'input',key==='scenario'));
+const resultFields=[['trial','회차'],['time_range','시작·종료·이상 시각과 시간대'],['targets_index','선택 대상·prefix·예약 번호'],['actual','실제 순서·결과·측정값과 파일별 읽기 결과'],['evidence','ZIP·원본·화면 증빙 이름과 생성 시각'],['issue','결함 ID·재현율·복구 내용 또는 Blocked/N/A 사유']];
+for(const tc of cases){const el=document.getElementById(tc.id);const form=document.createElement('div');form.className='result-form';const h=document.createElement('h4');h.textContent=tc.id+' 결과 기록';form.append(h);const grid=document.createElement('div');grid.className='grid';const status=field(grid,'status','결과 상태','select');statuses.forEach(value=>{const o=document.createElement('option');o.value=value;o.textContent=value;status.append(o);});for(const [key,label]of resultFields)field(grid,key,label,['actual','evidence','issue'].includes(key)?'textarea':'input',['actual','evidence','issue'].includes(key));form.append(grid);el.append(form);const a=document.createElement('a');a.href='#'+tc.id;a.textContent=tc.id;document.getElementById('tc-nav').append(a);}
+function values(parent){return Object.fromEntries([...parent.querySelectorAll('[data-field]')].map(el=>[el.dataset.field,el.value]));}
+function summary(){const counts=Object.fromEntries(statuses.map(s=>[s,0]));document.querySelectorAll('.testcase select').forEach(el=>counts[el.value]++);document.getElementById('summary').textContent=cases.length+'개 TC  |  '+statuses.map(s=>s+' '+counts[s]).join('  ·  ');return counts;}
+function fit(el){if(el.tagName==='TEXTAREA'){el.style.height='auto';el.style.height=Math.max(76,el.scrollHeight+2)+'px';}}
+let dirty=false;
+document.addEventListener('input',e=>{if(e.target.matches('[data-field],#conclusion')){dirty=true;fit(e.target);summary();document.getElementById('notice').textContent='입력 변경됨 · 종료하거나 새로고침하기 전에 결과 JSON을 저장하세요.';}});
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+function download(){const payload={...meta,exported_utc:new Date().toISOString(),environment:values(environment),summary:summary(),results:cases.map(tc=>({...tc,...values(document.getElementById(tc.id))})),conclusion:document.getElementById('conclusion').value};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});const a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;const run=(payload.environment.run_id||'run').replace(/[^a-zA-Z0-9가-힣_-]/g,'_').slice(0,60);a.download='One_Click_Log_TestResults_'+run+'_'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);document.getElementById('notice').textContent='저장을 요청했습니다. 다운로드된 JSON 파일을 확인하세요. 입력 수정 후에는 다시 저장해야 합니다.';dirty=false;}
+document.getElementById('export').addEventListener('click',download);
+document.getElementById('export-bottom').addEventListener('click',download);
+document.getElementById('choose-import').addEventListener('click',()=>document.getElementById('import').click());
+document.getElementById('print').addEventListener('click',()=>window.print());
+document.getElementById('import').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{if(dirty&&!window.confirm('현재 입력을 바꿉니다. 이전 결과 JSON을 저장했는지 확인하세요. 계속 불러올까요?'))return;if(f.size>5*1024*1024)throw Error('결과 파일은 5 MiB 이하여야 합니다.');const data=JSON.parse(await f.text());if(data.schema!==meta.schema||!['2026-10-24.1',meta.document_revision].includes(data.document_revision)||!Array.isArray(data.results)||data.results.length!==cases.length||!data.environment||typeof data.environment!=='object')throw Error('이 시험서와 일치하는 결과 JSON이 아닙니다.');const ids=new Set();for(const row of data.results){if(!row||!cases.some(tc=>tc.id===row.id&&tc.title===row.title)||ids.has(row.id)||!statuses.includes(row.status))throw Error('TC 또는 상태가 올바르지 않습니다.');ids.add(row.id);for(const [key] of resultFields)if(typeof row[key]!=='string')throw Error('TC 입력값이 올바르지 않습니다.');}for(const [key]of fields)if(typeof data.environment[key]!=='string')throw Error('환경 입력값이 올바르지 않습니다.');if(typeof data.conclusion!=='string')throw Error('종합 판정이 올바르지 않습니다.');for(const el of environment.querySelectorAll('[data-field]'))el.value=data.environment[el.dataset.field];for(const row of data.results){for(const el of document.getElementById(row.id).querySelectorAll('[data-field]')){el.value=row[el.dataset.field];fit(el);}}document.getElementById('conclusion').value=data.conclusion;fit(document.getElementById('conclusion'));summary();dirty=false;document.getElementById('notice').textContent='불러오기 완료: '+f.name;}catch(err){document.getElementById('notice').textContent='불러오기 실패: '+err.message;}finally{e.target.value='';}});
+window.addEventListener('beforeprint',()=>document.querySelectorAll('textarea').forEach(fit));summary();
+</script></body></html>
