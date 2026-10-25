@@ -46,7 +46,7 @@ def test_internal_bundle_contains_original_installer_license_guidance_and_hashes
     folder = installer.parent
     assert (folder / "LICENSE.txt").read_bytes() == (cache / lock["license"]["name"]).read_bytes()
     instructions = (folder / "READ_ME_FIRST.txt").read_text(encoding="utf-8")
-    assert all(word in instructions for word in ("한국어", "English", "中文", "administrator", "already installed"))
+    assert all(word in instructions for word in ("한국어", "English", "中文", "Initial_Setup.bat", "automatically", "administrator", "already installed"))
     manifest = json.loads((folder / "bundle_manifest.json").read_text(encoding="utf-8"))
     assert manifest["installation_required_on_target"] and not manifest["installer_executed_by_build"]
     for item in manifest["files"]:

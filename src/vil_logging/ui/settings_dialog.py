@@ -101,8 +101,8 @@ TEXT = {
                          "After stopping, ZIP is verified before the original is removed. Allow space for both files while compressing."),
     "format_help": ("기본 저장 형식은 pcap입니다. 다른 형식을 선택하면 다음 실행에도 기억합니다.",
                     "The default is pcap. A different choice is remembered for the next launch."),
-    "npcap_help": ("실제 캡처에 필요한 Npcap이 없습니다. 별도 설치 안내를 확인하세요.",
-                   "Npcap is required for live capture. Refer to your installation guide."),
+    "npcap_help": ("Npcap이 없습니다. 앱과 모든 CANoe를 종료한 뒤 EXE 옆 Initial_Setup.bat로 설치를 진행하세요.",
+                   "Npcap is missing. Close the app and all CANoe windows, then run Initial_Setup.bat beside the EXE to install it."),
 }
 
 

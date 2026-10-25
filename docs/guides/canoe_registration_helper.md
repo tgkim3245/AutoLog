@@ -1,6 +1,6 @@
 # 초기설정: 설치된 CANoe 버전 선택과 Npcap 설치
 
-기준 SW 0.9.23 · 작성 2026-10-25
+기준 SW 1.0.0 · 작성 2026-10-25
 
 배포 EXE 옆 [Initial_Setup.bat](../../tools/Initial_Setup.bat)는 Windows 기본 PowerShell로 설치된 CANoe 버전을 검색하고 사용자 선택 후 기본 COM 등록과 Npcap 관리자 설치를 진행한다. CANoe 19나 최신 버전을 자동 선택하지 않는다. RBS 구성(.cfg)의 작성·검증 버전에 맞는 CANoe·라이선스·Vector 드라이버와 프로젝트 전체를 먼저 준비한다.
 

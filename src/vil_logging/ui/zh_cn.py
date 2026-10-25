@@ -152,7 +152,7 @@ SETTINGS = {
     "network_next": "请确认采集工具和设备连接的网络，然后重试。", "ready_next": "在主界面选择对象后点击开始记录。",
     "scope": "环境和连接检查不能证明实际采集成功。", "timeout": "网络检查超时，请重新打开设置重试。",
     "format_help": "默认保存格式为 pcap，更改后会记住您的选择。",
-    "npcap_help": "实时采集需要 Npcap，请参阅单独的安装说明。",
+    "npcap_help": "缺少 Npcap。关闭应用和所有 CANoe 窗口，再运行 EXE 旁的 Initial_Setup.bat 进行安装。",
 }
 
 EVENTS = {
@@ -220,7 +220,7 @@ PHRASES = {
     "The saved configuration is unavailable. Choose the file again.": "已保存的配置文件不可用，请重新选择。",
     "Cannot read the configuration. Check its location and access.": "无法读取配置文件，请检查路径与权限。",
     "TShark works. The Npcap driver needed for live capture is missing.": "TShark 可用，但缺少实时采集所需的 Npcap 驱动。",
-    "Follow your separate guide to install Npcap, then reopen Settings and select the device network.": "请按照单独的说明安装 Npcap，然后重新打开设置并选择设备网络。",
+    "Close the app and all CANoe windows, run Initial_Setup.bat beside the EXE to install Npcap, then reopen the app and select the device network.": "关闭应用和所有 CANoe 窗口，运行 EXE 旁的 Initial_Setup.bat 安装 Npcap，再打开应用选择设备网络。",
     "Choose the network connected to the vehicle from the list above.": "请从上方列表选择连接车辆的网络。",
     "The previous network is missing. Check the cable or choose another network.": "未找到上次选择的网络，请检查连接线或选择其他网络。",
     "The network is visible to Windows but not the capture driver. Check Npcap installation.": "Windows 可以看到此网络，但采集驱动无法识别，请检查 Npcap。",

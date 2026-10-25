@@ -1,15 +1,15 @@
 # One Click Log
 
-Windows 11 x64에서 CANoe의 CAN·Diag BLF와 Zipy Ethernet 캡처를 제어하는 로컬 앱입니다. 현재 소스 버전은 **0.9.23**입니다. 배포 EXE 옆 Initial_Setup.bat에서 설치 CANoe 검색·버전 선택 후 COM 등록과 Npcap 관리자 설치를 진행합니다. Ethernet 설정에서 원본/정지 후 ZIP 보관을 선택합니다. 문서 검토일은 **2026-10-25**이며 문서 정리만으로 실차 검증 범위를 확대하지 않습니다.
+Windows 11 x64에서 CANoe의 CAN·Diag BLF와 Zipy Ethernet 캡처를 제어하는 로컬 앱입니다. 현재 소스 버전은 **1.0.0**입니다. 배포 EXE 옆 Initial_Setup.bat에서 설치 CANoe 검색·버전 선택 후 COM 등록과 Npcap 관리자 설치를 진행합니다. Ethernet 설정에서 원본/정지 후 ZIP 보관을 선택합니다. 문서 검토일은 **2026-10-25**이며 문서 정리만으로 실차 검증 범위를 확대하지 않습니다.
 
 배포 사용자는 EXE 옆 `START_HERE.txt`와 `One Click Log_User_Guide.html`, 또는 메인 상단 **사용법**을 먼저 읽으세요. 개발 문서는 [문서 목차](docs/README.md), 환경별 실제 확인 범위는 [검증표](docs/testing/canoe_support_matrix.md)에 있습니다.
 
 ## 기본 사용
 
-1. 배포 ZIP 전체를 쓰기 가능한 로컬 폴더에 풀고 `One Click Log.exe`를 실행합니다. `_internal`·`tools` 등 동봉 폴더를 함께 유지합니다.
+1. 배포 ZIP 전체를 로컬 폴더에 풀고 앱/모든 CANoe를 저장·종료한 뒤 **Initial_Setup.bat**를 실행합니다. CANoe 설치본을 선택하면 COM 등록과 Npcap 준비를 함께 진행합니다. Npcap이 없으면 동봉 설치기를 자동 관리자 실행하며 권한 승인·설치창 동의는 사용자가 합니다. 결과 확인 후 `One Click Log.exe`를 실행합니다. 동봉 폴더를 함께 유지합니다.
 2. 설정에서 저장 폴더·prefix·다음 번호를 적용하고 사용할 대상만 선택합니다. 기본 선택은 CAN·Zipy입니다.
 3. CAN·Diag는 서로 다른 cfg와 BLF 블록 하나씩 연결합니다. 전용 CANoe에서 라이선스·컴파일·채널 매핑과 **F9 측정·Trace 수신**을 확인합니다. 같은 cfg·블록이면 측정 후 연결 확인을 반복할 필요는 없습니다.
-4. Zipy는 동봉 TShark와 실제 캡처 NIC를 확인합니다. Npcap은 대상 PC에 설치되어 있어야 합니다. Wireshark GUI 별도 설치는 캡처 실행의 필수 조건이 아닙니다.
+4. Zipy는 동봉 TShark와 실제 캡처 NIC를 확인합니다. Npcap은 초기설정 BAT가 설치 또는 기설치 상태를 확인합니다. Wireshark GUI 별도 설치는 캡처 실행의 필수 조건이 아닙니다.
 5. 메인의 상태별 **기록 시작·정지** 버튼으로 구간을 제어하고 보관 결과를 확인합니다. 정상 정지는 CANoe 측정·다른 블록을 유지합니다.
 
 CAN은 `prefix_N.blf`, Diag는 `prefix_Diag_N.blf`, Zipy는 `prefix_N.pcap` 또는 `.pcapng`입니다. 세션의 번호를 공유하고 예약한 번호는 실패·삭제로 되돌리지 않습니다. 기본 prefix는 `One_Click_Log`입니다.

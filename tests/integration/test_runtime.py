@@ -324,7 +324,8 @@ def test_missing_npcap_is_reported_before_asking_for_a_network(runtime_factory, 
     assert result["status"] == "attention"
     assert "TShark는 정상" in result["message_ko"]
     assert "Npcap" in result["message_ko"]
-    assert "설정창을 다시 열고" in result["next_action_ko"]
+    assert "Initial_Setup.bat" in result["next_action_ko"]
+    assert "종료" in result["next_action_ko"] and "네트워크" in result["next_action_ko"]
     assert "wpcap.dll" in result["detail"]
     event = wait_for_message(runtime, "event", lambda value: value.code == "TARGET_ATTENTION")
     assert event.level == "INFO"

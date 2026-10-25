@@ -605,8 +605,8 @@ class Runtime:
             result = report("attention", "TShark는 정상입니다. 실제 캡처에 필요한 Npcap 드라이버가 없습니다.",
                             "TShark works. The Npcap driver needed for live capture is missing.",
                             connections.get("interface_query_error", ""))
-            result.update(next_action_ko="별도 설치 안내에 따라 Npcap을 준비한 뒤 설정창을 다시 열고 장비의 네트워크를 선택하세요.",
-                          next_action_en="Follow your separate guide to install Npcap, then reopen Settings and select the device network.")
+            result.update(next_action_ko="앱과 모든 CANoe를 종료하고 EXE 옆 Initial_Setup.bat로 Npcap 설치를 진행한 뒤 앱을 다시 열어 네트워크를 선택하세요.",
+                          next_action_en="Close the app and all CANoe windows, run Initial_Setup.bat beside the EXE to install Npcap, then reopen the app and select the device network.")
             return result, connections
         if not settings.nic_id:
             return report("attention", "차량에 연결된 네트워크를 위 목록에서 선택하세요.",
