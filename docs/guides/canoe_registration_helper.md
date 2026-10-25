@@ -4,6 +4,8 @@
 
 배포 EXE 옆 [Initial_Setup.bat](../../tools/Initial_Setup.bat)는 Windows 기본 PowerShell로 CANoe 19 공식 COM 등록과 Npcap 관리자 설치를 순서대로 수행한다. Python은 필요 없다. 일반·내부 배포 모두 BAT를 포함하며, Npcap 공식 설치 파일은 확인된 회사 내부 PC 1대용 배포에만 포함한다.
 
+CAN·Diag는 **CANoe 19(64비트)를 사용해야 한다.** CANoe 19 프로그램·라이선스·Vector 드라이버는 먼저 설치·준비한다. BAT는 설치된 CANoe 19의 기본 COM 등록과 Npcap 설치를 진행한다. 배포 가이드 첫 화면의 **0. 초기설정**에서 같은 순서를 안내한다.
+
 1. 배포 ZIP 전체를 로컬 폴더에 푼다. 앱과 모든 CANoe 작업을 저장·종료한다.
 2. Initial_Setup.bat를 더블클릭한다. 설치 폴더와 Vector 레지스트리에서 CANoe64.exe 버전 19와 짝인 RegisterComponents.exe를 찾는다. 후보가 여러 개면 번호를 선택한다.
 3. Vector 서명을 확인한 공식 등록 도구의 Windows 관리자 요청을 승인한다. 완료 후 선택한 CANoe 19가 64비트 COM 대상으로 등록됐는지 확인한다. 다른 자동화도 이 기본 대상의 영향을 받는다.
