@@ -2,7 +2,7 @@
   "g001": "{{APP_NAME}} {{APP_VERSION}} User Guide",
   "g002": "Your first recording",
   "g003": "Choose a save folder, prepare the connections, then use the same button to start and stop.",
-  "g004": "Software <b>{{APP_VERSION}}</b> · Guide revision {{GUIDE_REVISION}} · Updated {{UPDATED_DATE}}",
+  "g004": "Software <b>{{APP_VERSION}}</b> · Guide revision {{GUIDE_REVISION}} · Updated {{UPDATED_DATE}} · Window title: made by Taegon.Kim",
   "g005": "Quick start",
   "g006": "1 Save folder",
   "g007": "4 Record",

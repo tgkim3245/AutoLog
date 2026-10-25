@@ -2,7 +2,7 @@
   "g001": "{{APP_NAME}} {{APP_VERSION}} 사용자 가이드",
   "g002": "처음 기록하기",
   "g003": "저장 위치와 연결을 준비한 뒤, 같은 버튼으로 시작하고 정지합니다.",
-  "g004": "적용 SW <b>{{APP_VERSION}}</b> · 문서 개정 {{GUIDE_REVISION}} · 업데이트 {{UPDATED_DATE}}",
+  "g004": "적용 SW <b>{{APP_VERSION}}</b> · 문서 개정 {{GUIDE_REVISION}} · 업데이트 {{UPDATED_DATE}} · 창 제목: made by Taegon.Kim",
   "g005": "따라 하기",
   "g006": "1 저장 위치",
   "g007": "4 기록",

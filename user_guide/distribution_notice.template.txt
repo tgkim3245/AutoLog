@@ -1,5 +1,6 @@
 {{APP_NAME}} {{APP_VERSION}} 배포 안내 — 먼저 읽어 주세요
 문서 개정: {{GUIDE_REVISION}} / {{UPDATED_DATE}}
+메인 창 제목 표시줄: made by Taegon.Kim
 
 처음 사용한다면 메인 상단의 사용법(버그리포트 왼쪽)을 누르세요.
 화면 사진으로 따라 하는 5단계 HTML 가이드가 앱 언어에 맞춰 기본 브라우저에서 열립니다.

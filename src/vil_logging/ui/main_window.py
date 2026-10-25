@@ -429,7 +429,7 @@ class MainWindow(QMainWindow):
     def set_language(self, language: str):
         self._language = language if language in {"ko", "en", "zh"} else "ko"
         language = self._language
-        self.setWindowTitle(f"One Click Log · {tr('title', language)} · {__version__}")
+        self.setWindowTitle(f"One Click Log · {tr('title', language)} · {__version__} · made by Taegon.Kim")
         self.demo_label.setText(tr("demo", language))
         self.language_button.set_language(language)
         self.settings_button.setToolTip(tr("settings", language))

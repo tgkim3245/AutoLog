@@ -2,7 +2,7 @@
   "g001": "{{APP_NAME}} {{APP_VERSION}} 使用指南",
   "g002": "开始第一次记录",
   "g003": "选择保存位置并准备好连接，然后使用同一个按钮开始和停止记录。",
-  "g004": "软件 <b>{{APP_VERSION}}</b> · 文档修订 {{GUIDE_REVISION}} · 更新日期 {{UPDATED_DATE}}",
+  "g004": "软件 <b>{{APP_VERSION}}</b> · 文档修订 {{GUIDE_REVISION}} · 更新日期 {{UPDATED_DATE}} · 窗口标题：made by Taegon.Kim",
   "g005": "快速入门",
   "g006": "1 保存位置",
   "g007": "4 记录",
