@@ -1,5 +1,5 @@
 {
-  "app_version": "1.0.0",
+  "app_version": "1.0.1",
   "illustrative_data": true,
   "real_device_capture": false,
   "annotations_version": 1,
@@ -9,7 +9,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "1471c95b52974bcb56635135c9da7d9489aa921fee882d0ece52ce28245fcb69",
+      "sha256": "d64ecb761f1eaa6569dae92e0abaf3814fd7e11f1f78cd49d063d290f613e6fa",
       "annotations": [
         {
           "step": 1,
@@ -29,7 +29,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "1471c95b52974bcb56635135c9da7d9489aa921fee882d0ece52ce28245fcb69",
+      "sha256": "d64ecb761f1eaa6569dae92e0abaf3814fd7e11f1f78cd49d063d290f613e6fa",
       "annotations": [
         {
           "step": 1,
@@ -290,7 +290,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "0ce03c9c84429eb9f45d1a94bc0bda1cf1889f70866c56e5c11ed09e231ec79e",
+      "sha256": "603bcf01bdd40559bc7972be423b989a1263cda9db4235d439fd8668d88a0939",
       "annotations": [
         {
           "step": 1,
@@ -321,7 +321,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "af765d2b0537d6aef6d9ca360960545784d9bf273da6825de4e43408f4b849fd",
+      "sha256": "1d9fa5adcbb2d01aefdf122be354ee35f95cea7d9e5549a4e1223ea1a4f38144",
       "annotations": [
         {
           "step": 1,
@@ -341,7 +341,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "b4b44236e6ae2b9a183a5b7783fd1f6efae6eca38adaa69ede7515f481e8fa9b",
+      "sha256": "80e152b25ddb8785d02ec25bea81df650b6df7b406c16da19d0b7107dcd68091",
       "annotations": [
         {
           "step": 1,
@@ -361,7 +361,7 @@
       "language": "ko",
       "width": 480,
       "height": 455,
-      "sha256": "c42023ecd289bb57b76c9856e8302a5c1893390d457375b9f33660a5a54431a8",
+      "sha256": "de92782bf0041417cb474da6017bf62496b246512eafde021177b4d5488bda5e",
       "annotations": [
         {
           "step": 1,
@@ -443,7 +443,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "0b201af08ed067fa94e363b1d3998dada751eccdfcde0f50505452b994c1684b",
+      "sha256": "8e022c1b7aad7f706e15afc0fc1aac70fb1713183b6b2f601b5c033cb3026340",
       "annotations": [
         {
           "step": 1,
@@ -463,7 +463,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "0b201af08ed067fa94e363b1d3998dada751eccdfcde0f50505452b994c1684b",
+      "sha256": "8e022c1b7aad7f706e15afc0fc1aac70fb1713183b6b2f601b5c033cb3026340",
       "annotations": [
         {
           "step": 1,
@@ -724,7 +724,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "8d092a2d36a504e2798ce0b24479fcfb482623c2cd341608a645bb1f0c1ce933",
+      "sha256": "a360e484b47b5d4b4d425d8b5c50b33fb10c01d9fb8901a43fa69cbdb5dce5ba",
       "annotations": [
         {
           "step": 1,
@@ -755,7 +755,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "d3681fc5287afe774958d6606fb873702e7b3ef6ffff0907b8ff569a928be1ef",
+      "sha256": "3fcfb5d5ee007505f37ea7f113a7a270fc82a998c132b46e61573dab0998c85a",
       "annotations": [
         {
           "step": 1,
@@ -775,7 +775,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "d882d5d535a2890db69a85212309b4a6b304670c3551d617550a22eb4b26f983",
+      "sha256": "3e85bd64ece29fd169135d7efe7844ac05711f74c23710cc2aa777938c60f856",
       "annotations": [
         {
           "step": 1,
@@ -795,7 +795,7 @@
       "language": "en",
       "width": 480,
       "height": 455,
-      "sha256": "3a64dee51a6f6d38ccddf3a4e99f07b48cb65736aacb2bbf9ef68da76fb6d293",
+      "sha256": "7d0547308355f640ca5ebd17457c562ad6759865e53627971acf5c7183687cdf",
       "annotations": [
         {
           "step": 1,
@@ -877,7 +877,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "ad1a5f8c65d005762b8e20d99086639997857c337a5c813946666a1fbaf4fe55",
+      "sha256": "763447f0668572fa332846949b66dac19831928cd3aaba63bf2eb4638af4be0d",
       "annotations": [
         {
           "step": 1,
@@ -897,7 +897,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "ad1a5f8c65d005762b8e20d99086639997857c337a5c813946666a1fbaf4fe55",
+      "sha256": "763447f0668572fa332846949b66dac19831928cd3aaba63bf2eb4638af4be0d",
       "annotations": [
         {
           "step": 1,
@@ -1158,7 +1158,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "fd057345022ce629f714f1530c9b95ff8b6c244b53f729f1844a803d2317de5d",
+      "sha256": "cc8f520d8fcc0f3379baa68d5295c3c3a7dbb2b09324a5f6e7c0cd7b5bbf1933",
       "annotations": [
         {
           "step": 1,
@@ -1189,7 +1189,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "ff906347c8341d80d6178e4ed19da2f375a6b6f88cea29de61d4a72f00de8eeb",
+      "sha256": "3b3ba761f9980f72c5ed40cb9c3671275caafb7d406ee2da7144e26bad9a96ce",
       "annotations": [
         {
           "step": 1,
@@ -1209,7 +1209,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "77342d98d3e80b424cedb36b29da335a2df3cf475fd63fff07d2fc33baa172b3",
+      "sha256": "db12f0c8026558ea192bb28ac71f8dd9b1c4bc0ed1e33dd83cba07f666cac001",
       "annotations": [
         {
           "step": 1,
@@ -1229,7 +1229,7 @@
       "language": "zh",
       "width": 480,
       "height": 455,
-      "sha256": "e17e98ff490b523c3e4876fe7f26946df67a30f8ca39667d3ce019ea34449395",
+      "sha256": "b34ce4009f099473ff7a1a6c461f6d0526454fb046e1e895c751b930fcf5b527",
       "annotations": [
         {
           "step": 1,

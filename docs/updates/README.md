@@ -6,6 +6,7 @@
 
 | 해당 버전 | 기록 |
 | --- | --- |
+| 1.0.1 | [CANoe 블록 Name 미지원 연결 수정](canoe_name_compatibility_1_0_1.md) |
 | 1.0.0 | [1.0.0 릴리즈와 Npcap 설치 안내 통일](release_1_0_0.md) |
 | 0.9.23 | [CANoe 버전 선택과 RBS 열기 실패 재설정](canoe_version_selection_0_9_23.md) |
 | 0.9.22 | [초기설정 BAT 통합·배포와 선택형 ZIP 보관](initial_setup_zip_0_9_22.md) |

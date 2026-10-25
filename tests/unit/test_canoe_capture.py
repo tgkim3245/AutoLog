@@ -472,7 +472,7 @@ def test_real_can_layout_selects_only_blf_and_reports_names_and_formats(tmp_path
     assert details["selected_block"] == "1"
     assert details["blocks"][0]["name"] == "CAN_Logging"
     assert details["blocks"][1] == {"id": "2", "name": "ETH_Logging", "path": "traffic.pcapng",
-                                    "format": "pcapng", "compatible": False}
+                                    "format": "pcapng", "compatible": False, "name_available": True}
     for selection in ["2", "99"]:
         details = capture.connect({**params, "logging_block": selection})
         assert details["selected_block"] == "" and details["selection_error"]
@@ -1248,3 +1248,176 @@ def test_external_logging_stop_is_detected_and_closed_file_can_still_be_retained
     assert app.blocks[0].Trigger.stops == 1  # AutoLog does not issue a second stop.
     assert capture.inspect_file("s1")["actual_format"] == "blf"
     assert app.Measurement.Running
+
+
+class OptionalNameBlock(Block):
+    """A real COM error shape from the 19.2.76 field report; other APIs work."""
+    def __init__(self, path, name_error):
+        self.name_error = name_error
+        self.name_reads = 0
+        super().__init__(path)
+
+    @property
+    def Name(self):
+        self.name_reads += 1
+        if self.name_error is not None:
+            raise self.name_error
+        return self._display_name
+
+    @Name.setter
+    def Name(self, value):
+        self._display_name = value
+
+
+def missing_block_name_error(code=0x80004001, *, wrapped=True):
+    import pywintypes
+    code = code - (1 << 32) if code >= (1 << 31) else code
+    if wrapped:
+        return pywintypes.com_error(-2147352567, "Exception occurred", (0, None, None, None, 0, code), None)
+    return pywintypes.com_error(code, "Member unavailable", None, None)
+
+
+def optional_name_capture(tmp_path, *, count=2, error=None, fresh=True):
+    cfg = tmp_path / "generated.cfg"
+    cfg.write_bytes(b"generated configuration; never opened by actual CANoe")
+    app = Application(count)
+    app.blocks = [OptionalNameBlock(f"original_{i}.blf" if i == 0 else f"other_{i}.pcapng",
+                                   error or missing_block_name_error()) for i in range(count)]
+    app.fresh_proxies = fresh
+    capture = CanoeCapture(create_application=lambda: app)
+    return capture, app, {"cfg_path": str(cfg)}, tmp_path
+
+
+def test_connect_accepts_not_implemented_block_name(tmp_path):
+    capture, app, params, _ = optional_name_capture(tmp_path)
+    details = capture.connect(params)
+    assert details["selected_block"] == "1"
+    assert [block["name"] for block in details["blocks"]] == ["Logging 1", "Logging 2"]
+    assert all(not block["name_available"] for block in details["blocks"])
+    assert capture._selection["blocks"][0]["name"] is None
+    app.Measurement.Running = True
+    capture.prepare(params)
+    reads = [block.name_reads for block in app.blocks]
+    capture._validate()
+    capture._validate()
+    assert [block.name_reads for block in app.blocks] == reads
+
+
+@pytest.mark.parametrize("fresh", [False, True])
+def test_optional_names_record_stop_and_repeat_without_other_block_changes(tmp_path, fresh):
+    fixture = optional_name_capture(tmp_path, fresh=fresh)
+    capture, app, params, root = fixture
+    details = capture.connect(params)
+    assert details["selected_block"] == "1"
+    app.Measurement.Running = True
+    for number in range(3):
+        capture.prepare(params)
+        file = root / f"optional_name_{number}.blf"
+        capture.configure(str(number), {"temp_path": str(file)})
+        capture.start(str(number), {"temp_path": str(file)})
+        assert capture.query()[0] == "recording"
+        capture.stop(str(number))
+        assert capture.inspect_file(str(number))["actual_format"] == "blf"
+    assert app.blocks[0].FullName == "original_0.blf"
+    assert app.blocks[1].FullName == "other_1.pcapng"
+    assert app.blocks[1].Trigger.starts == app.blocks[1].Trigger.stops == 0
+    assert app.Measurement.Running and len(app.open_calls) == 1
+
+
+@pytest.mark.parametrize("code", [0x80004001, 0x80020003, 0x80020006])
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_only_known_unsupported_name_errors_use_fallback(tmp_path, code, wrapped):
+    capture, app, params, _ = optional_name_capture(tmp_path, error=missing_block_name_error(code, wrapped=wrapped))
+    assert capture.connect(params)["selected_block"] == "1"
+    assert not app.blocks[0].Trigger.Active
+
+
+@pytest.mark.parametrize("code", [0x800706BA, 0x80070005, 0x80004005])
+def test_name_rpc_access_and_other_errors_are_not_hidden(tmp_path, code):
+    error = missing_block_name_error(code)
+    capture, app, params, _ = optional_name_capture(tmp_path, error=error)
+    with pytest.raises(type(error)):
+        capture.connect(params)
+    assert all(block.Trigger.starts == 0 for block in app.blocks)
+
+
+def test_missing_name_attribute_uses_fallback(tmp_path):
+    capture, _, params, _ = optional_name_capture(tmp_path, error=AttributeError("Name"))
+    assert capture.connect(params)["blocks"][0]["name"] == "Logging 1"
+
+
+def test_optional_name_still_blocks_ambiguous_duplicate_paths(tmp_path):
+    capture, app, params, _ = optional_name_capture(tmp_path)
+    app.blocks[1].FullName = app.blocks[0].FullName
+    capture.connect({**params, "logging_block": "1"})
+    app.Measurement.Running = True
+    with pytest.raises(RuntimeError, match="changed"):
+        capture.prepare({**params, "logging_block": "1"})
+    assert all(block.Trigger.starts == 0 for block in app.blocks)
+
+
+@pytest.mark.parametrize("change", ["reorder", "sibling", "manual_filename", "count"])
+def test_optional_names_keep_layout_and_path_guards(tmp_path, change):
+    capture, app, params, _ = optional_name_capture(tmp_path)
+    capture.connect(params)
+    app.Measurement.Running = True
+    if change == "reorder":
+        app.blocks.reverse()
+    elif change == "sibling":
+        app.blocks[1].FullName = "foreign.pcapng"
+    elif change == "manual_filename":
+        app.blocks[0].FullName = "manual_rename.blf"
+    else:
+        app.Configuration.OnlineSetup.LoggingCollection.Count += 1
+    with pytest.raises(RuntimeError, match="changed"):
+        capture.prepare(params)
+    assert all(block.Trigger.starts == 0 for block in app.blocks)
+
+
+def test_single_unnamed_block_allows_safe_manual_output_refresh(tmp_path):
+    capture, app, params, _ = optional_name_capture(tmp_path, count=1)
+    capture.connect(params)
+    app.Measurement.Running = True
+    app.blocks[0].FullName = "manual_single.blf"
+    capture.prepare(params)
+    assert capture._selection["blocks"][0]["path"] == "manual_single.blf"
+
+
+def test_optional_name_does_not_hide_required_full_name_error(tmp_path):
+    capture, app, params, _ = optional_name_capture(tmp_path)
+    error = missing_block_name_error()
+    class MissingPath:
+        @property
+        def FullName(self):
+            raise error
+    app.blocks[0] = MissingPath()
+    with pytest.raises(type(error)):
+        capture.connect(params)
+    assert capture.block is None and not capture.attempted
+
+
+def test_optional_names_restore_known_trigger_suffixes_across_three_segments(tmp_path):
+    capture, app, params, root = optional_name_capture(tmp_path)
+    block = NormalizingRestoreBlock(str(root / "original.blf"))
+    class NoNameProxy(FreshComProxy):
+        def __getattr__(self, name):
+            if name == "Name":
+                raise missing_block_name_error()
+            return super().__getattr__(name)
+    app.blocks[0] = NoNameProxy(block)
+    capture.connect(params)
+    app.Measurement.Running = True
+    try:
+        for number in range(3):
+            capture.prepare(params)
+            path, session = root / f"normalized_{number}.blf", f"normalized-{number}"
+            capture.configure(session, {"temp_path": str(path)})
+            capture.start(session, {"temp_path": str(path)})
+            block.armed = True
+            capture.stop(session)
+            assert not capture.stats()["output_restore_pending"]
+            assert capture.inspect_file(session)["actual_format"] == "blf"
+        assert app.blocks[1].FullName == "other_1.pcapng" and not app.blocks[1].Trigger.starts
+    finally:
+        if block.writer:
+            block.writer.close()

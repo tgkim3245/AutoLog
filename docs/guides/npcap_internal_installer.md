@@ -1,6 +1,6 @@
 # 내부 PC용 Npcap 설치기 동봉
 
-기준 SW 1.0.0 · 빌드 코드 검토 2026-10-25
+기준 SW 1.0.1 · 빌드 코드 검토 2026-10-26
 
 현재 옵션은 사용자가 확인한 같은 회사 내부 PC 1대용 패키지를 만드는 범위다. 일반 빌드와 구분하며 외부 배포용으로 전용하지 않는다. 이 문서는 해당 빌드 동작을 설명하며 배포 범위가 달라질 때의 권한을 대신 판단하지 않는다.
 
@@ -8,7 +8,7 @@
 .\build.cmd --include-npcap-internal
 ```
 
-별도 `One Click Log-1.0.0-internal_<시각>` 빌드에 공식 Npcap 1.90 설치기를 원본 그대로 `installers/Npcap`에 복사한다. 공식 LICENSE·세 언어 설치 안내·파일 해시 목록을 함께 넣는다. 일반 빌드는 이 설치기를 포함하지 않는다.
+별도 `One Click Log-1.0.1-internal_<시각>` 빌드에 공식 Npcap 1.90 설치기를 원본 그대로 `installers/Npcap`에 복사한다. 공식 LICENSE·세 언어 설치 안내·파일 해시 목록을 함께 넣는다. 일반 빌드는 이 설치기를 포함하지 않는다.
 
 고정 출처·크기·SHA256은 [npcap.lock.json](../../packaging/npcap.lock.json), 구현은 [npcap_bundle.py](../../packaging/npcap_bundle.py)를 기준으로 한다. 빌드는 Windows Authenticode 서명과 복사 결과를 확인하고 `build_info.json`에 `npcap_installer`와 `distribution_scope=internal-single-pc`를 기록한다. Wireshark CLI 폴더의 drivers_included=false와 별도 동봉 설치기를 혼동하지 않는다.
 

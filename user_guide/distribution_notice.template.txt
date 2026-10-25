@@ -2,6 +2,16 @@
 문서 개정: {{GUIDE_REVISION}} / {{UPDATED_DATE}}
 메인 창 제목 표시줄: made by Taegon.Kim
 
+1.0.1 연결 수정
+CANoe 실행·RBS 열기 뒤 Logging Block.Name 조회 미구현 오류로 실패하던 사례를 수정했습니다.
+이름 조회가 지원되지 않으면 Logging 1, Logging 2처럼 번호로 표시합니다.
+블록 번호·출력 경로·BLF 형식을 확인해 선택하세요. 이름 없는 다중 블록에서 수동 기록으로
+파일명을 변경했다면 연결 확인을 다시 눌러 선택을 갱신합니다. 필수 경로/블록/기록 상태 검사는 유지합니다.
+해당 실차 PC의 수정판 연결·취득 성공은 현장에서 다시 확인해야 합니다. 계속 실패하면 새 버그리포트를 남기세요.
+English: Unsupported logging-block Name queries now use numbered labels. Verify block numbers, paths and BLF format; reconnect after manual filename changes with unnamed multiple blocks. Vehicle retesting is required.
+中文：记录模块 Name 查询不受支持时改用编号显示。请核对模块编号、路径及 BLF 格式；多个无名称模块手动改名后需重新连接。仍需在实车重新确认。
+
+
 처음 쓰는 PC — 앱 실행 전 초기설정
 - CAN·Diag는 사용할 RBS 구성(.cfg)의 작성·검증 버전에 맞는 CANoe·라이선스·Vector 드라이버를 먼저 준비하세요.
 - 배포 ZIP 전체를 로컬 폴더에 풀고 앱과 모든 CANoe 작업을 저장·종료합니다.

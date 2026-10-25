@@ -25,6 +25,35 @@ def _same_path(first, second):
     return str(Path(first).resolve()).casefold() == str(Path(second).resolve()).casefold()
 
 
+def _unsupported_name_property(error):
+    """Only optional member absence/unsupported HRESULTs may use a display fallback."""
+    if isinstance(error, AttributeError):
+        return True
+    try:
+        from pywintypes import com_error
+    except ImportError:
+        return False
+    if not isinstance(error, com_error):
+        return False
+    unsupported = {0x80004001, 0x80020003, 0x80020006}  # NOTIMPL, MEMBERNOTFOUND, UNKNOWNNAME
+    result = error.hresult & 0xFFFFFFFF
+    if result in unsupported:
+        return True
+    # IDispatch wraps server-side failures in DISP_E_EXCEPTION; inspect its scode.
+    info = error.excepinfo
+    return (result == 0x80020009 and isinstance(info, tuple) and len(info) >= 6
+            and isinstance(info[5], int) and info[5] & 0xFFFFFFFF in unsupported)
+
+
+def _names_compatible(first, second):
+    return first is None or second is None or first == second
+
+
+def _unique_readable_name(before, after, blocks):
+    return (before["name"] is not None and before["name"] == after["name"]
+            and sum(item["name"] == after["name"] for item in blocks) == 1)
+
+
 @dataclass
 class ActivatedApplication:
     application: object
@@ -73,6 +102,7 @@ class CanoeCapture:
         self._output_snapshot = None
         self._restore_context = None
         self._selection = None
+        self._unsupported_block_names = set()
         self.output_restore_error = ""
         self.file_exclusive = False
         self._inspection = None
@@ -98,7 +128,25 @@ class CanoeCapture:
                 "output_restore_error": self.output_restore_error,
                 "output_restore_deferred": self._restore_deferred,
                 "owned_idle_output": str(self._idle_output or ""),
-                "block_validation": "logical_selection_owned_output_idle_blf_refresh", "diagnostics": list(self.journal)}
+                "block_validation": "logical_selection_owned_output_idle_blf_refresh",
+                "block_name_fallbacks": sorted(self._unsupported_block_names), "diagnostics": list(self.journal)}
+
+    def _block_name(self, block, index):
+        if index in self._unsupported_block_names:
+            return None
+        reason = "empty_name"
+        try:
+            value = block.Name
+        except Exception as error:
+            if not _unsupported_name_property(error):
+                raise
+            value, reason = None, str(error)
+        if value is not None and str(value).strip():
+            return str(value)
+        self._unsupported_block_names.add(index)
+        self._trace("canoe.block_name_unavailable", block=index, display_name=f"Logging {index}",
+                    reason=reason, identity="collection_index_and_verified_output_path")
+        return None
 
     def _validate(self, *, allow_idle_output_refresh=False):
         if self.app is None or not _same_path(self.app.Configuration.FullName, self.cfg):
@@ -117,7 +165,7 @@ class CanoeCapture:
             observed, current = [], None
             for i in range(1, count + 1):
                 item = collection.Item(i)
-                observed.append({"name": str(item.Name), "path": str(item.FullName)})
+                observed.append({"name": self._block_name(item, i), "path": str(item.FullName)})
                 if i == self.index:
                     current = item
             expected_paths = []
@@ -126,6 +174,8 @@ class CanoeCapture:
             restored_output_change = None
             for i, (before, after) in enumerate(zip(expected["blocks"], observed), 1):
                 paths = [before["path"]]
+                names_match = _names_compatible(before["name"], after["name"])
+                unique_name = _unique_readable_name(before, after, observed)
                 if i == self.index and self._output_snapshot is not None:
                     # Partial COM setters/restoration can leave either path.
                     # Start/query/stop additionally require the exact working
@@ -137,30 +187,30 @@ class CanoeCapture:
                         paths.append(self._idle_output)
                 elif (i == self.index and allow_idle_output_refresh
                       and (not self.attempted or self.stop_confirmed)
-                      and before["name"] == after["name"]
+                      and names_match and (unique_name or count == 1)
                       and Path(after["path"]).suffix.lower() == ".blf"
-                      and sum(item["name"] == after["name"] for item in observed) == 1
                       and not _same_path(before["path"], after["path"])):
                     # A manual test or CANoe's file-number increment changes
                     # FullName without changing the selected logical block.
-                    # Only accept this before taking output ownership, with a
-                    # unique name and unchanged cfg/layout/sibling outputs.
+                    # Only before output ownership, with a unique readable name
+                    # (or a sole block) and unchanged cfg/layout/sibling outputs.
                     paths = [after["path"]]
                     idle_output_change = {"previous": before["path"], "current": after["path"]}
                 expected_paths.append(paths)
                 if (i == self.index and self._restore_context is not None
                         and (not self.attempted or self.trigger_stopped)
-                        and before["name"] == after["name"]
-                        and sum(item["name"] == after["name"] for item in observed) == 1
+                        and names_match
+                        and (unique_name or before["name"] is None or after["name"] is None)
                         and not current.Trigger.Active and self._restored_path_matches(after["path"])):
                     paths.append(after["path"])
                     if not _same_path(before["path"], after["path"]):
                         restored_output_change = dict(selected=after, previous=before["path"])
-                if before["name"] != after["name"] or not any(_same_path(after["path"], path) for path in paths):
+                if not names_match or not any(_same_path(after["path"], path) for path in paths):
                     reason = "block_layout_or_output_changed"
             selected = observed[self.index - 1]
-            matches = sum(item["name"] == selected["name"] and _same_path(item["path"], selected["path"])
-                          for item in observed)
+            # A synthetic display label must never make identical unknown-name paths unique.
+            matches = sum(_names_compatible(item["name"], selected["name"])
+                          and _same_path(item["path"], selected["path"]) for item in observed)
             if matches != 1:
                 reason = "ambiguous_logging_block"
             if reason:
@@ -228,7 +278,7 @@ class CanoeCapture:
             observed["block_count"] = int(collection.Count)
             if 0 < self.index <= observed["block_count"]:
                 block = collection.Item(self.index)
-                observed["block"] = {"name": str(block.Name), "path": str(block.FullName),
+                observed["block"] = {"name": self._block_name(block, self.index), "path": str(block.FullName),
                                      "trigger_active": bool(block.Trigger.Active)}
         except Exception as diagnostic_error:
             observed["block_observation_error"] = str(diagnostic_error)
@@ -441,6 +491,7 @@ class CanoeCapture:
                 self.version = "unknown"
             self._trace("canoe.configuration_opened", cfg=self.cfg, canoe_pid=self.canoe_pid)
         self._validate()
+        self._unsupported_block_names.clear()  # Explicit connection refreshes optional capabilities.
         collection = self.app.Configuration.OnlineSetup.LoggingCollection
         count = int(collection.Count)
         if not 0 < count <= 128:
@@ -449,7 +500,9 @@ class CanoeCapture:
         for i in range(1, count + 1):
             item = collection.Item(i)
             output = str(item.FullName)
-            blocks.append({"id": str(i), "name": str(item.Name), "path": output,
+            name = self._block_name(item, i)
+            blocks.append({"id": str(i), "name": name if name is not None else f"Logging {i}",
+                           "name_available": name is not None, "path": output,
                            "format": Path(output).suffix.lower().lstrip("."),
                            "compatible": Path(output).suffix.lower() == ".blf"})
         selected = str(params.get("logging_block", ""))
@@ -467,7 +520,8 @@ class CanoeCapture:
             index = 0
         self.index = index
         self.block = collection.Item(index) if index else None
-        self._selection = {"blocks": [{"name": item["name"], "path": item["path"]} for item in blocks]
+        self._selection = {"blocks": [{"name": item["name"] if item["name_available"] else None,
+                                       "path": item["path"]} for item in blocks]
                            } if self.block is not None else None
         if not continuing:
             self.session_id, self.path = "", None
@@ -562,7 +616,8 @@ class CanoeCapture:
                 pass  # The pending snapshot and both failures remain in the journal.
             raise
         self._trace("canoe.output_confirmed", path=str(path), block=self.index,
-                    name=str(self.block.Name), block_validation="logical_selection_and_owned_output")
+                    name=self._block_name(self.block, self.index) or f"Logging {self.index}",
+                    block_validation="logical_selection_and_owned_output")
         return self.stats()
 
     def start(self, session_id, params):
