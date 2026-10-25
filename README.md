@@ -1,6 +1,6 @@
 # One Click Log
 
-Windows 11 x64에서 CANoe의 CAN·Diag BLF와 Zipy Ethernet 캡처를 제어하는 로컬 앱입니다. 현재 소스 버전은 **0.9.22**입니다. 배포 EXE 옆 Initial_Setup.bat에서 CANoe 19 등록과 Npcap 관리자 설치를 진행합니다. Ethernet 설정에서 원본/정지 후 ZIP 보관을 선택합니다. 문서 검토일은 **2026-10-25**이며 문서 정리만으로 실차 검증 범위를 확대하지 않습니다.
+Windows 11 x64에서 CANoe의 CAN·Diag BLF와 Zipy Ethernet 캡처를 제어하는 로컬 앱입니다. 현재 소스 버전은 **0.9.23**입니다. 배포 EXE 옆 Initial_Setup.bat에서 설치 CANoe 검색·버전 선택 후 COM 등록과 Npcap 관리자 설치를 진행합니다. Ethernet 설정에서 원본/정지 후 ZIP 보관을 선택합니다. 문서 검토일은 **2026-10-25**이며 문서 정리만으로 실차 검증 범위를 확대하지 않습니다.
 
 배포 사용자는 EXE 옆 `START_HERE.txt`와 `One Click Log_User_Guide.html`, 또는 메인 상단 **사용법**을 먼저 읽으세요. 개발 문서는 [문서 목차](docs/README.md), 환경별 실제 확인 범위는 [검증표](docs/testing/canoe_support_matrix.md)에 있습니다.
 

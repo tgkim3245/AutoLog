@@ -1,6 +1,6 @@
 # 개발 안내
 
-기준 SW 0.9.22 · 검토 2026-10-25
+기준 SW 0.9.23 · 검토 2026-10-25
 
 제품명은 One Click Log이며 내부 Python 패키지명 `vil_logging`은 유지합니다. 앱 소스는 `src/vil_logging`, 개발 보조 명령은 `tools`, 실제 배포 가이드는 `user_guide`입니다. [폴더별 책임](docs/reference/project_structure.md)과 [문서 목차](docs/README.md)를 따릅니다.
 
@@ -55,7 +55,7 @@ py -3.14 -m venv .venv
 Documents 안에서는 기본 `%USERPROFILE%\Downloads\OneClickLog_Builds`, 그 외에는 프로젝트 `outputs`를 사용하며 쓰기가 보호돼 있으면 다운로드 위치를 사용합니다. 실제 위치는 빌드 화면에서 확인합니다. 예시 빌드 ID와 구조는 다음과 같습니다.
 
 ```text
-One Click Log-0.9.22_YYYYMMDD_HHMMSS/
+One Click Log-0.9.23_YYYYMMDD_HHMMSS/
   One Click Log/
     One Click Log.exe
     Initial_Setup.bat
@@ -66,13 +66,13 @@ One Click Log-0.9.22_YYYYMMDD_HHMMSS/
     One Click Log_User_Guide.html
     START_HERE.txt
     build_info.json
-  One Click Log-0.9.22_YYYYMMDD_HHMMSS.zip
-  One Click Log-0.9.22_YYYYMMDD_HHMMSS.zip.sha256.txt
+  One Click Log-0.9.23_YYYYMMDD_HHMMSS.zip
+  One Click Log-0.9.23_YYYYMMDD_HHMMSS.zip.sha256.txt
   build_info.json
   build.log
 ```
 
-EXE 옆 Initial_Setup.bat는 CANoe 19 등록과 Npcap 관리자 설치를 통합합니다. BAT와 해시는 일반·내부 배포 모두에 포함하며 Npcap 설치 파일 자체는 내부 배포 옵션에만 포함합니다. 빌드 중 두 설치/등록 도구를 실행하지 않습니다.
+EXE 옆 Initial_Setup.bat는 설치 CANoe 검색·버전 선택 후 COM 등록과 Npcap 관리자 설치를 통합합니다. BAT와 해시는 일반·내부 배포 모두에 포함하며 Npcap 설치 파일 자체는 내부 배포 옵션에만 포함합니다. 빌드 중 두 설치/등록 도구를 실행하지 않습니다.
 
 EXE와 동봉 폴더 전체 또는 ZIP을 전달합니다. SW 버전은 `src/vil_logging/__init__.py` 한 곳에서 변경합니다. 같은 버전 재빌드도 기존 산출물을 덮어쓰지 않습니다. Git 커밋·작업 트리 변경 여부·도구/문서 해시는 build_info에 기록됩니다. 코드나 문서를 수정해도 이전 EXE/ZIP이 자동 갱신되지는 않습니다.
 

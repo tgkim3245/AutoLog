@@ -2,7 +2,7 @@
 
 | 파일 | 용도 |
 | --- | --- |
-| [Initial_Setup.bat](Initial_Setup.bat) | 배포 EXE 옆에 동봉. CANoe 19 공식 COM 등록과 Npcap 관리자 설치 통합. [사용 안내](../docs/guides/canoe_registration_helper.md) |
+| [Initial_Setup.bat](Initial_Setup.bat) | 배포 EXE 옆에 동봉. 설치된 CANoe 검색·버전 선택 후 공식 COM 등록과 Npcap 관리자 설치 통합. [사용 안내](../docs/guides/canoe_registration_helper.md) |
 | [build_vehicle_test_document.py](build_vehicle_test_document.py) | 실차 TC Markdown으로 입력형 HTML 생성. --check는 최신성만 검사 |
 | [check_docs.py](check_docs.py) | 로컬 문서 링크·앵커·개인 경로 검사 |
 

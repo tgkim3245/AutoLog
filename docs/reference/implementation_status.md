@@ -1,6 +1,6 @@
 # 현재 구현과 남은 확인
 
-기준 SW 0.9.22 · 코드/기존 근거 검토 2026-10-25
+기준 SW 0.9.23 · 코드/기존 근거 검토 2026-10-25
 
 구현 여부, 자동 검사, 이전 현장 확인, 현재 버전의 실차 검증을 구분한다. 검증 숫자는 해당 실행 시점 기록으로 남기며 새 검사 결과 없이 과거 숫자를 현재 결과로 치환하지 않는다.
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 준비 UI | 설정/연결 부족 안내·F9 측정 재확인·상태별 시작/정지 | ui/capture_button.py, tests/unit/test_readiness.py |
 | CAN·Diag | 독립 cfg/BLF 블록·수동 측정 유지·원본 cfg 무저장 | adapters/canoe.py, tests/unit/test_canoe_capture.py |
-| 초기설정 | 배포 Initial_Setup.bat로 CANoe 19 COM 등록·Npcap 관리자 설치 | tools/Initial_Setup.bat, tests/unit/test_canoe_registration_helper.py |
+| 초기설정 | 배포 Initial_Setup.bat로 설치 CANoe 검색·사용자 버전 선택 후 COM 등록·Npcap 관리자 설치 | tools/Initial_Setup.bat, tests/unit/test_canoe_registration_helper.py |
 | COM 진단 | 독립 모드 준비·등록 누락/손상과 복구 도구 안내 | diagnostics/canoe_setup.py, tests/unit/test_canoe_registration.py |
 | 채널 기준 | 읽을 수 있는 로컬 시리얼/포트 기준 비교 | diagnostics/canoe_hardware.py, tests/unit/test_improvements.py |
 | Zipy 기록 | dumpcap 원본·TShark 후행 해석·pcap/pcapng·64 MiB 버퍼·정지 후 ZIP 선택 | adapters/tshark.py, tests/unit/test_tshark_capture.py |

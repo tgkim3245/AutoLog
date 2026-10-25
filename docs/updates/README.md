@@ -6,6 +6,7 @@
 
 | 해당 버전 | 기록 |
 | --- | --- |
+| 0.9.23 | [CANoe 버전 선택과 RBS 열기 실패 재설정](canoe_version_selection_0_9_23.md) |
 | 0.9.22 | [초기설정 BAT 통합·배포와 선택형 ZIP 보관](initial_setup_zip_0_9_22.md) |
 | 0.9.21 | [내부 PC Npcap 설치기 동봉과 해당 배포 검증](npcap_internal_installer_0_9_21.md) |
 | 0.9.21 | [사용자 가이드 사진 안내 — 2026-10-24.1](user_guide_annotations_2026_10_24.md) |

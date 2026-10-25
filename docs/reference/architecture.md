@@ -1,6 +1,6 @@
 # 현재 구현 구조
 
-기준 SW 0.9.22 · 코드 대조 2026-10-25
+기준 SW 0.9.23 · 코드 대조 2026-10-25
 
 Windows 11 x64의 Python 3.14·PySide6 데스크톱 앱이다. 메인 UI는 명령을 요청하고 제한된 알림을 소비하며, COM·파일 작업·worker 응답 대기는 별도 실행 문맥에서 수행한다. 내부 패키지명 `vil_logging`과 이전 데이터 이행 호환 이름은 제품 표시명과 구분한다.
 
@@ -20,7 +20,7 @@ Windows 11 x64의 Python 3.14·PySide6 데스크톱 앱이다. 메인 UI는 명�
 | `documentation.py` | 배포/소스 공통 가이드 렌더·번역/사진/좌표/버전 검증 |
 | `verification.py` | 생성 파일·localhost를 사용하는 명시적 CLI 검증 |
 | `packaging/` | 버전별 PyInstaller 빌드·Wireshark/Npcap 고정 자료·배포 무결성 |
-| `tools/` | TC 문서 생성·문서 검사·별도 전달용 CANoe 19 등록 BAT. 앱이 자동 실행하지 않음 |
+| `tools/` | TC 문서 생성·문서 검사·배포 초기설정 BAT(설치 CANoe 검색·사용자 버전 선택 후 COM 등록/Npcap 설치). 앱이 자동 실행하지 않음 |
 
 `FakeWorkerPool`은 demo뿐 아니라 실제 pool의 공통 요청/응답 기반도 제공한다. 모의 worker·PacketBridge·복구·오프라인 검증 코드는 테스트와 실제 오류/호환 경로에서 참조하므로 화면에 보이지 않는다는 이유로 제거하지 않는다.
 

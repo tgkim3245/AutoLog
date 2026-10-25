@@ -1,16 +1,16 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-set "ONECLICKLOG_CANOE19_HELPER=%~f0"
-set "ONECLICKLOG_CANOE19_MODE=%~1"
-set "ONECLICKLOG_CANOE19_POWERSHELL=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
-if exist "%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe" set "ONECLICKLOG_CANOE19_POWERSHELL=%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
-"%ONECLICKLOG_CANOE19_POWERSHELL%" -NoLogo -NoProfile -Command "$text=[IO.File]::ReadAllText($env:ONECLICKLOG_CANOE19_HELPER,[Text.Encoding]::UTF8); $mark='# POWERSHELL_PAYLOAD_BEGIN'; $pos=$text.LastIndexOf($mark); if($pos -lt 0){exit 90}; & ([scriptblock]::Create($text.Substring($pos+$mark.Length)))"
-set "ONECLICKLOG_CANOE19_RESULT=%errorlevel%"
+set "ONECLICKLOG_SETUP_HELPER=%~f0"
+set "ONECLICKLOG_SETUP_MODE=%~1"
+set "ONECLICKLOG_SETUP_POWERSHELL=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
+if exist "%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe" set "ONECLICKLOG_SETUP_POWERSHELL=%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
+"%ONECLICKLOG_SETUP_POWERSHELL%" -NoLogo -NoProfile -Command "$text=[IO.File]::ReadAllText($env:ONECLICKLOG_SETUP_HELPER,[Text.Encoding]::UTF8); $mark='# POWERSHELL_PAYLOAD_BEGIN'; $pos=$text.LastIndexOf($mark); if($pos -lt 0){exit 90}; & ([scriptblock]::Create($text.Substring($pos+$mark.Length)))"
+set "ONECLICKLOG_SETUP_RESULT=%errorlevel%"
 echo.
-if /i "%ONECLICKLOG_CANOE19_MODE%"=="--check" goto finish
+if /i "%ONECLICKLOG_SETUP_MODE%"=="--check" goto finish
 pause
 :finish
-exit /b %ONECLICKLOG_CANOE19_RESULT%
+exit /b %ONECLICKLOG_SETUP_RESULT%
 # POWERSHELL_PAYLOAD_BEGIN
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2
@@ -42,48 +42,90 @@ function Get-CanoeVersion {
     return [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
 }
 
-function Get-Canoe19Tools {
+function Add-CanoeSearchRoot {
+    param($Roots, [string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return }
+    $pathValue = [Environment]::ExpandEnvironmentVariables($Path).Trim('"')
+    if (Test-Path -LiteralPath $pathValue -PathType Leaf) { $pathValue = [IO.Path]::GetDirectoryName($pathValue) }
+    if (Test-Path -LiteralPath $pathValue -PathType Container) { [void]$Roots.Add([IO.Path]::GetFullPath($pathValue)) }
+}
+
+function Get-CanoeSearchRoots {
     $roots = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($programFolder in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramW6432)) {
         if ([string]::IsNullOrWhiteSpace($programFolder) -or -not (Test-Path -LiteralPath $programFolder -PathType Container)) { continue }
-        foreach ($folder in @(Get-ChildItem -LiteralPath $programFolder -Directory -Filter '*CANoe*19*' -ErrorAction SilentlyContinue)) {
-            [void]$roots.Add($folder.FullName)
+        foreach ($folder in @(Get-ChildItem -LiteralPath $programFolder -Directory -Filter '*CANoe*' -ErrorAction SilentlyContinue)) {
+            Add-CanoeSearchRoot -Roots $roots -Path $folder.FullName
         }
-    }
-    foreach ($view in @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32)) {
-        $base = $null; $vector = $null
-        try {
-            $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $view)
-            $vector = $base.OpenSubKey('SOFTWARE\Vector\CANoe')
-            if ($null -ne $vector) {
-                foreach ($name in $vector.GetSubKeyNames()) {
-                    $entry = $vector.OpenSubKey($name)
-                    try {
-                        $install = [string]$entry.GetValue('Path')
-                        if ($install -and (Test-Path -LiteralPath $install -PathType Container)) { [void]$roots.Add([IO.Path]::GetFullPath($install)) }
-                    } finally { if ($null -ne $entry) { $entry.Close() } }
-                }
+        foreach ($vendor in @('Vector', 'Vector Informatik')) {
+            $vendorFolder = Join-Path $programFolder $vendor
+            if (-not (Test-Path -LiteralPath $vendorFolder -PathType Container)) { continue }
+            foreach ($folder in @(Get-ChildItem -LiteralPath $vendorFolder -Directory -Filter '*CANoe*' -ErrorAction SilentlyContinue)) {
+                Add-CanoeSearchRoot -Roots $roots -Path $folder.FullName
             }
-        } catch { Write-Host ('Registry discovery warning: ' + $_.Exception.Message) -ForegroundColor Yellow }
-        finally {
-            if ($null -ne $vector) { $vector.Close() }
-            if ($null -ne $base) { $base.Close() }
         }
     }
+    foreach ($hive in @([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryHive]::CurrentUser)) {
+        foreach ($view in @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32)) {
+            $base = $null
+            try {
+                $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, $view)
+                foreach ($branch in @('SOFTWARE\Vector\CANoe', 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')) {
+                    $parent = $base.OpenSubKey($branch)
+                    if ($null -eq $parent) { continue }
+                    try {
+                        foreach ($name in $parent.GetSubKeyNames()) {
+                            $entry = $parent.OpenSubKey($name)
+                            if ($null -eq $entry) { continue }
+                            try {
+                                if ($branch.EndsWith('Uninstall') -and [string]$entry.GetValue('DisplayName') -notmatch '\bCANoe\b') { continue }
+                                foreach ($valueName in @('Path', 'InstallLocation', 'InstallDir')) {
+                                    Add-CanoeSearchRoot -Roots $roots -Path ([string]$entry.GetValue($valueName))
+                                }
+                            } finally { $entry.Close() }
+                        }
+                    } finally { $parent.Close() }
+                }
+            } catch { Write-Host ('Registry discovery warning: ' + $_.Exception.Message) -ForegroundColor Yellow }
+            finally { if ($null -ne $base) { $base.Close() } }
+        }
+    }
+    Add-CanoeSearchRoot -Roots $roots -Path (Get-CanoeServer -View Registry64)
+    return @($roots | Sort-Object)
+}
+
+function Get-CanoeFileTrust {
+    param([string]$Path)
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    $trusted = $signature.Status -eq 'Valid' -and $null -ne $signature.SignerCertificate -and $signature.SignerCertificate.Subject -match 'Vector Informatik'
+    return [pscustomobject]@{ Status=[string]$signature.Status; TrustedVector=[bool]$trusted; Unsigned=($signature.Status -eq 'NotSigned') }
+}
+
+function Test-CanoeTrustCombination {
+    param($Tool, $Application)
+    return [bool](($Tool.TrustedVector -or $Tool.Unsigned) -and ($Application.TrustedVector -or $Application.Unsigned))
+}
+
+function Get-CanoeInstallations {
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($root in $roots) {
+    $found = @()
+    foreach ($root in @(Get-CanoeSearchRoots)) {
         Write-Host ('Search: ' + $root)
-        foreach ($tool in @(Get-ChildItem -LiteralPath $root -File -Filter RegisterComponents.exe -Recurse -ErrorAction SilentlyContinue)) {
-            # Pair the utility with its own 64-bit CANoe executable, never a different version.
-            $application = Join-Path $tool.DirectoryName 'CANoe64.exe'
-            if (-not (Test-Path -LiteralPath $application -PathType Leaf)) { continue }
-            $info = Get-CanoeVersion -Path $application
-            if ($info.FileMajorPart -ne 19 -or -not $seen.Add($tool.FullName)) { continue }
-            $signature = Get-AuthenticodeSignature -LiteralPath $tool.FullName
-            $valid = $signature.Status -eq 'Valid' -and $null -ne $signature.SignerCertificate -and $signature.SignerCertificate.Subject -match 'Vector Informatik'
-            [pscustomobject]@{ Tool=$tool.FullName; Application=$application; Version=$info.FileVersion; Signature=[string]$signature.Status; TrustedVector=$valid }
+        foreach ($application in @(Get-ChildItem -LiteralPath $root -File -Filter CANoe64.exe -Recurse -ErrorAction SilentlyContinue)) {
+            if (-not $seen.Add($application.FullName)) { continue }
+            try {
+                $info = Get-CanoeVersion -Path $application.FullName
+                $tool = Join-Path $application.DirectoryName 'RegisterComponents.exe'
+                $present = Test-Path -LiteralPath $tool -PathType Leaf
+                $toolTrust = [pscustomobject]@{Status='Missing';TrustedVector=$false;Unsigned=$false}
+                if ($present) { $toolTrust = Get-CanoeFileTrust -Path $tool }
+                $appTrust = Get-CanoeFileTrust -Path $application.FullName
+                $confirmUnsigned = (Test-CanoeTrustCombination -Tool $toolTrust -Application $appTrust) -and ($toolTrust.Unsigned -or $appTrust.Unsigned)
+                $found += [pscustomobject]@{ Tool=$tool; Application=$application.FullName; Major=$info.FileMajorPart; Version=$info.FileVersion; ToolPresent=$present; TrustedVector=$toolTrust.TrustedVector; TrustedApplication=$appTrust.TrustedVector; ToolSignatureStatus=$toolTrust.Status; ApplicationSignatureStatus=$appTrust.Status; CanConfirmUnsigned=$confirmUnsigned }
+            } catch { Write-Host ('Could not inspect ' + $application.FullName + ': ' + $_.Exception.Message) -ForegroundColor Yellow }
         }
     }
+    return @($found | Sort-Object @{Expression='Major';Descending=$true}, Version, Application)
 }
 
 function Assert-ToolsClosed {
@@ -94,46 +136,68 @@ function Assert-ToolsClosed {
     }
 }
 
-function Invoke-Canoe19Registration {
+function Invoke-CanoeRegistration {
     param([bool]$CheckOnly)
-    Write-Host 'One Click Log - Initial setup: CANoe 19 COM' -ForegroundColor Cyan
-    Write-Host 'This changes the Windows CANoe automation target to version 19 when registration is run.'
+    Write-Host 'One Click Log - Select the default CANoe for your RBS/CFG' -ForegroundColor Cyan
+    Write-Host 'No version is selected automatically. COM registration affects CANoe automation on this PC.'
     $before = Get-CanoeServer -View Registry64
     Write-Host ('Current 64-bit COM server: ' + $(if ($before) { $before } else { '(not registered)' }))
-    $candidates = @(Get-Canoe19Tools)
+    $candidates = @(Get-CanoeInstallations)
     if (-not $candidates.Count) {
-        Write-Host 'No matching RegisterComponents.exe + CANoe64.exe version 19 pair was found.' -ForegroundColor Yellow
-        Write-Host 'No registration tool was run. Check the real CANoe 19 installation folder or ask your PC administrator to repair the installation.'
+        Write-Host 'No CANoe64.exe installation was found in known installation locations.' -ForegroundColor Yellow
+        Write-Host 'No registration tool was run. Install/repair the CANoe version required by your RBS/CFG, or ask your PC administrator.'
         return 2
     }
     for ($index = 0; $index -lt $candidates.Count; $index++) {
         $item = $candidates[$index]
-        Write-Host ('[{0}] {1}' -f ($index+1),$item.Tool)
-        Write-Host ('    CANoe: {0}; signature: {1}; trusted Vector: {2}' -f $item.Version,$item.Signature,$item.TrustedVector)
+        $current = if ([string]::Equals($before,$item.Application,[StringComparison]::OrdinalIgnoreCase)) { ' [current COM target]' } else { '' }
+        Write-Host ('[{0}] CANoe {1} (64-bit){2}' -f ($index+1),$item.Version,$current)
+        Write-Host ('    Application: ' + $item.Application)
+        Write-Host ('    Registration tool: {0}; present: {1}; signature: {2}; application signature: {3}' -f $item.Tool,$item.ToolPresent,$item.ToolSignatureStatus,$item.ApplicationSignatureStatus)
+        if ($item.CanConfirmUnsigned) { Write-Host '    Unsigned file(s): official installation review and an extra REGISTER confirmation are required.' -ForegroundColor Yellow }
     }
     if ($CheckOnly) {
-        Write-Host 'CHECK ONLY: no tool was executed and no COM registration was changed.' -ForegroundColor Green
-        if (@($candidates | Where-Object { $_.TrustedVector }).Count) { return 0 }
+        Write-Host 'CHECK ONLY: no selection, tool execution or COM registration change.' -ForegroundColor Green
+        if (@($candidates | Where-Object { $_.ToolPresent -and $_.TrustedVector -and $_.TrustedApplication -and $_.Major -gt 0 }).Count) { return 0 }
         return 3
     }
     Assert-ToolsClosed
-    $selected = $candidates[0]
-    if ($candidates.Count -gt 1) {
-        $answer = Read-Host 'More than one version 19 installation was found. Enter its number, or press Enter to cancel'
+    while ($true) {
+        $answer = [string](Read-Host ('Enter the LIST NUMBER for the CANoe required by your RBS/CFG (1-{0}), or Enter/Q to cancel' -f $candidates.Count))
+        $answer = $answer.Trim()
+        if (-not $answer -or $answer -ieq 'q') { Write-Host 'Cancelled. No registration tool was run.'; return 4 }
         $number = 0
-        if (-not [int]::TryParse($answer, [ref]$number) -or $number -lt 1 -or $number -gt $candidates.Count) { Write-Host 'Cancelled. No tool was run.'; return 4 }
-        $selected = $candidates[$number-1]
+        if ([int]::TryParse($answer, [ref]$number) -and $number -ge 1 -and $number -le $candidates.Count) { break }
+        Write-Host 'Invalid selection. Enter a list number, not a CANoe version number.' -ForegroundColor Yellow
     }
-    if (-not $selected.TrustedVector) { throw 'The chosen tool does not have a valid Vector signature. It was NOT executed.' }
-    # Recheck after user input, immediately before asking Windows for elevation.
+    $selected = $candidates[$number-1]
+    Write-Host ('Chosen: CANoe {0}; {1}' -f $selected.Version,$selected.Application) -ForegroundColor Cyan
+    if (-not $selected.ToolPresent) { throw 'The chosen installation has no paired RegisterComponents.exe. Repair this CANoe installation; no other version was substituted.' }
+    $unsignedApproved = $false
+    $toolHash = ''; $applicationHash = ''
+    if (-not $selected.TrustedVector -or -not $selected.TrustedApplication) {
+        if (-not $selected.CanConfirmUnsigned) { throw 'The chosen tool/application has an invalid or unverified signature. It was NOT executed.' }
+        $toolHash = (Get-FileHash -LiteralPath $selected.Tool -Algorithm SHA256).Hash
+        $applicationHash = (Get-FileHash -LiteralPath $selected.Application -Algorithm SHA256).Hash
+        Write-Host 'These installed files have no digital signature. The script cannot establish their publisher.' -ForegroundColor Yellow
+        Write-Host ('Tool SHA256: ' + $toolHash)
+        Write-Host ('Application SHA256: ' + $applicationHash)
+        $approval = [string](Read-Host 'Only if you verified this is your official trusted CANoe installation, type REGISTER to continue; otherwise press Enter to cancel')
+        if ($approval -cne 'REGISTER') { Write-Host 'Cancelled. No registration tool was run.'; return 4 }
+        $unsignedApproved = $true
+    }
     Assert-ToolsClosed
+    if (-not (Test-Path -LiteralPath $selected.Application -PathType Leaf) -or -not (Test-Path -LiteralPath $selected.Tool -PathType Leaf)) { throw 'The chosen installation changed or disappeared. No tool was run.' }
     $selectedVersion = Get-CanoeVersion -Path $selected.Application
-    if ($selectedVersion.FileMajorPart -ne 19) { throw 'The chosen CANoe executable is no longer version 19. No tool was run.' }
-    $signature = Get-AuthenticodeSignature -LiteralPath $selected.Tool
-    if ($signature.Status -ne 'Valid' -or $null -eq $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch 'Vector Informatik') { throw 'The selected tool signature changed or could not be verified. No tool was run.' }
+    if ($selected.Major -le 0 -or $selectedVersion.FileMajorPart -ne $selected.Major -or $selectedVersion.FileVersion -ne $selected.Version) { throw 'The chosen CANoe executable version changed. No tool was run.' }
+    $toolTrust = Get-CanoeFileTrust -Path $selected.Tool
+    $appTrust = Get-CanoeFileTrust -Path $selected.Application
+    if ($unsignedApproved) {
+        if (-not (Test-CanoeTrustCombination -Tool $toolTrust -Application $appTrust) -or $toolTrust.Status -ne $selected.ToolSignatureStatus -or $appTrust.Status -ne $selected.ApplicationSignatureStatus) { throw 'The selected tool/application signature changed. No tool was run.' }
+        if ((Get-FileHash -LiteralPath $selected.Tool -Algorithm SHA256).Hash -ne $toolHash -or (Get-FileHash -LiteralPath $selected.Application -Algorithm SHA256).Hash -ne $applicationHash) { throw 'The unsigned installation hash changed after confirmation. No tool was run.' }
+    } elseif (-not $toolTrust.TrustedVector -or -not $appTrust.TrustedVector) { throw 'The selected tool/application signature changed or could not be verified. No tool was run.' }
     Write-Host ('Run as administrator: ' + $selected.Tool) -ForegroundColor Cyan
-    Write-Host 'Approve the Windows UAC request and complete any Vector registration dialog.'
-    # This is the interactive Vector utility; keep its own dialogs visible.
+    Write-Host 'Approve Windows UAC and complete the official Vector registration dialog.'
     $registrar = Start-Process -FilePath $selected.Tool -WorkingDirectory ([IO.Path]::GetDirectoryName($selected.Tool)) -Verb RunAs -WindowStyle Normal -Wait -PassThru
     Write-Host ('Registration tool exit code: ' + $registrar.ExitCode)
     if ($registrar.ExitCode -ne 0) { Write-Host 'The tool did not report success.' -ForegroundColor Red; return 5 }
@@ -141,15 +205,15 @@ function Invoke-Canoe19Registration {
     Write-Host ('Current 64-bit COM server: ' + $(if ($after) { $after } else { '(not registered)' }))
     if (-not $after -or -not (Test-Path -LiteralPath $after -PathType Leaf)) { throw 'The 64-bit CANoe COM server is still missing. Keep this log and contact your PC administrator.' }
     $registered = Get-CanoeVersion -Path $after
-    if ($registered.FileMajorPart -ne 19 -or -not [string]::Equals([IO.Path]::GetFullPath($after),[IO.Path]::GetFullPath($selected.Application),[StringComparison]::OrdinalIgnoreCase)) {
+    if ($registered.FileMajorPart -ne $selected.Major -or $registered.FileVersion -ne $selected.Version -or -not [string]::Equals([IO.Path]::GetFullPath($after),[IO.Path]::GetFullPath($selected.Application),[StringComparison]::OrdinalIgnoreCase)) {
         throw 'COM registration still points to another installation. Keep this log; do not delete CANoe versions or edit the registry manually.'
     }
-    Write-Host 'SUCCESS: 64-bit CANoe COM now points to the chosen CANoe 19.' -ForegroundColor Green
-    Write-Host 'Open One Click Log, choose your CFG, and press Check connection.'
-    Write-Host 'This result confirms registration only, not measurement, licensing or vehicle logging.'
+    Write-Host ('SUCCESS: 64-bit CANoe COM now points to the chosen CANoe ' + $selected.Version) -ForegroundColor Green
+    Write-Host 'Open One Click Log, choose your RBS/CFG, and check the connection.'
+    Write-Host 'If the wrong RBS/CFG version fails to open, save/close the app and all CANoe windows, then rerun this BAT and choose the correct version.'
+    Write-Host 'Registration does not establish RBS compatibility, licensing, measurement or vehicle capture.'
     return 0
 }
-
 
 function Test-NpcapInstalled {
     $windows = [Environment]::GetFolderPath('Windows')
@@ -160,7 +224,7 @@ function Test-NpcapInstalled {
 }
 
 function Get-NpcapInstaller {
-    $folder = [IO.Path]::GetDirectoryName($env:ONECLICKLOG_CANOE19_HELPER)
+    $folder = [IO.Path]::GetDirectoryName($env:ONECLICKLOG_SETUP_HELPER)
     return Join-Path $folder 'installers\Npcap\npcap-1.90.exe'
 }
 
@@ -211,7 +275,7 @@ function Invoke-InitialSetup {
     param([bool]$CheckOnly)
     if (-not $CheckOnly) { Assert-ToolsClosed }
     $canoe = 1; $npcap = 1
-    try { $canoe = Invoke-Canoe19Registration -CheckOnly $CheckOnly }
+    try { $canoe = Invoke-CanoeRegistration -CheckOnly $CheckOnly }
     catch { Write-Host ('CANoe setup error: ' + $_.Exception.Message) -ForegroundColor Red }
     try { $npcap = Invoke-NpcapSetup -CheckOnly $CheckOnly }
     catch { Write-Host ('Npcap setup error: ' + $_.Exception.Message) -ForegroundColor Red }
@@ -225,7 +289,7 @@ function Invoke-InitialSetup {
 $taskExitCode = 1
 $taskTranscript = $false
 try {
-    $mode = [string]$env:ONECLICKLOG_CANOE19_MODE
+    $mode = [string]$env:ONECLICKLOG_SETUP_MODE
     if ($mode -and $mode -ne '--check') { throw 'Unknown option. Double-click for initial setup, or use --check for discovery only.' }
     $logFolder = Join-Path ([IO.Path]::GetTempPath()) 'OneClickLog-InitialSetup'
     [void][IO.Directory]::CreateDirectory($logFolder)
