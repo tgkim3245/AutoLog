@@ -431,3 +431,43 @@ def test_upgrade_only_adds_zipy_default_to_legacy_blank_settings(tmp_path, docum
             assert "02:00:00" in second._settings.monitor_rules_json
     finally:
         second.close_for_test()
+
+
+@pytest.mark.parametrize("compression", ["none", "zip"])
+def test_normal_stop_archives_selected_ethernet_storage_mode(real, compression):
+    import zipfile
+    runtime, tools = real
+    runtime.save_preferences({"ethernet_compression": compression}).result(5)
+    runtime.toggle((Role.ETHERNET,)).result(8)
+    assert runtime.phase == SessionPhase.RECORDING
+    plan = runtime._plan
+    raw = plan.files[0].temp_path.read_bytes()
+    runtime.toggle((Role.ETHERNET,)).result(8)
+    assert runtime.phase == SessionPhase.COMPLETED
+    file = plan.files[0]
+    assert not file.temp_path.exists()
+    if compression == "zip":
+        with zipfile.ZipFile(file.final_path) as archive:
+            assert archive.read(file.temp_path.name) == raw
+    else:
+        assert file.final_path.read_bytes() == raw
+    history = runtime.refresh_file_history().result(5)
+    assert history[0]["can_rename"]
+    assert history[0]["files"][0]["path"] == str(file.final_path)
+
+
+def test_zip_storage_failure_keeps_raw_and_reports_failed(real, monkeypatch):
+    import zipfile
+    runtime, tools = real
+    runtime.save_preferences({"ethernet_compression": "zip"}).result(5)
+    runtime.toggle((Role.ETHERNET,)).result(8)
+    file = runtime._plan.files[0]
+    raw = file.temp_path.read_bytes()
+    def disk_full(*args, **kwargs):
+        raise OSError("generated disk full")
+    monkeypatch.setattr(zipfile.ZipFile, "open", disk_full)
+    runtime.toggle((Role.ETHERNET,)).result(8)
+    assert runtime.phase == SessionPhase.FAILED
+    assert file.temp_path.read_bytes() == raw
+    assert not file.final_path.exists()
+    assert any(event.code == "FILE_ERROR" for event in events(runtime))

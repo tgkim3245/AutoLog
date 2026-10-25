@@ -87,7 +87,7 @@ def check_paths(paths: list[Path], *, root: Path = ROOT) -> tuple[list[str], int
 
 def main() -> int:
     paths = [ROOT / name for name in ['README.md', 'CONTRIBUTING.md', 'AGENTS.md', 'outputs/README.md']]
-    for name in ['docs', 'user_guide']:
+    for name in ['docs', 'user_guide', 'tools']:
         paths.extend(path for path in (ROOT / name).rglob('*')
                      if path.is_file() and path.suffix.lower() in {'.md', '.html'})
     errors, checked, evidence = check_paths(sorted(set(paths)))

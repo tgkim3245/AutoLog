@@ -32,7 +32,12 @@ from vil_logging.contracts.models import (
 from vil_logging.diagnostics.capture_quality import LOW_SPACE_BYTES, SPACE_RECOVERY_BYTES
 from vil_logging.monitors.observation import fresh_report
 from vil_logging.storage.blf_snapshot import cleanup_finalization_files, cleanup_retained_source
-from vil_logging.storage.capture_files import cleanup_work_directory, publish_capture
+from vil_logging.storage.capture_files import (
+    cleanup_work_directory,
+    cleanup_zip_source,
+    publish_capture,
+    uses_zip,
+)
 from vil_logging.storage.discard import discard_interrupted
 from vil_logging.storage.file_access import matches, observe
 from vil_logging.storage.file_service import FileResultStorageError, FileService
@@ -1065,17 +1070,20 @@ class Runtime:
                             details=result.details)
 
     def _cleanup_retained_blf_sources(self):
-        """Only published, unchanged BLF copies; handle retention never blocks capture."""
+        """Clean only owned raw sources of published BLF/ZIP captures."""
         for session in self._repo.captures(limit=None):
             for item in session["files"]:
                 inspection = item["metadata"].get("inspection", {})
+                pending_zip = inspection.get("zip_archive") and not inspection.get("zip_source_cleaned")
                 pending_source = inspection.get("retained_source") and not inspection.get("retained_source_cleaned")
                 pending_helpers = any(not row.get("cleaned") for row in inspection.get("finalization_files", []))
-                if item["state"] != "published" or not (pending_source or pending_helpers):
+                if item["state"] != "published" or not (pending_source or pending_helpers or pending_zip):
                     continue
                 file = CaptureFilePlan(Role(item["role"]), item["filename"],
                                        Path(item["temp_path"]), Path(item["final_path"]))
                 try:
+                    if pending_zip:
+                        cleanup_zip_source(file, inspection, published_path=Path(item["metadata"].get("actual_path", item["final_path"])))
                     if pending_source:
                         cleanup_retained_source(file, inspection)
                     if pending_helpers:
@@ -1085,6 +1093,8 @@ class Runtime:
                     log.info("storage.blf_source_cleanup_deferred", extra={"fields": {
                         "session_id": session["session_id"], "path": str(file.temp_path), "error": str(error)}})
                 else:
+                    if pending_zip:
+                        inspection["zip_source_cleaned"] = True
                     if pending_source:
                         inspection["retained_source_cleaned"] = True
                     self._repo.update_capture_file(session["session_id"], file.role, "published", inspection=inspection)
@@ -1283,7 +1293,12 @@ class Runtime:
                                                        actual_path=str(actual_path), inspection=inspection)
                         try:
                             self._publish("capture_step", {"step": "saving", "target": role.label})
-                            actual_path = publish_capture(file, inspection)
+                            if uses_zip(file):
+                                actual_path = publish_capture(file, inspection, before_publish=lambda prepared:
+                                    self._repo.update_capture_file(plan.session_id, role, "publishing",
+                                        actual_path=prepared["zip_archive"]["path"], inspection=prepared))
+                            else:
+                                actual_path = publish_capture(file, inspection)
                         except (OSError, ValueError) as error:
                             if phase != SessionPhase.INCOMPLETE:
                                 phase = SessionPhase.FAILED
@@ -1295,6 +1310,10 @@ class Runtime:
                             self._repo.update_capture_file(plan.session_id, role, "published",
                                                            actual_path=str(actual_path), inspection=inspection)
                             self._published_files[role] = inspection
+                            try:
+                                cleanup_zip_source(file, inspection)
+                            except (OSError, ValueError) as error:
+                                self._event("FILE_CLEANUP_WARNING", level="WARNING", original=str(error))
                             self._event("FILE_PUBLISHED" if role == Role.ETHERNET else "BLF_PUBLISHED",
                                         target=role.label, path=str(actual_path), bytes=inspection["bytes"],
                                         packets=inspection.get("packet_count", 0),

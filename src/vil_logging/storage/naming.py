@@ -1,6 +1,6 @@
 """Pure capture plans plus Windows filename and output preflight checks.
 
-The temporary and final names are identical; only their directories differ.
+Ethernet ZIP plans retain a raw working name and publish a .pcap[ng].zip archive.
 No capture file or work directory is created by this module.
 """
 
@@ -72,7 +72,7 @@ def renamed_filename(name: str, role: Role, extension: str) -> str:
     validate_prefix(name)
     if not isinstance(role, Role):
         raise NamingError("Capture role is invalid")
-    allowed = {"pcap", "pcapng"} if role == Role.ETHERNET else {"blf"}
+    allowed = {"pcap", "pcapng", "pcap.zip", "pcapng.zip"} if role == Role.ETHERNET else {"blf"}
     if extension not in allowed:
         raise NamingError("Unsupported capture extension")
     marker = "_Diag" if role == Role.DIAG else ""
@@ -84,9 +84,15 @@ def renamed_filename(name: str, role: Role, extension: str) -> str:
     return filename
 
 
+def capture_extension(settings: AppSettings, role: Role) -> str:
+    if role != Role.ETHERNET:
+        return "blf"
+    return settings.ethernet_format + (".zip" if settings.ethernet_compression == "zip" else "")
+
+
 def _filename(settings: AppSettings, role: Role) -> str:
     marker = "Diag_" if role == Role.DIAG else ""
-    extension = settings.ethernet_format if role == Role.ETHERNET else "blf"
+    extension = capture_extension(settings, role)
     filename = f"{capture_prefix(settings.prefix)}{marker}{settings.next_index}.{extension}"
     if _RESERVED.match(filename):
         raise NamingError(f"Windows reserves this filename: {filename}")
@@ -122,6 +128,8 @@ def validate_settings(
         raise NamingError("The index is too long for a Windows filename")
     if settings.ethernet_format not in {"pcap", "pcapng"}:
         raise NamingError("Ethernet format must be pcap or pcapng")
+    if settings.ethernet_compression not in {"none", "zip"}:
+        raise NamingError("Ethernet compression must be none or zip")
     if settings.language not in {"ko", "en", "zh"}:
         raise NamingError("Language must be ko, en or zh")
     if type(settings.version) is not int or settings.version < 1:
@@ -177,7 +185,8 @@ def build_plan(
     files = tuple(
         CaptureFilePlan(
             role=role, filename=(filename := _filename(settings, role)),
-            temp_path=output / ".vil_work" / identifier / filename,
+            temp_path=output / ".vil_work" / identifier / (filename[:-4] if role == Role.ETHERNET
+                                                       and settings.ethernet_compression == "zip" else filename),
             final_path=output / filename,
         )
         for role in roles

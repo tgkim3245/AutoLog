@@ -35,7 +35,7 @@ from .theme import ThemedComboBox, apply_theme, refresh_style
 from .validation_panel import ValidationPanel
 
 logger = logging.getLogger(__name__)
-PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format",
+PREFERENCES = ("output_dir", "can_cfg", "diag_cfg", "tshark_path", "nic_id", "ethernet_format", "ethernet_compression",
                "can_logging_block", "diag_logging_block")
 TEXT = {
     "intro": ("파일과 네트워크 선택은 자동으로 기억합니다.", "File and network choices are saved automatically."),
@@ -94,6 +94,11 @@ TEXT = {
               "Environment and connection checks do not establish successful capture."),
     "timeout": ("네트워크 확인이 지연되고 있습니다. 설정창을 다시 열어 확인하세요.",
                 "Network discovery is taking too long. Reopen settings to retry."),
+    "compression": ("저장 방식", "Storage mode"),
+    "compression_none": ("원본 저장", "Keep original"),
+    "compression_zip": ("정지 후 ZIP 압축", "ZIP after stopping"),
+    "compression_help": ("기록 정지 후 ZIP을 검증하고 원본을 정리합니다. 압축 중에는 원본과 ZIP을 둘 공간이 필요합니다.",
+                         "After stopping, ZIP is verified before the original is removed. Allow space for both files while compressing."),
     "format_help": ("기본 저장 형식은 pcap입니다. 다른 형식을 선택하면 다음 실행에도 기억합니다.",
                     "The default is pcap. A different choice is remembered for the next launch."),
     "npcap_help": ("실제 캡처에 필요한 Npcap이 없습니다. 별도 설치 안내를 확인하세요.",
@@ -226,6 +231,13 @@ class SettingsDialog(QDialog):
         self.format_input.addItems(["pcap", "pcapng"])
         self.format_input.currentTextChanged.connect(self._format_changed)
         form.addRow(self.format_label, self.format_input)
+        self.compression_label = QLabel()
+        self.compression_input = ThemedComboBox()
+        self.compression_input.setObjectName("ethernetCompressionComboBox")
+        self.compression_input.addItem("", "none")
+        self.compression_input.addItem("", "zip")
+        self.compression_input.currentIndexChanged.connect(self._compression_changed)
+        form.addRow(self.compression_label, self.compression_input)
         layout.addLayout(form)
         self.network_hint = self._helper()
         layout.addWidget(self.network_hint)
@@ -445,6 +457,8 @@ class SettingsDialog(QDialog):
             return self.block_inputs[key].currentData() or ""
         if key == "nic_id":
             return self.nic_input.currentData() or ""
+        if key == "ethernet_compression":
+            return self.compression_input.currentData() or "none"
         if key == "ethernet_format":
             return self.format_input.currentText()
         return self.fields[key].text().strip()
@@ -495,6 +509,10 @@ class SettingsDialog(QDialog):
             self.fields[key].setText(chosen)
             self._save_preferences((key,), force=True)
 
+    def _compression_changed(self, _value):
+        self._mark_dirty("ethernet_compression")
+        self._save_preferences(("ethernet_compression",))
+
     def _format_changed(self, _value):
         self._mark_dirty("ethernet_format")
         self._save_preferences(("ethernet_format",))
@@ -514,7 +532,8 @@ class SettingsDialog(QDialog):
             return
         values = {key: self._current(key) for key in self.fields}
         values.update(next_index=next_index, nic_id=self._current("nic_id"),
-                      ethernet_format=self.format_input.currentText(), ethernet_buffer_mib="64")
+                      ethernet_format=self.format_input.currentText(),
+                      ethernet_compression=self._current("ethernet_compression"), ethernet_buffer_mib="64")
         self._save_preferences(PREFERENCES)
         self.feedback.clear()
         self.settings_applied.emit(replace(self._settings, **values))
@@ -571,6 +590,11 @@ class SettingsDialog(QDialog):
                 self._dirty.discard("ethernet_format")
                 with QSignalBlocker(self.format_input):
                     self.format_input.setCurrentText(settings.ethernet_format)
+            key = "ethernet_compression"
+            if key not in self._dirty or (self._current(key) == settings.ethernet_compression and key not in pending):
+                self._dirty.discard(key)
+                with QSignalBlocker(self.compression_input):
+                    self.compression_input.setCurrentIndex(self.compression_input.findData(settings.ethernet_compression))
             selected = self._current("nic_id") if "nic_id" in self._dirty else settings.nic_id
             if selected == settings.nic_id and "nic_id" not in pending:
                 self._dirty.discard("nic_id")
@@ -835,6 +859,11 @@ class SettingsDialog(QDialog):
                            (self.tool_heading, "tool"), (self.tool_hint, "tool_help"),
                            (self.network_label, "network"), (self.network_hint, "network_help")):
             label.setText(self._t(key))
+        self.compression_label.setText(self._t("compression"))
+        with QSignalBlocker(self.compression_input):
+            self.compression_input.setItemText(0, self._t("compression_none"))
+            self.compression_input.setItemText(1, self._t("compression_zip"))
+        self.compression_input.setToolTip(self._t("compression_help"))
         self.format_label.setText(tr("format", self._language))
         self.format_input.setToolTip(self._t("format_help"))
         for key, label in self.block_labels.items():
@@ -851,7 +880,7 @@ class SettingsDialog(QDialog):
         self._busy = busy
         self.validation_panel.set_locked(busy)
         for widget in [*self.fields.values(), *self.browse_buttons, self.nic_input,
-                       *self.block_inputs.values(), self.format_input,
+                       *self.block_inputs.values(), self.format_input, self.compression_input,
                        self.apply_button]:
             widget.setEnabled(not busy)
         self.set_language(self._language)

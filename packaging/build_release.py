@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -237,12 +238,16 @@ def build(
         executable = package / f"{app_name}.exe"
         if not executable.is_file() or not (package / "_internal").is_dir():
             raise RuntimeError("The build did not produce the expected EXE and _internal folder.")
+        setup = root / "tools/Initial_Setup.bat"
+        shutil.copyfile(setup, package / setup.name)
+        initial_setup = {"name": setup.name, "bytes": setup.stat().st_size, "sha256": sha256(setup)}
         documentation = write_user_documentation(package, guide_metadata, documents)
         capture_tools = bundle_capture_tools(root, package, output.parent / "tool-cache", work, logger)
         npcap = (bundle_npcap_installer(root, package, output.parent / "tool-cache", logger)
                  if include_npcap_internal else None)
         package_info = dict(info, status="succeeded", exe_sha256=sha256(executable),
-                            documentation=documentation, capture_tools=capture_tools, npcap_installer=npcap)
+                            documentation=documentation, capture_tools=capture_tools, npcap_installer=npcap,
+                            initial_setup=initial_setup)
         write_json(package / "build_info.json", package_info)
         archive = output / f"{output.name}.zip"
         logger.info("Creating %s", archive.name)

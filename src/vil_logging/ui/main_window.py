@@ -39,7 +39,7 @@ from vil_logging.contracts.models import (
 )
 from vil_logging.diagnostics.canoe_readiness import stage_text
 from vil_logging.monitors.observation import fresh_report
-from vil_logging.storage.naming import capture_prefix
+from vil_logging.storage.naming import capture_extension, capture_prefix
 
 from .branding import application_icon
 from .capture_button import CaptureButton
@@ -714,7 +714,7 @@ class MainWindow(QMainWindow):
             ObservationState.WARNING, ObservationState.UNKNOWN} else "neutral")
         refresh_style(self.observation_labels[target.role])
         self.target_formats[target.role].setText(
-            "." + self._settings.ethernet_format if target.role == Role.ETHERNET else ".blf"
+            "." + capture_extension(self._settings, target.role)
         )
         self._render_readiness()
 
@@ -738,7 +738,7 @@ class MainWindow(QMainWindow):
             names = []
             for role in self.selected_roles():
                 prefix = capture_prefix(self._settings.prefix) + ("Diag_" if role == Role.DIAG else "")
-                extension = self._settings.ethernet_format if role == Role.ETHERNET else "blf"
+                extension = capture_extension(self._settings, role)
                 names.append(f"{prefix}{self._settings.next_index}.{extension}")
             self.file_names.setText(" · ".join(names) or "—")
             self.file_names.setToolTip("\n".join(names))

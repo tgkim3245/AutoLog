@@ -123,8 +123,8 @@ class FileService:
         for file in session["files"]:
             source = Path(file["path"])
             role = Role(file["role"])
-            extension = source.suffix[1:]
-            if extension not in ({"pcap", "pcapng"} if role == Role.ETHERNET else {"blf"}):
+            extension = "".join(source.suffixes[-2:])[1:] if source.suffix.lower() == ".zip" else source.suffix[1:]
+            if extension not in ({"pcap", "pcapng", "pcap.zip", "pcapng.zip"} if role == Role.ETHERNET else {"blf"}):
                 raise FileManagementError("지원하지 않는 파일 확장자 / Unsupported capture extension")
             filename = renamed_filename(name, role, extension)
             destination = source.with_name(filename)

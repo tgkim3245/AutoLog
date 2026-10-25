@@ -51,6 +51,8 @@ def capture(app, language, records):
 
     def save(name, widget, rect=None, *, annotations):
         app.processEvents()
+        if rect is not None:
+            widget.grab()  # Settle the full Qt paint before rendering a clipped guide region.
         pixmap = widget.grab(rect) if rect is not None else widget.grab()
         path = images / (name + ("" if language == "ko" else "-" + language) + ".png")
         assert pixmap.save(str(path))
@@ -122,7 +124,8 @@ def capture(app, language, records):
         "message_zh": "所选以太网适配器已就绪。", "next_action_zh": "关闭设置并开始记录。"})
     app.processEvents()
     save("ethernet", dialog, QRect(14, 96, dialog.width() - 28, dialog.height() - 160), annotations=[
-        mark(dialog.nic_input, "select", "network"), mark(dialog.prepare_buttons[Role.ETHERNET], "click", "connect")])
+        mark(dialog.nic_input, "select", "network"), mark(dialog.compression_input, "select", "compression"),
+        mark(dialog.prepare_buttons[Role.ETHERNET], "click", "connect")])
     dialog.nic_input._activity = {
         "example-ethernet": {"pps": 18500, "history": [15000, 16500, 18000, 17000, 19000, 18500] * 4},
         "example-wifi": {"pps": 24, "history": [5, 0, 10, 8, 2, 24] * 4}}

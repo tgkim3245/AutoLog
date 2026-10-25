@@ -1,6 +1,6 @@
 # 현재 구현 구조
 
-기준 SW 0.9.21 · 코드 대조 2026-10-25
+기준 SW 0.9.22 · 코드 대조 2026-10-25
 
 Windows 11 x64의 Python 3.14·PySide6 데스크톱 앱이다. 메인 UI는 명령을 요청하고 제한된 알림을 소비하며, COM·파일 작업·worker 응답 대기는 별도 실행 문맥에서 수행한다. 내부 패키지명 `vil_logging`과 이전 데이터 이행 호환 이름은 제품 표시명과 구분한다.
 
@@ -20,7 +20,7 @@ Windows 11 x64의 Python 3.14·PySide6 데스크톱 앱이다. 메인 UI는 명�
 | `documentation.py` | 배포/소스 공통 가이드 렌더·번역/사진/좌표/버전 검증 |
 | `verification.py` | 생성 파일·localhost를 사용하는 명시적 CLI 검증 |
 | `packaging/` | 버전별 PyInstaller 빌드·Wireshark/Npcap 고정 자료·배포 무결성 |
-| `tools/` | TC 문서 생성과 문서 링크/생성물 최신성 검사. 앱 런타임에 포함하지 않음 |
+| `tools/` | TC 문서 생성·문서 검사·별도 전달용 CANoe 19 등록 BAT. 앱이 자동 실행하지 않음 |
 
 `FakeWorkerPool`은 demo뿐 아니라 실제 pool의 공통 요청/응답 기반도 제공한다. 모의 worker·PacketBridge·복구·오프라인 검증 코드는 테스트와 실제 오류/호환 경로에서 참조하므로 화면에 보이지 않는다는 이유로 제거하지 않는다.
 
@@ -40,6 +40,8 @@ UI는 시작·정지·연결·설정·파일 작업을 Runtime에 제출한다. 
 
 선택한 NIC 하나에서 dumpcap이 PCAP/PCAPNG 원본을 직접 기록하고 별도 TShark가 증가 중인 파일을 후행 해석한다. 해석 실패는 원본 취득 경로와 구분해 관측 확인 불가로 처리하며 지속되면 정책에 따라 전체 기록을 정지한다.
 
+설정의 저장 방식 기본은 원본이다. ZIP 선택 시 기록 중에는 원본 PCAP/PCAPNG를 유지한다. 정지·전체 검사 후 ZIP64 지원 스트리밍 압축, 전체 해제 읽기/CRC·SHA256 일치, DB의 압축본 식별 정보 선저장, 충돌 없는 최종 이동 순서로 보관한다. 보관 확정 후 일치하는 원본만 정리한다. 실패 시 원본을 보존하며 X/강제 종료 중단 구간은 기존 폐기 정책을 따른다. ZIP과 원본을 함께 둘 여유 공간이 필요하다.
+
 동봉 도구가 기본이며 직접 선택한 설치본도 사용할 수 있다. Npcap 드라이버는 대상 PC 준비 조건이다. 캡처 버퍼는 64 MiB 고정이며 파일 크기 상한이 아니다. 유효성 규칙은 원본 필터가 아니며 다른 Source도 저장한다.
 
 ## 세션과 파일
@@ -53,7 +55,8 @@ UI는 시작·정지·연결·설정·파일 작업을 Runtime에 제출한다. 
   .vil_work/세션UUID/          기록 중·마무리 소유 파일
   One_Click_Log_7.blf         CAN 완료 파일
   One_Click_Log_Diag_7.blf    Diag 완료 파일
-  One_Click_Log_7.pcap        Zipy 완료 파일
+  One_Click_Log_7.pcap        Zipy 원본 저장
+  One_Click_Log_7.pcap.zip    ZIP 선택 시 완료 파일 (내부 원본 하나)
 ```
 
 ## 저장물과 검증 경계

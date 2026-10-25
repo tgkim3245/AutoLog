@@ -1,6 +1,7 @@
 Npcap - same-company internal PC setup / 사내 PC 설치 / 公司内部电脑安装
 
 한국어
+EXE 옆 Initial_Setup.bat로 CANoe 19 등록과 이 Npcap 설치를 함께 진행할 수 있습니다.
 1. 이 배포본은 요청한 같은 회사 내부 PC 1대용입니다.
 2. 대상 PC에 Npcap이 이미 설치돼 있으면 다시 설치할 필요가 없습니다.
 3. 처음 설치하는 PC에서는 One Click Log를 닫고, 이 폴더의 npcap-1.90.exe를
@@ -14,6 +15,7 @@ Npcap - same-company internal PC setup / 사내 PC 설치 / 公司内部电脑�
    다른 사용 범위는 아래 공식 조건을 확인하세요. LICENSE.txt 및 설치창의 약관이 적용됩니다.
 
 English
+Initial_Setup.bat beside the EXE combines CANoe 19 registration and this Npcap installer.
 This package was prepared for the requested single PC inside the same company.
 If Npcap is already installed, no reinstallation is needed. Otherwise, close
 One Click Log, right-click npcap-1.90.exe and choose Run as administrator.
@@ -26,6 +28,7 @@ Free installation limits do not grant external redistribution rights. Do not
 repurpose this internal package for external distribution; see the official terms.
 
 中文
+EXE 旁的 Initial_Setup.bat 合并 CANoe 19 注册与 Npcap 安装。
 此发行包为所确认的同一公司内部一台电脑准备。
 已安装 Npcap 时无需重装。首次安装时，请关闭 One Click Log，右键点击
 npcap-1.90.exe，选择“以管理员身份运行”。在官方安装界面阅读并同意许可证，

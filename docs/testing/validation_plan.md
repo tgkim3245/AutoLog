@@ -1,6 +1,6 @@
 # 검증 계획
 
-기준 SW 0.9.21 · 검토 2026-10-25
+기준 SW 0.9.22 · 검토 2026-10-25
 
 자동 검사, 명시적 localhost 검사, 실제 장비/차량 시험을 구분한다. 현재 수동 실차 절차는 [48 TC 시험서](vehicle_test_plan.md)와 [결과 입력 HTML](One_Click_Log_Vehicle_Test_Plan.html)이다. 모든 TC의 초기 결과는 미실행이다. 결과는 [텍스트 양식](vehicle_test_result_template.md) 또는 HTML의 JSON으로 별도 보관한다.
 

@@ -1,5 +1,5 @@
 {
-  "app_version": "0.9.21",
+  "app_version": "0.9.22",
   "illustrative_data": true,
   "real_device_capture": false,
   "annotations_version": 1,
@@ -9,7 +9,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "114b6535cc1a9e4421c952d4ab5fcd6316ff9b64a35633a1b84af7f26bebf63f",
+      "sha256": "88087ac9190142d002d09f91831a8f4bef2cb60d17ff017d0bda25bfed74ff02",
       "annotations": [
         {
           "step": 1,
@@ -29,7 +29,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "114b6535cc1a9e4421c952d4ab5fcd6316ff9b64a35633a1b84af7f26bebf63f",
+      "sha256": "88087ac9190142d002d09f91831a8f4bef2cb60d17ff017d0bda25bfed74ff02",
       "annotations": [
         {
           "step": 1,
@@ -175,7 +175,7 @@
       "language": "ko",
       "width": 672,
       "height": 570,
-      "sha256": "54cf1c4c9ab655a83bb6097b273709b367ec8807845c315c7c888d21febac3e6",
+      "sha256": "31bd2f42124746ae770093444f22e9118be3a491059f595922deac369a714df7",
       "annotations": [
         {
           "step": 1,
@@ -190,11 +190,22 @@
         },
         {
           "step": 2,
+          "action": "select",
+          "label": "원본 / ZIP 선택",
+          "rect": [
+            139,
+            302,
+            506,
+            36
+          ]
+        },
+        {
+          "step": 3,
           "action": "click",
           "label": "연결 확인",
           "rect": [
             554,
-            369,
+            417,
             76,
             34
           ]
@@ -279,7 +290,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "6c5dea18cb57e460ed9e673cb1f1f25235ee0746aea17afbc04d2d37fe6736e8",
+      "sha256": "a750d8749c0aedd3c5b7c68bdd27569aadd63ceb0b1009e3f09b021784828104",
       "annotations": [
         {
           "step": 1,
@@ -310,7 +321,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "133e885bd5978162ee58e661d42b094e29250e32ca1600e931498e673fe58c00",
+      "sha256": "e9908cfa7acd694bf7ddfec2936da60e83ccc2489b4963795f45067ac7e065e3",
       "annotations": [
         {
           "step": 1,
@@ -330,7 +341,7 @@
       "language": "ko",
       "width": 480,
       "height": 296,
-      "sha256": "3733064704f0fad4328f5841a9c458380d6c8f6e09732d2c1a1c49dcb130f44d",
+      "sha256": "842c58df6fdc6c48760baf63401f6e151396425eba2f5b82f2368f31e683f408",
       "annotations": [
         {
           "step": 1,
@@ -350,7 +361,7 @@
       "language": "ko",
       "width": 480,
       "height": 455,
-      "sha256": "8c98e6ca578abf38ad832a53e055f3c6df70885535c31484b2abab31737abb19",
+      "sha256": "4f7a2f10872fd874698ade05d8fbe46c41ff8a333e45bce0e77ab2b4b0a0f571",
       "annotations": [
         {
           "step": 1,
@@ -432,7 +443,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "5f48b7b2d23edf3026273ea9cca2a66f1738dff60beaf8f4a2dd7b1947a1893e",
+      "sha256": "4792b5c130ecd22ce4239056e1d6093839a950754fa7ac31b52392afbc2e0ddb",
       "annotations": [
         {
           "step": 1,
@@ -452,7 +463,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "5f48b7b2d23edf3026273ea9cca2a66f1738dff60beaf8f4a2dd7b1947a1893e",
+      "sha256": "4792b5c130ecd22ce4239056e1d6093839a950754fa7ac31b52392afbc2e0ddb",
       "annotations": [
         {
           "step": 1,
@@ -598,7 +609,7 @@
       "language": "en",
       "width": 672,
       "height": 570,
-      "sha256": "08a621e7bb90a9764496f6fe9cfed3c55249bd0f50e8e31cf8fd51985c0c4ffe",
+      "sha256": "b725bcd59d2333ddc825f3832460f8f6198341990fceacb856eb0ad90a694714",
       "annotations": [
         {
           "step": 1,
@@ -607,17 +618,28 @@
           "rect": [
             143,
             206,
-            502,
+            495,
             36
           ]
         },
         {
           "step": 2,
+          "action": "select",
+          "label": "Choose original / ZIP",
+          "rect": [
+            143,
+            302,
+            495,
+            36
+          ]
+        },
+        {
+          "step": 3,
           "action": "click",
           "label": "Check connection",
           "rect": [
-            509,
-            384,
+            502,
+            432,
             121,
             34
           ]
@@ -627,18 +649,18 @@
     {
       "file": "networks-en.png",
       "language": "en",
-      "width": 502,
+      "width": 495,
       "height": 162,
-      "sha256": "32003449e60d3d921a106c929090b1e9beeae792b92af8f78f046de8b6595406",
+      "sha256": "00c3b20505d6093b2f245bb92e8802c39500741354f3188788785e0e230ac964",
       "annotations": [
         {
           "step": 1,
           "action": "check",
           "label": "Check incoming traffic",
           "rect": [
-            323,
+            319,
             55,
-            168,
+            165,
             44
           ]
         },
@@ -649,7 +671,7 @@
           "rect": [
             9,
             55,
-            297,
+            292,
             44
           ]
         }
@@ -702,7 +724,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "e3ac759242e24283ca9249b5ecc17ee23cd28383649728cc9b43eb42357c619c",
+      "sha256": "ded71ca80f8affd94a8553b16eaaa5ba5cb4d6923044aaa771c91136bb8ce405",
       "annotations": [
         {
           "step": 1,
@@ -733,7 +755,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "5080e0618545b713c8333d2e46701d4088b48fa1d0836cb12ab5e34610968f9e",
+      "sha256": "8186fdba75ac421686a4eb654dfb15494e5dd11098460fc92e29383e7657cb90",
       "annotations": [
         {
           "step": 1,
@@ -753,7 +775,7 @@
       "language": "en",
       "width": 480,
       "height": 296,
-      "sha256": "4f0dbc957608669385c9298a3f616e488b0494fb09176585e430df21839b4d46",
+      "sha256": "27286c7a3471d4c165d395be26c2bc22274e307b7af5114472b26ccf18728805",
       "annotations": [
         {
           "step": 1,
@@ -773,7 +795,7 @@
       "language": "en",
       "width": 480,
       "height": 455,
-      "sha256": "0c6f063ad51d8efa9bce295eadcd31142f486886bb2b844b4107a2925daba16d",
+      "sha256": "8923f2ed06d8aac55915a495c9830b5002ae3125b44b27d86b107fb36baf1f00",
       "annotations": [
         {
           "step": 1,
@@ -855,7 +877,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "6bbfeaad3b1ac276eb5ceba499f776c94a040a35ede71bdab80cfc6eaf29a778",
+      "sha256": "8cf9663f613bcdb68ef66e4b722e64ed7367cb4cac6505289abffff9763308b4",
       "annotations": [
         {
           "step": 1,
@@ -875,7 +897,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "6bbfeaad3b1ac276eb5ceba499f776c94a040a35ede71bdab80cfc6eaf29a778",
+      "sha256": "8cf9663f613bcdb68ef66e4b722e64ed7367cb4cac6505289abffff9763308b4",
       "annotations": [
         {
           "step": 1,
@@ -1021,7 +1043,7 @@
       "language": "zh",
       "width": 672,
       "height": 570,
-      "sha256": "8519e617a13263431384e15506a54f137149b7afc6c74546a3813be5d348cafa",
+      "sha256": "ade7ab32da501050bb778c46ff0ed5a4a438303b3e8b9cded7d48a803f33f7a3",
       "annotations": [
         {
           "step": 1,
@@ -1036,11 +1058,22 @@
         },
         {
           "step": 2,
+          "action": "select",
+          "label": "选择原始文件 / ZIP",
+          "rect": [
+            135,
+            303,
+            510,
+            36
+          ]
+        },
+        {
+          "step": 3,
           "action": "click",
           "label": "检查连接",
           "rect": [
             558,
-            370,
+            418,
             72,
             34
           ]
@@ -1125,7 +1158,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "a411c22998b838bd440fb39a5db2520cc9053d5d9fba426bd0e8de8ec2cd95c0",
+      "sha256": "0f0979a220359352abf10836f76672772aad205aa79be7c9f1a3911b8e06e623",
       "annotations": [
         {
           "step": 1,
@@ -1156,7 +1189,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "2b072829aec388403b47e5abab0b4f6a3044a51cacb7cfcd805c83a9ec453ae5",
+      "sha256": "04620c515f4c0ae714e854d584d64443ba30dd2ca6a426e3f9b0897e87c2bb92",
       "annotations": [
         {
           "step": 1,
@@ -1176,7 +1209,7 @@
       "language": "zh",
       "width": 480,
       "height": 296,
-      "sha256": "df6945431bef0e3d6a55fc33a826357e8cf619274ca606e75cd328a04a995b32",
+      "sha256": "e67e2ce1406feba02a99ec4a8befcbfd4bd6368ddbad00d1b23c4d2bffaf855f",
       "annotations": [
         {
           "step": 1,
@@ -1196,7 +1229,7 @@
       "language": "zh",
       "width": 480,
       "height": 455,
-      "sha256": "2c7d236763296e0ba7cabc7a6ff334e949649f6562e0fa71abaf785237e9f3db",
+      "sha256": "d2976bc46ee07e1ec2b7be294136988c8ea89cb8a743355e5a04e5e69ff1924d",
       "annotations": [
         {
           "step": 1,

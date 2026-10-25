@@ -6,6 +6,8 @@ import io
 import json
 import logging
 import subprocess
+import tempfile
+import zipfile
 from contextlib import ExitStack
 from pathlib import Path
 from uuid import uuid4
@@ -18,10 +20,14 @@ from vil_logging.storage.blf_snapshot import (
     cleanup_finalization_files,
     cleanup_retained_source,
     finalization_paths,
-    publication_source,
     snapshot_path,
 )
-from vil_logging.storage.capture_files import cleanup_work_directory
+from vil_logging.storage.capture_files import (
+    capture_source,
+    cleanup_work_directory,
+    cleanup_zip_source,
+    prepare_capture_zip,
+)
 from vil_logging.storage.file_access import ExclusiveFile, matches, observe
 from vil_logging.storage.file_service import FileManagementError, FileService
 
@@ -49,6 +55,8 @@ def _paths(file):
         capture = CaptureFilePlan(Role(file["role"]), file["filename"], Path(file["temp_path"]), Path(file["final_path"]))
         evidence = file["metadata"].get("inspection") or file["metadata"].get("stop_evidence", {})
         paths.extend(str(path) for path, _ in finalization_paths(capture, evidence))
+    if file["role"] == "ethernet" and Path(file["final_path"]).name == Path(file["temp_path"]).name + ".zip":
+        paths.append(file["temp_path"] + ".zip")
     return list(dict.fromkeys(paths))
 
 
@@ -58,7 +66,22 @@ def inspect_recovery_file(path: Path, extension: str, tshark_path: str) -> dict:
     # An existing writer blocks even the inspection attempt.
     with ExclusiveFile(path, before):
         pass
-    if extension == "blf":
+    if extension == "zip":
+        # Verify CRC by full read and inspect the contained capture using the same tool.
+        with zipfile.ZipFile(path) as zipped, tempfile.TemporaryDirectory(prefix="OneClickLog-verify-") as folder:
+            members = zipped.infolist()
+            if len(members) != 1 or members[0].is_dir() or Path(members[0].filename).name != members[0].filename:
+                raise ValueError("Capture ZIP must contain one plain capture filename")
+            member = members[0]
+            target = Path(folder) / member.filename
+            if target.suffix not in {".pcap", ".pcapng"}:
+                raise ValueError("Unsupported capture ZIP member")
+            with zipped.open(member) as reader, target.open("xb") as writer:
+                while chunk := reader.read(1024 * 1024):
+                    writer.write(chunk)
+            result = inspect_recovery_file(target, target.suffix[1:], tshark_path)
+            result = {key: value for key, value in result.items() if key not in {"inode", "device", "bytes", "mtime_ns"}}
+    elif extension == "blf":
         result = inspect_blf(path)
     elif extension in {"pcap", "pcapng"}:
         sibling = Path(tshark_path).parent if tshark_path else None
@@ -138,7 +161,7 @@ class RecoveryService:
         inspection = {"finalization_files": file["metadata"].get("stop_evidence", {}).get("finalization_files", []),
                       **file["metadata"].get("inspection", {})}
         capture_file = CaptureFilePlan(Role(role), file["filename"], Path(file["temp_path"]), Path(file["final_path"]))
-        source, destination = publication_source(capture_file, inspection), capture_file.final_path
+        source, destination = capture_source(capture_file, inspection), capture_file.final_path
         if file["state"] == "publishing" and destination.exists():
             expected = {key: inspection[key] for key in ("inode", "bytes", "mtime_ns") if key in inspection}
             if not matches(observe(destination), expected):
@@ -155,7 +178,12 @@ class RecoveryService:
         elif destination.exists() or destination.is_symlink():
             raise FileExistsError(f"기존 파일을 보존합니다. / Existing output: {destination}")
         log.info("recovery.inspection_started", extra={"session_id": session_id, "role": role, "path": str(source)})
-        inspection = {**inspection, **inspect_recovery_file(source, destination.suffix[1:], tshark_path)}
+        inspection = {**inspection, **inspect_recovery_file(source, "blf" if role in {"can", "diag"} else source.suffix[1:], tshark_path)}
+        if source != destination:
+            prepare_capture_zip(capture_file, inspection, before_publish=lambda prepared:
+                self.repo.update_capture_file(session_id, Role(role), "publishing",
+                    actual_path=prepared["zip_archive"]["path"], inspection=prepared))
+            source = capture_source(capture_file, inspection)
         item = {"session_id": session_id, "role": role, "source": str(source),
                 "destination": str(destination), "identity": {key: inspection[key]
                     for key in ("device", "inode", "bytes", "mtime_ns")}, "status": "pending"}
@@ -175,6 +203,10 @@ class RecoveryService:
         # Persisted identity is sufficient for interrupted journal reconciliation.
         # Keep validation separately for display/audit; failure here cannot lose the move journal.
         self.repo.update_capture_file(session_id, Role(role), "published", inspection=inspection)
+        try:
+            cleanup_zip_source(capture_file, inspection)
+        except (OSError, ValueError):
+            log.info("recovery.zip_source_cleanup_deferred", extra={"session_id": session_id})
         if inspection.get("retained_source"):
             try:
                 cleanup_retained_source(capture_file, inspection)

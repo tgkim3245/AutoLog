@@ -125,6 +125,10 @@ TEXT = {
 }
 
 SETTINGS = {
+    "compression": "保存方式",
+    "compression_none": "保留原始文件",
+    "compression_zip": "停止后压缩为 ZIP",
+    "compression_help": "停止后验证 ZIP，再清理原始文件。压缩时需要同时容纳原始文件和 ZIP 的空间。",
     "intro": "文件与网络选择会自动保存。", "storage": "保存设置", "canoe": "CAN · Diag 配置",
     "ethernet": "Ethernet 连接", "network": "采集网络", "choose_network": "请选择网络",
     "missing_network": "上次选择 · 当前不可用", "up": "已连接", "down": "已断开", "unknown": "状态未知",

@@ -45,6 +45,8 @@ def discard_interrupted(repo, *, reason):
             try:
                 source, directory = _work_directory(session, file)
                 candidates = {source, source.with_name(source.name + ".sealed")}
+                if file["role"] == "ethernet" and Path(file["final_path"]).name == source.name + ".zip":
+                    candidates.add(source.with_name(source.name + ".zip"))
                 if directory.exists():
                     candidates.update(path for path in directory.iterdir() if HELPER.fullmatch(path.name))
                 for path in sorted(candidates):

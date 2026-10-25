@@ -68,6 +68,7 @@ class AppSettings:
     next_index: int = 1
     output_dir: str = ""
     ethernet_format: str = "pcap"
+    ethernet_compression: str = "none"
     ethernet_buffer_mib: str = "64"
     can_cfg: str = ""
     diag_cfg: str = ""

@@ -1,6 +1,6 @@
 # 현재 프로젝트 구조
 
-기준 SW 0.9.21 · 검토 2026-10-25
+기준 SW 0.9.22 · 검토 2026-10-25
 
 ```text
 logging_automation/
@@ -22,7 +22,7 @@ logging_automation/
     integration/     세션·파일·프로세스 통합 검사
     hardware/        명시적으로 실행하는 외부 도구 검사
   packaging/         EXE/ZIP 빌드·공식 도구 lock·라이선스 안내
-  tools/             문서 검사·실차 시험 HTML 생성
+  tools/             문서 검사·실차 시험 HTML 생성·배포 초기설정 BAT
   docs/
     README.md        문서 시작점
     reference/       현재 요구사항·구조·제어·구현 범위
@@ -40,7 +40,7 @@ logging_automation/
 
 ## 유지 기준
 
-앱 런타임과 개발/문서 도구를 분리한다. `src/vil_logging`의 import 호환성을 문서 이동 때문에 바꾸지 않는다. `packaging`의 lock·라이선스와 `user_guide`의 원본·42장 언어별 사진·매니페스트는 빌드 검증에 필요하므로 유지한다.
+앱 런타임과 개발/문서·별도 지원 도구를 분리한다. `src/vil_logging`의 import 호환성을 문서 이동 때문에 바꾸지 않는다. `packaging`의 lock·라이선스와 `user_guide`의 원본·42장 언어별 사진·매니페스트는 빌드 검증에 필요하므로 유지한다.
 
 demo worker, 관측/파일 식별·복구, 이전 프로필 이행은 실제 사용처와 회귀 검사가 있다. 제거된 화면의 번역이나 다른 문서로 통합된 안내만 사용처를 확인한 뒤 삭제한다. 과거 HTML 화면 시안과 가이드 위치 변경용 중복 문서는 제거했으며 현재 화면은 Qt 소스와 가이드 사진을 기준으로 본다.
 

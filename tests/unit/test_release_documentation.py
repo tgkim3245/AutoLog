@@ -22,6 +22,8 @@ SPEC.loader.exec_module(release)
 def project(tmp_path):
     root = tmp_path / "source"
     shutil.copytree(ROOT / "user_guide", root / "user_guide")
+    (root / "tools").mkdir()
+    shutil.copyfile(ROOT / "tools/Initial_Setup.bat", root / "tools/Initial_Setup.bat")
     return root
 
 
@@ -162,6 +164,9 @@ def test_release_zip_contains_guides_with_matching_hashes(project, tmp_path, mon
     with zipfile.ZipFile(output / info["archive"]) as archive:
         assert archive.testzip() is None
         embedded = json.loads(archive.read("AutoLog/build_info.json"))
+        assert archive.read("AutoLog/Initial_Setup.bat") == (ROOT / "tools/Initial_Setup.bat").read_bytes()
+        assert embedded["initial_setup"] == info["initial_setup"]
+        assert hashlib.sha256(archive.read("AutoLog/Initial_Setup.bat")).hexdigest() == info["initial_setup"]["sha256"]
         assert embedded["documentation"] == info["documentation"]
         assert embedded["capture_tools"] == info["capture_tools"]
         assert embedded["npcap_installer"] == info["npcap_installer"]

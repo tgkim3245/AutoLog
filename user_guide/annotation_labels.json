@@ -1,24 +1,117 @@
 {
-  "settings": {"ko": "설정 열기", "en": "Open settings", "zh": "打开设置"},
-  "folder": {"ko": "저장 폴더 선택", "en": "Choose save folder", "zh": "选择保存文件夹"},
-  "prefix": {"ko": "파일 prefix 입력", "en": "Enter file prefix", "zh": "输入文件名前缀"},
-  "apply": {"ko": "적용", "en": "Apply", "zh": "应用"},
-  "cfg": {"ko": "cfg 파일 선택", "en": "Choose cfg file", "zh": "选择 cfg 文件"},
-  "connect": {"ko": "연결 확인", "en": "Check connection", "zh": "检查连接"},
-  "block": {"ko": "BLF 기록 블록 선택", "en": "Choose BLF block", "zh": "选择 BLF 记录模块"},
-  "network": {"ko": "장비 네트워크 선택", "en": "Choose device network", "zh": "选择设备网络"},
-  "traffic": {"ko": "수신 그래프 확인", "en": "Check incoming traffic", "zh": "查看接收曲线"},
-  "targets": {"ko": "이번에 쓸 대상 체크", "en": "Select capture targets", "zh": "勾选本次记录目标"},
-  "start": {"ko": "기록 시작", "en": "Start recording", "zh": "开始记录"},
-  "measurement": {"ko": "F9·Trace 확인 후 시작", "en": "After F9 / Trace check", "zh": "确认 F9 / Trace 后开始"},
-  "stop": {"ko": "기록 정지·저장", "en": "Stop and save", "zh": "停止并保存"},
-  "files": {"ko": "최종 파일명 확인", "en": "Check saved filenames", "zh": "确认最终文件名"},
-  "open_folder": {"ko": "로그 폴더 열기", "en": "Open log folder", "zh": "打开日志文件夹"},
-  "rename": {"ko": "새 이름 입력 → Enter", "en": "New name → Enter", "zh": "输入新名称 → Enter"},
-  "report": {"ko": "문제 발생 시 버그리포트", "en": "Bug report on failure", "zh": "出错时生成错误报告"},
-  "report_saved": {"ko": "바탕화면 ZIP → 이메일", "en": "Desktop ZIP → email", "zh": "桌面 ZIP → 发送邮件"},
-  "rule": {"ko": "수정할 규칙 선택", "en": "Choose rule to edit", "zh": "选择要编辑的规则"},
-  "popup": {"ko": "팝업 안내 문구 입력", "en": "Enter popup message", "zh": "输入弹窗提示内容"},
-  "save_rule": {"ko": "규칙 저장", "en": "Save rule", "zh": "保存规则"},
-  "render": {"ko": "Render에서 |6 → e1 입력", "en": "Enter |6 → e1 in Render", "zh": "在 Render 输入 |6 → e1"}
+  "settings": {
+    "ko": "설정 열기",
+    "en": "Open settings",
+    "zh": "打开设置"
+  },
+  "folder": {
+    "ko": "저장 폴더 선택",
+    "en": "Choose save folder",
+    "zh": "选择保存文件夹"
+  },
+  "prefix": {
+    "ko": "파일 prefix 입력",
+    "en": "Enter file prefix",
+    "zh": "输入文件名前缀"
+  },
+  "apply": {
+    "ko": "적용",
+    "en": "Apply",
+    "zh": "应用"
+  },
+  "cfg": {
+    "ko": "cfg 파일 선택",
+    "en": "Choose cfg file",
+    "zh": "选择 cfg 文件"
+  },
+  "connect": {
+    "ko": "연결 확인",
+    "en": "Check connection",
+    "zh": "检查连接"
+  },
+  "block": {
+    "ko": "BLF 기록 블록 선택",
+    "en": "Choose BLF block",
+    "zh": "选择 BLF 记录模块"
+  },
+  "network": {
+    "ko": "장비 네트워크 선택",
+    "en": "Choose device network",
+    "zh": "选择设备网络"
+  },
+  "traffic": {
+    "ko": "수신 그래프 확인",
+    "en": "Check incoming traffic",
+    "zh": "查看接收曲线"
+  },
+  "targets": {
+    "ko": "이번에 쓸 대상 체크",
+    "en": "Select capture targets",
+    "zh": "勾选本次记录目标"
+  },
+  "start": {
+    "ko": "기록 시작",
+    "en": "Start recording",
+    "zh": "开始记录"
+  },
+  "measurement": {
+    "ko": "F9·Trace 확인 후 시작",
+    "en": "After F9 / Trace check",
+    "zh": "确认 F9 / Trace 后开始"
+  },
+  "stop": {
+    "ko": "기록 정지·저장",
+    "en": "Stop and save",
+    "zh": "停止并保存"
+  },
+  "files": {
+    "ko": "최종 파일명 확인",
+    "en": "Check saved filenames",
+    "zh": "确认最终文件名"
+  },
+  "open_folder": {
+    "ko": "로그 폴더 열기",
+    "en": "Open log folder",
+    "zh": "打开日志文件夹"
+  },
+  "rename": {
+    "ko": "새 이름 입력 → Enter",
+    "en": "New name → Enter",
+    "zh": "输入新名称 → Enter"
+  },
+  "report": {
+    "ko": "문제 발생 시 버그리포트",
+    "en": "Bug report on failure",
+    "zh": "出错时生成错误报告"
+  },
+  "report_saved": {
+    "ko": "바탕화면 ZIP → 이메일",
+    "en": "Desktop ZIP → email",
+    "zh": "桌面 ZIP → 发送邮件"
+  },
+  "rule": {
+    "ko": "수정할 규칙 선택",
+    "en": "Choose rule to edit",
+    "zh": "选择要编辑的规则"
+  },
+  "popup": {
+    "ko": "팝업 안내 문구 입력",
+    "en": "Enter popup message",
+    "zh": "输入弹窗提示内容"
+  },
+  "save_rule": {
+    "ko": "규칙 저장",
+    "en": "Save rule",
+    "zh": "保存规则"
+  },
+  "render": {
+    "ko": "Render에서 |6 → e1 입력",
+    "en": "Enter |6 → e1 in Render",
+    "zh": "在 Render 输入 |6 → e1"
+  },
+  "compression": {
+    "ko": "원본 / ZIP 선택",
+    "en": "Choose original / ZIP",
+    "zh": "选择原始文件 / ZIP"
+  }
 }

@@ -62,6 +62,7 @@ def _settings_document(settings: AppSettings) -> dict[str, Any]:
     # references live in an extension table that those releases can ignore.
     for role in ("can", "diag"):
         document.pop(role + "_hardware_baseline", None)
+    document.pop("ethernet_compression", None)  # Older v2 releases ignore the extension table.
     document["next_index"] = str(settings.next_index)
     return document
 
@@ -79,6 +80,8 @@ class Repository:
             self._connection.execute("PRAGMA journal_mode=WAL")
             self._connection.execute("PRAGMA synchronous=FULL")
             self._initialize()
+            self._connection.execute("CREATE TABLE IF NOT EXISTS storage_preferences "
+                                     "(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             self._connection.execute("CREATE TABLE IF NOT EXISTS hardware_references "
                                      "(role TEXT PRIMARY KEY, cfg TEXT NOT NULL, document TEXT NOT NULL)")
             self._connection.execute("CREATE TABLE IF NOT EXISTS settings_migrations "
@@ -167,6 +170,9 @@ class Repository:
                                                  (role,)).fetchone()
             key = role + "_hardware_baseline"
             document[key] = reference["document"] if reference and reference["cfg"] == document.get(role + "_cfg", "") else ""
+        compression = self._connection.execute("SELECT value FROM storage_preferences WHERE key=?",
+                                                ("ethernet_compression",)).fetchone()
+        document["ethernet_compression"] = compression["value"] if compression else "none"
         document["ethernet_buffer_mib"] = "64"  # Fixed application buffer; ignore legacy UI tuning.
         document.update(next_index=int(row["next_index"]), version=row["version"])
         return AppSettings(**document)
@@ -174,6 +180,9 @@ class Repository:
     @staticmethod
     def _write_settings(connection: sqlite3.Connection, settings: AppSettings) -> None:
         settings = replace(settings, ethernet_buffer_mib="64")
+        connection.execute("INSERT INTO storage_preferences VALUES(?,?) ON CONFLICT(key) "
+                           "DO UPDATE SET value=excluded.value",
+                           ("ethernet_compression", settings.ethernet_compression))
         for role in ("can", "diag"):
             connection.execute("INSERT INTO hardware_references VALUES(?,?,?) ON CONFLICT(role) "
                                "DO UPDATE SET cfg=excluded.cfg,document=excluded.document",
@@ -263,7 +272,7 @@ class Repository:
         Capture preparation still performs full filesystem/tool validation.
         """
         allowed = {"can_cfg", "diag_cfg", "tshark_path", "output_dir", "nic_id",
-                   "language", "ethernet_format", "ethernet_buffer_mib", "can_logging_block", "diag_logging_block", "monitor_rules_json",
+                   "language", "ethernet_format", "ethernet_compression", "ethernet_buffer_mib", "can_logging_block", "diag_logging_block", "monitor_rules_json",
                    "can_hardware_baseline", "diag_hardware_baseline"}
         if not isinstance(patch, dict) or set(patch) - allowed:
             raise RepositoryError("Unsupported connection preference fields")
@@ -274,6 +283,8 @@ class Repository:
             raise RepositoryError("Unsupported display language")
         if "ethernet_format" in patch and patch["ethernet_format"] not in {"pcap", "pcapng"}:
             raise RepositoryError("Unsupported Ethernet file format")
+        if "ethernet_compression" in patch and patch["ethernet_compression"] not in {"none", "zip"}:
+            raise RepositoryError("Unsupported Ethernet compression")
         if "ethernet_buffer_mib" in patch:
             from vil_logging.diagnostics.capture_quality import validate_buffer
             validate_buffer(patch["ethernet_buffer_mib"])

@@ -13,7 +13,7 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#304
 @media(max-width:650px){main{padding:22px 18px 50px}h1{font-size:25px}h2{font-size:21px}.grid{grid-template-columns:1fr}.testcase{padding:17px 14px}.panel{padding:16px}.full{grid-column:auto}table{min-width:560px}}
 @media print{@page{size:A4;margin:16mm}body,main{background:white}main{max-width:none;padding:0}body{font-size:10pt;line-height:1.6}h1{font-size:21pt}h2{font-size:15pt;break-after:avoid}h3{font-size:12pt;break-after:avoid}.toolbar,.tc-nav,#notice,.save-note{display:none}.testcase{border:1px solid #bbb;padding:12px;margin:15px 0;break-inside:auto}.result-form{break-inside:avoid}table{font-size:9pt;min-width:0}tr{break-inside:avoid}thead{display:table-header-group}.table-scroll{overflow:visible}input,textarea,select{font-size:9pt;border-color:#bbb}li{break-inside:avoid}code{overflow-wrap:anywhere}}
 </style></head><body><main id="top"><h1>One Click Log 실차 시험서</h1>
-<p>기준 SW 0.9.21 · 개정 2026-10-25.1 · 검토일 2026-10-25 · 시간대 Asia/Seoul</p>
+<p>기준 SW 0.9.22 · 개정 2026-10-25.2 · 검토일 2026-10-25 · 시간대 Asia/Seoul</p>
 <p>이 시험서는 실제 PC·장비·차량에서 기록, 데이터 확인, 이상 정지와 재실행을 검증하는 절차다. 모든 TC의 초기 결과는 미실행이다. 정상 파일 보관과 실제 수신 무손실은 별도로 판정한다. 정차 정상 기록부터 확인한 뒤 이상·장시간 시험으로 넓힌다.</p>
 <p>버그리포트 ZIP과 TC별 실제 결과를 함께 전달하면 명령 순서·상태 전이·오류·보관 과정을 분석할 수 있다. 프레임 누락·신호·진단 왕복은 해당 BLF·PCAP/PCAPNG와 비교 기준도 필요하다. ZIP만으로 모든 시험의 수행 여부와 무손실을 확정할 수는 없다.</p>
 <section class="panel" aria-label="현장 시험 결과 입력"><h2>현장 결과 입력</h2><p class="save-note">입력은 HTML 파일에 저장되지 않습니다. 새로고침·종료 전에 JSON을 저장하세요. ZIP·캡처 파일은 별도로 보관하고 전달하세요.</p><div class="toolbar"><button id="export" type="button">결과 JSON 저장</button><button id="choose-import" type="button">결과 JSON 불러오기</button><input id="import" type="file" accept=".json,application/json" hidden><button id="print" type="button">인쇄</button></div><div id="environment" class="grid"></div><p id="notice" role="status" aria-live="polite">아직 입력한 결과가 없습니다. 모든 TC는 Not Run입니다.</p><p id="summary" class="statusbar"></p><nav id="tc-nav" class="tc-nav" aria-label="TC 바로가기"></nav></section><h2>시험서 사용 방법</h2>
@@ -45,8 +45,8 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#304
 <article class="testcase" id="TC-01"><h3>TC-01 배포물과 진단 저장 준비</h3>
 <ul>
 <li>조건: P0 · 정차 실차 · 약 5분 · 시험 배포물 확보.</li>
-<li>절차: ZIP 전체를 쓰기 가능한 폴더에 푼다. EXE와 사용법을 열고 버전·빌드 ID를 기록한다. 버그리포트를 저장한다.</li>
-<li>기대: 앱·오프라인 가이드와 버전이 대응한다. EXE 옆 developer_logs의 JSONL과 바탕화면 ZIP이 생성된다. 캡처는 자동 시작되지 않는다.</li>
+<li>절차: ZIP 전체를 쓰기 가능한 폴더에 푼다. 앱·CANoe 저장 종료 후 Initial_Setup.bat --check로 검색하고 초기설정을 실행한다. CANoe 19 등록·Npcap 설치/건너뛰기·관리자 승인 취소 결과를 각각 기록한다. EXE와 사용법을 열고 버전·빌드 ID를 기록한다. 버그리포트를 저장한다.</li>
+<li>기대: CANoe 기본 COM 대상이 선택한 19이고 Npcap 준비 상태를 별도로 표시한다. 취소/누락/서명 실패를 성공으로 표시하지 않는다. 앱·오프라인 가이드와 버전이 대응한다. EXE 옆 developer_logs의 JSONL과 바탕화면 ZIP이 생성된다. 캡처는 자동 시작되지 않는다.</li>
 <li>증빙·복구: 빌드 정보·최초 ZIP·저장 위치. 진단 저장 실패부터 해결한다.</li>
 </ul>
 </article>
@@ -208,9 +208,9 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#304
 <article class="testcase" id="TC-21"><h3>TC-21 PCAP과 PCAPNG</h3>
 <ul>
 <li>조건: P1 · 정차 실차 · 약 4분 · Zipy 정상 수신.</li>
-<li>절차: pcap 한 구간 보관 후 pcapng 한 구간 기록. Wireshark/capinfos로 실제 형식을 본다. 형식 변경 후 직전 파일 이름 변경도 확인.</li>
-<li>기대: 선택 형식·확장자 일치. 이전 파일을 자동 변환하거나 확장자만 바꾸지 않는다. 이름 변경에도 원래 형식 유지.</li>
-<li>증빙·복구: 두 원본·형식 검사·ZIP. 기본 형식으로 복구.</li>
+<li>절차: pcap/pcapng 각각 원본 저장과 정지 후 ZIP 압축으로 짧은 구간을 기록한다(4조합). 설정 재실행 유지·기록 중 설정 잠금을 확인한다. ZIP을 풀어 Wireshark/capinfos로 실제 형식·패킷 수를 확인한다. ZIP 이름 변경·삭제·기존 이름 충돌 보존도 확인한다. 격리된 시험 폴더에서 압축 실패·저장 공간 부족 시 원본 보존과 완료 오표시 방지를 확인한다.</li>
+<li>기대: 선택 형식·확장자 일치. ZIP에는 원본 캡처 하나가 있고 풀어 읽을 수 있다. 압축은 정지 후 이루어지고 보관 확정 뒤 원본이 정리된다. 압축 실패는 원본을 보존한다. X/강제 종료 중단 구간 정리는 기존 정책을 따른다. 이전 파일 자동 변환 없음. 이름 변경에도 형식·.zip 유지.</li>
+<li>증빙·복구: 4조합 파일·패킷 수·설정·실패 상태·버그리포트. 기본 pcap/원본 저장으로 복구.</li>
 </ul>
 </article>
 <article class="testcase" id="TC-22"><h3>TC-22 기준 외 Source의 원본 저장</h3>
@@ -471,7 +471,7 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#304
 <p>캡처·진단 순환 로그·내보낸 ZIP·설정 이력 DB는 서로 다른 저장물이다. 캡처는 지정 저장 폴더에 보관하고 25 MiB 진단 한도를 적용하지 않는다. 설정·다음 번호·이력 DB 기본 위치는 <code>%LOCALAPPDATA%/One Click Log/state.sqlite3</code>다. DB 메타데이터는 시작 때 기본 90일·이벤트 10000건·완료 세션 1000건 기준으로 일부를 history_archive의 jsonl.gz에 검증 저장한 뒤 정리한다. 최근 이벤트 500건·완료 세션 100건과 미완료/실패/진행 중·보호 이력은 유지한다. 이 정리는 캡처 원본을 지우지 않으며 DB·아카이브도 ZIP에 자동 포함하지 않는다.</p>
 <h2>구현 근거와 확인 범위</h2>
 <ul>
-<li>src/vil_logging/__init__.py: 기준 SW 0.9.21.</li>
+<li>src/vil_logging/__init__.py: 기준 SW 0.9.22.</li>
 <li>src/vil_logging/app.py: 진단 활성화·경로·Windows 바탕화면·오류 표시·종료 연결.</li>
 <li>src/vil_logging/diagnostics/debug_log.py: 5 MiB·4백업·4096 큐·가림·스냅샷·검증·flush.</li>
 <li>src/vil_logging/runtime.py: 준비·번호 예약·전체 이상 정지·파일 보관·재실행 정리.</li>
@@ -484,7 +484,7 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#304
 </ul>
 <p>이번 작업은 시험 설계·기록 양식 작성이다. 실제 차량/VN 장비를 연결해 위 TC를 수행한 결과는 아니다.</p><section class="panel"><h2>종합 판정 기록</h2><label class="field">미해결 결함 · 데이터 무손실과 60분 및 1 GiB 개별 판정 · 다음 시험 범위 · 판단자와 판단일<textarea id="conclusion" rows="4"></textarea></label><div class="toolbar"><button id="export-bottom" type="button">결과 JSON 저장</button><a href="#top">문서 처음으로</a></div></section></main><script>
 'use strict';
-const meta={"schema": "one-click-log-vehicle-test-results-v1", "document_revision": "2026-10-25.1", "reference_app_version": "0.9.21", "source_sha256": "bb0a078707c12147723a918fb24edc9439639355da5a5da96213623021d46c51"};
+const meta={"schema": "one-click-log-vehicle-test-results-v1", "document_revision": "2026-10-25.2", "reference_app_version": "0.9.22", "source_sha256": "0f3f1e297ee1e33dfd6e2e207abcf519e2a0fb9ce802f297eca2c40d16f7aee1"};
 const fields=[['run_id','시험 회차 ID'],['tester','시험자'],['date_timezone','시험일과 시간대'],['actual_version_build','실제 EXE 버전과 빌드 ID'],['artifact_hash','배포 ZIP 또는 EXE SHA256'],['pc_windows','PC 별칭과 Windows 빌드'],['vehicle_ecu','차량 별칭과 ECU SW 버전'],['canoe_vector','CANoe 옵션·Vector 드라이버와 장비'],['can_config','CAN cfg 별칭·BLF 블록·채널'],['diag_config','Diag cfg 별칭·BLF 블록·채널'],['comparison_reference','동일 버스 비교 근거와 DBC 버전'],['nic','NIC 이름·식별자·포트'],['capture_tools','TShark와 Npcap 버전'],['zipy_rules','실제 Zipy 규칙·시간·최소 pps'],['storage','저장 위치 별칭·prefix·최초 번호'],['capacity','초기 여유와 예상 기록량'],['scenario','환경과 승인된 시험 시나리오']];
 const statuses=['Not Run','Pass','Fail','Blocked','N/A'];
 const cases=[...document.querySelectorAll('article.testcase')].map(el=>({id:el.id,title:el.querySelector('h3').textContent,definition:el.innerText}));
@@ -504,6 +504,6 @@ document.getElementById('export').addEventListener('click',download);
 document.getElementById('export-bottom').addEventListener('click',download);
 document.getElementById('choose-import').addEventListener('click',()=>document.getElementById('import').click());
 document.getElementById('print').addEventListener('click',()=>window.print());
-document.getElementById('import').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{if(dirty&&!window.confirm('현재 입력을 바꿉니다. 이전 결과 JSON을 저장했는지 확인하세요. 계속 불러올까요?'))return;if(f.size>5*1024*1024)throw Error('결과 파일은 5 MiB 이하여야 합니다.');const data=JSON.parse(await f.text());if(data.schema!==meta.schema||!['2026-10-24.1',meta.document_revision].includes(data.document_revision)||!Array.isArray(data.results)||data.results.length!==cases.length||!data.environment||typeof data.environment!=='object')throw Error('이 시험서와 일치하는 결과 JSON이 아닙니다.');const ids=new Set();for(const row of data.results){if(!row||!cases.some(tc=>tc.id===row.id&&tc.title===row.title)||ids.has(row.id)||!statuses.includes(row.status))throw Error('TC 또는 상태가 올바르지 않습니다.');ids.add(row.id);for(const [key] of resultFields)if(typeof row[key]!=='string')throw Error('TC 입력값이 올바르지 않습니다.');}for(const [key]of fields)if(typeof data.environment[key]!=='string')throw Error('환경 입력값이 올바르지 않습니다.');if(typeof data.conclusion!=='string')throw Error('종합 판정이 올바르지 않습니다.');for(const el of environment.querySelectorAll('[data-field]'))el.value=data.environment[el.dataset.field];for(const row of data.results){for(const el of document.getElementById(row.id).querySelectorAll('[data-field]')){el.value=row[el.dataset.field];fit(el);}}document.getElementById('conclusion').value=data.conclusion;fit(document.getElementById('conclusion'));summary();dirty=false;document.getElementById('notice').textContent='불러오기 완료: '+f.name;}catch(err){document.getElementById('notice').textContent='불러오기 실패: '+err.message;}finally{e.target.value='';}});
+document.getElementById('import').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{if(dirty&&!window.confirm('현재 입력을 바꿉니다. 이전 결과 JSON을 저장했는지 확인하세요. 계속 불러올까요?'))return;if(f.size>5*1024*1024)throw Error('결과 파일은 5 MiB 이하여야 합니다.');const data=JSON.parse(await f.text());if(data.schema!==meta.schema||!['2026-10-24.1','2026-10-25.1',meta.document_revision].includes(data.document_revision)||!Array.isArray(data.results)||data.results.length!==cases.length||!data.environment||typeof data.environment!=='object')throw Error('이 시험서와 일치하는 결과 JSON이 아닙니다.');const ids=new Set();for(const row of data.results){if(!row||!cases.some(tc=>tc.id===row.id&&tc.title===row.title)||ids.has(row.id)||!statuses.includes(row.status))throw Error('TC 또는 상태가 올바르지 않습니다.');ids.add(row.id);for(const [key] of resultFields)if(typeof row[key]!=='string')throw Error('TC 입력값이 올바르지 않습니다.');}for(const [key]of fields)if(typeof data.environment[key]!=='string')throw Error('환경 입력값이 올바르지 않습니다.');if(typeof data.conclusion!=='string')throw Error('종합 판정이 올바르지 않습니다.');for(const el of environment.querySelectorAll('[data-field]'))el.value=data.environment[el.dataset.field];for(const row of data.results){for(const el of document.getElementById(row.id).querySelectorAll('[data-field]')){el.value=row[el.dataset.field];fit(el);}}document.getElementById('conclusion').value=data.conclusion;fit(document.getElementById('conclusion'));summary();dirty=false;document.getElementById('notice').textContent='불러오기 완료: '+f.name;}catch(err){document.getElementById('notice').textContent='불러오기 실패: '+err.message;}finally{e.target.value='';}});
 window.addEventListener('beforeprint',()=>document.querySelectorAll('textarea').forEach(fit));summary();
 </script></body></html>
